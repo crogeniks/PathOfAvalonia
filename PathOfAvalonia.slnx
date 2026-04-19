@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/TreeApp/">
+    <Project Path="src/TreeApp/PathOfAvalonia.TreeApp.csproj" />
+  </Folder>
+  <Folder Name="/src/TreeDomain/">
+    <Project Path="src/TreeDomain/PathOfAvalonia.TreeDomain.csproj" />
+  </Folder>
+</Solution>
