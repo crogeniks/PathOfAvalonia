@@ -1,0 +1,29 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.cs]
+indent_size = 4
+
+# Always require an explicit access modifier on members (IDE0040).
+dotnet_style_require_accessibility_modifiers = always:warning
+dotnet_diagnostic.IDE0040.severity = warning
+
+# Always require braces, even on single-line blocks (IDE0011).
+csharp_prefer_braces = true:warning
+dotnet_diagnostic.IDE0011.severity = warning
+
+# Prefer `var` for local variables (IDE0007 / IDE0008).
+csharp_style_var_for_built_in_types = true:warning
+csharp_style_var_when_type_is_apparent = true:warning
+csharp_style_var_elsewhere = true:warning
+dotnet_diagnostic.IDE0007.severity = warning
+dotnet_diagnostic.IDE0008.severity = suggestion
+
+[*.{xml,axaml,csproj,props,targets,json}]
+indent_size = 2

@@ -1,0 +1,7 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="PathOfAvalonia.TreeApp.MainWindow"
+        Width="1280" Height="800"
+        Title="PathOfAvalonia — passive tree PoC">
+    <Grid Name="Root" Background="#101018" />
+</Window>
