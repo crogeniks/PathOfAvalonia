@@ -24,6 +24,14 @@
 
   <ItemGroup>
     <AvaloniaResource Include="..\..\assets\tree_3_28.json" Link="Assets/tree_3_28.json" />
+    <AvaloniaResource Include="..\..\assets\sprites_3_28.json" Link="Assets/sprites_3_28.json" />
     <AvaloniaResource Include="..\..\assets\background_3_28.png" Link="Assets/background_3_28.png" />
+    <AvaloniaResource Include="..\..\assets\skills-3.jpg" Link="Assets/skills-3.jpg" />
+    <AvaloniaResource Include="..\..\assets\skills-disabled-3.jpg" Link="Assets/skills-disabled-3.jpg" />
+    <AvaloniaResource Include="..\..\assets\frame-3.png" Link="Assets/frame-3.png" />
+    <AvaloniaResource Include="..\..\assets\mastery-3.png" Link="Assets/mastery-3.png" />
+    <AvaloniaResource Include="..\..\assets\mastery-connected-3.png" Link="Assets/mastery-connected-3.png" />
+    <AvaloniaResource Include="..\..\assets\mastery-active-selected-3.png" Link="Assets/mastery-active-selected-3.png" />
+    <AvaloniaResource Include="..\..\assets\mastery-disabled-3.png" Link="Assets/mastery-disabled-3.png" />
   </ItemGroup>
 </Project>
