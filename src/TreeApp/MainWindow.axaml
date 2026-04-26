@@ -1,7 +1,40 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:PathOfAvalonia.TreeApp"
         x:Class="PathOfAvalonia.TreeApp.MainWindow"
         Width="1280" Height="800"
         Title="PathOfAvalonia — passive tree PoC">
-    <Grid Name="Root" Background="#101018" />
+    <TabControl Background="#101018">
+        <TabItem Header="Passive Tree">
+            <Grid Name="Root" Background="#101018">
+                <Border HorizontalAlignment="Right" VerticalAlignment="Top"
+                        Margin="12" Padding="10"
+                        Background="#CC1A1A24" CornerRadius="6"
+                        BorderBrush="#3A3A4A" BorderThickness="1">
+                    <StackPanel Orientation="Vertical" Spacing="6" Width="360">
+                        <TextBlock Text="Class" Foreground="#EAEAEA" FontWeight="Bold"/>
+                        <ComboBox Name="ClassSelector" HorizontalAlignment="Stretch"/>
+                        <TextBlock Text="Import build" Foreground="#EAEAEA" FontWeight="Bold"
+                                   Margin="0,6,0,0"/>
+                        <TextBlock Text="Paste a PoE tree URL or a PoB build code:"
+                                   Foreground="#AAAACC" FontSize="11"/>
+                        <TextBox Name="ImportInput"
+                                 AcceptsReturn="False"
+                                 TextWrapping="NoWrap"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                                 PlaceholderText="https://www.pathofexile.com/passive-skill-tree/... or PoB code"/>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Button Name="ImportButton" Content="Import"/>
+                            <Button Name="ClearButton" Content="Clear"/>
+                            <TextBlock Name="ImportStatus" Foreground="#CCCCDD"
+                                       VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </TabItem>
+        <TabItem Header="Equipment">
+            <local:EquipmentView Name="EquipmentView"/>
+        </TabItem>
+    </TabControl>
 </Window>

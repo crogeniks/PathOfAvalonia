@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PathOfAvalonia.TreeApp.EquipmentView"
+             Background="#101018">
+    <Grid>
+        <TextBlock Name="EmptyMessage"
+                   Text="Import a build to see equipment."
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Foreground="#AAAACC" FontSize="16"/>
+        <ScrollViewer Name="Scroller" IsVisible="False"
+                      HorizontalScrollBarVisibility="Disabled">
+            <WrapPanel Name="ItemsPanel" Margin="8" Orientation="Horizontal"/>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
