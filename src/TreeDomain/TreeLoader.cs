@@ -53,6 +53,16 @@ public static class TreeLoader
             var y = grp.Y - Math.Cos(angle) * radius;
 
             var type = ClassifyNode(nd);
+            IReadOnlyList<MasteryEffect>? effects = null;
+            if (nd.MasteryEffects is { Length: > 0 } meArr)
+            {
+                var list = new List<MasteryEffect>(meArr.Length);
+                foreach (var me in meArr)
+                {
+                    list.Add(new MasteryEffect(me.Effect, me.Stats ?? Array.Empty<string>()));
+                }
+                effects = list;
+            }
             nodes[nd.Id] = new Node
             {
                 Id = nd.Id,
@@ -60,7 +70,12 @@ public static class TreeLoader
                 Type = type,
                 X = x,
                 Y = y,
+                Icon = nd.Icon,
+                ActiveIcon = nd.ActiveIcon,
+                InactiveIcon = nd.InactiveIcon,
                 AscendancyName = nd.AscendancyName,
+                ClassStartIndex = nd.ClassStartIndex,
+                MasteryEffects = effects,
             };
             orbitInfo[nd.Id] = (nd.Group.Value, orbit, grp.X, grp.Y, angle, radius);
         }
@@ -260,6 +275,9 @@ public static class TreeLoader
     {
         [JsonPropertyName("id")] public int Id { get; set; }
         [JsonPropertyName("name")] public string? Name { get; set; }
+        [JsonPropertyName("icon")] public string? Icon { get; set; }
+        [JsonPropertyName("activeIcon")] public string? ActiveIcon { get; set; }
+        [JsonPropertyName("inactiveIcon")] public string? InactiveIcon { get; set; }
         [JsonPropertyName("group")] public int? Group { get; set; }
         [JsonPropertyName("orbit")] public int? Orbit { get; set; }
         [JsonPropertyName("orbitIndex")] public int? OrbitIndex { get; set; }
@@ -273,5 +291,12 @@ public static class TreeLoader
         [JsonPropertyName("isAscendancyStart")] public bool IsAscendancyStart { get; set; }
         [JsonPropertyName("ascendancyName")] public string? AscendancyName { get; set; }
         [JsonPropertyName("classStartIndex")] public int? ClassStartIndex { get; set; }
+        [JsonPropertyName("masteryEffects")] public MasteryEffectDto[]? MasteryEffects { get; set; }
+    }
+
+    private sealed class MasteryEffectDto
+    {
+        [JsonPropertyName("effect")] public int Effect { get; set; }
+        [JsonPropertyName("stats")] public string[]? Stats { get; set; }
     }
 }

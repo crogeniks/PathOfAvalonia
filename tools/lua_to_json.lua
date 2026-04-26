@@ -1,17 +1,18 @@
 -- Converts PoB tree.lua to a slim JSON for the Avalonia port.
--- Keeps only the fields the PoC needs: node id/position/flags/edges,
+-- Keeps only the fields the PoC needs: node id/position/flags/edges/icon,
 -- group x/y/orbits, and orbit constants.
+--
+-- Optionally converts sprites.lua → sprites JSON (atlas filenames + UV coords)
+-- when called as: lua lua_to_json.lua tree.lua tree.json sprites.lua sprites.json
 
-local inPath = arg[1]
-local outPath = arg[2]
-if not inPath or not outPath then
-    io.stderr:write("usage: lua lua_to_json.lua <tree.lua> <out.json>\n")
+local treeIn  = arg[1]
+local treeOut = arg[2]
+local sprIn   = arg[3]
+local sprOut  = arg[4]
+if not treeIn or not treeOut then
+    io.stderr:write("usage: lua lua_to_json.lua <tree.lua> <tree.json> [<sprites.lua> <sprites.json>]\n")
     os.exit(1)
 end
-
-local chunk, err = loadfile(inPath)
-if not chunk then error(err) end
-local tree = chunk()
 
 -- tiny JSON encoder (no external deps)
 local enc
@@ -60,7 +61,18 @@ enc = function(v)
     error('cannot encode ' .. t)
 end
 
--- Slim the groups
+local function writeJson(path, value)
+    local f = assert(io.open(path, 'w'))
+    f:write(enc(value))
+    f:close()
+end
+
+-- ---------- tree ----------
+
+local chunk, err = loadfile(treeIn)
+if not chunk then error(err) end
+local tree = chunk()
+
 local groups = {}
 for gid, g in pairs(tree.groups or {}) do
     groups[tostring(gid)] = {
@@ -70,7 +82,6 @@ for gid, g in pairs(tree.groups or {}) do
     }
 end
 
--- Slim the nodes
 local function asIntList(t)
     if not t then return {} end
     local out = {}
@@ -86,9 +97,23 @@ for key, n in pairs(tree.nodes or {}) do
     if key ~= 'root' then
         local id = tonumber(key) or tonumber(n.skill)
         if id then
+            local masteryEffects
+            if n.isMastery and type(n.masteryEffects) == 'table' then
+                masteryEffects = {}
+                for i, me in ipairs(n.masteryEffects) do
+                    local stats = {}
+                    if type(me.stats) == 'table' then
+                        for _, s in ipairs(me.stats) do stats[#stats + 1] = s end
+                    end
+                    masteryEffects[i] = { effect = me.effect, stats = stats }
+                end
+            end
             nodes[tostring(id)] = {
                 id = id,
                 name = n.name,
+                icon = n.icon,
+                activeIcon = n.activeIcon,
+                inactiveIcon = n.inactiveIcon,
                 group = n.group,
                 orbit = n.orbit,
                 orbitIndex = n.orbitIndex,
@@ -102,6 +127,7 @@ for key, n in pairs(tree.nodes or {}) do
                 ascendancyName = n.ascendancyName,
                 classStartIndex = n.classStartIndex,
                 isAscendancyStart = n.isAscendancyStart or false,
+                masteryEffects = masteryEffects,
             }
         end
     end
@@ -120,11 +146,51 @@ local slim = {
     nodes = nodes,
 }
 
-local f = assert(io.open(outPath, 'w'))
-f:write(enc(slim))
-f:close()
+writeJson(treeOut, slim)
 
 local nCount, gCount = 0, 0
 for _ in pairs(nodes) do nCount = nCount + 1 end
 for _ in pairs(groups) do gCount = gCount + 1 end
-io.stderr:write(string.format('wrote %s : %d nodes, %d groups\n', outPath, nCount, gCount))
+io.stderr:write(string.format('wrote %s : %d nodes, %d groups\n', treeOut, nCount, gCount))
+
+-- ---------- sprites ----------
+
+if sprIn and sprOut then
+    local sChunk, sErr = loadfile(sprIn)
+    if not sChunk then error(sErr) end
+    local spritesFile = sChunk()
+    local rawSprites = spritesFile.sprites or spritesFile
+    -- PoB strips ?hash suffix and directory prefix to get local filename.
+    local function localName(url)
+        return (url:gsub('%?%x+$', '')):gsub('.*/', '')
+    end
+    -- Atlases we actually use (icons + frames + masteries). Excludes bloodlines,
+    -- ascendancy WebP, tattoo/active-effect layers — all deferred to later.
+    local wanted = {
+        'normalActive', 'normalInactive',
+        'notableActive', 'notableInactive',
+        'keystoneActive', 'keystoneInactive',
+        'mastery', 'masteryInactive', 'masteryConnected', 'masteryActiveSelected',
+        'frame',
+    }
+    local atlases = {}
+    local totalCoords = 0
+    for _, key in ipairs(wanted) do
+        local a = rawSprites[key]
+        if a then
+            local coords = {}
+            for name, c in pairs(a.coords or {}) do
+                coords[name] = { x = c.x, y = c.y, w = c.w, h = c.h }
+                totalCoords = totalCoords + 1
+            end
+            atlases[key] = {
+                file = localName(a.filename or ''),
+                w = a.w,
+                h = a.h,
+                coords = coords,
+            }
+        end
+    end
+    writeJson(sprOut, { atlases = atlases })
+    io.stderr:write(string.format('wrote %s : %d atlases, %d coords total\n', sprOut, #wanted, totalCoords))
+end
