@@ -14,6 +14,9 @@ public sealed class PassiveTreeView : Control
 {
     private readonly TreeModel _tree;
     private readonly PassiveSpec _spec;
+    private readonly SpriteMap _sprites;
+    // One Bitmap per unique atlas filename (multiple atlas keys share a file).
+    private readonly Dictionary<string, Bitmap> _atlasBitmaps = new();
 
     // View transform (tree-space → screen-space): screen = tree * scale + offset
     private double _scale = 0.05;
@@ -30,6 +33,8 @@ public sealed class PassiveTreeView : Control
     private bool _panMoved;
 
     private int? _hoverNodeId;
+    private HoverPath _hoverPath = HoverPath.Empty;
+    private HashSet<int> _hoverPathNodes = new();
 
     private readonly Bitmap? _bgTile;
     private const double BgTileScreen = 98; // tile size in screen-px (matches PoB asset, no zoom scaling)
@@ -37,30 +42,68 @@ public sealed class PassiveTreeView : Control
     // Tree-space sizes: scaled by _scale into screen-px each frame so they all
     // shrink together when the user zooms out.
     private const double NodeRadius = 45;
-    private const double HitRadius = 75;
     private const double ConnectorThicknessTree = 18;
+    // PoB draws each sprite at (atlas_px * SpriteDisplayScale) tree-units per half-dimension
+    // (`DrawAsset` in PassiveTreeView.lua uses data.width * scale * 1.33, rect spans 2x).
+    private const double SpriteDisplayScale = 1.33;
+
+    // Hit-test radii (tree-units) per node type. From PoB's nodeOverlay.artWidth * 1.33
+    // (PassiveTree.lua:387–438). Squared here to skip the sqrt in the loop.
+    private static readonly double HitRsqNormal   = Sq(40 * SpriteDisplayScale);
+    private static readonly double HitRsqNotable  = Sq(58 * SpriteDisplayScale);
+    private static readonly double HitRsqKeystone = Sq(84 * SpriteDisplayScale);
+    private static readonly double HitRsqSocket   = Sq(58 * SpriteDisplayScale);
+    private static readonly double HitRsqMastery  = Sq(65 * SpriteDisplayScale);
+    private static double Sq(double x) => x * x;
 
     // Cached brushes
     private static readonly IBrush BgBrush = new SolidColorBrush(Color.FromRgb(0x10, 0x10, 0x18));
     private static readonly IBrush NormalBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x60));
     private static readonly IBrush AllocatedBrush = new SolidColorBrush(Color.FromRgb(0xff, 0xc8, 0x4a));
-    private static readonly IBrush NotableBrush = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x90));
-    private static readonly IBrush KeystoneBrush = new SolidColorBrush(Color.FromRgb(0xc0, 0x80, 0x40));
-    private static readonly IBrush MasteryBrush = new SolidColorBrush(Color.FromRgb(0x40, 0x80, 0xc0));
-    private static readonly IBrush JewelBrush = new SolidColorBrush(Color.FromRgb(0xc0, 0xc0, 0x40));
     private static readonly IBrush ConnectorBrush = new SolidColorBrush(Color.FromRgb(0x40, 0x40, 0x48));
-    // Node outlines stay in screen-px so nodes always have a crisp border at any zoom.
+    private static readonly IBrush HoverPathBrush = new SolidColorBrush(Color.FromArgb(0x80, 0xff, 0xc8, 0x4a));
     private static readonly IPen NodeOutlinePen = new Pen(Brushes.Black, 1.5);
-    private static readonly IPen HoverOutlinePen = new Pen(new SolidColorBrush(Color.FromRgb(0xff, 0xff, 0xff)), 2.5);
 
-    public PassiveTreeView(TreeModel tree, PassiveSpec spec)
+    public PassiveTreeView(TreeModel tree, PassiveSpec spec, SpriteMap sprites)
     {
         _tree = tree;
         _spec = spec;
+        _sprites = sprites;
         ClipToBounds = true;
         Focusable = true;
-        _spec.SpecChanged += () => InvalidateVisual();
+        _spec.SpecChanged += () =>
+        {
+            if (_hoverNodeId is { } id)
+            {
+                _hoverPath = _spec.HoverPathTo(id);
+                _hoverPathNodes = new HashSet<int>(_hoverPath.Nodes);
+            }
+            InvalidateVisual();
+        };
         _bgTile = TryLoadBackground(tree.Version);
+        LoadAtlasBitmaps();
+    }
+
+    private void LoadAtlasBitmaps()
+    {
+        foreach (var atlas in _sprites.Atlases.Values)
+        {
+            if (_atlasBitmaps.ContainsKey(atlas.File))
+            {
+                continue;
+            }
+            var uri = new Uri($"avares://PathOfAvalonia.TreeApp/Assets/{atlas.File}");
+            try
+            {
+                using var s = AssetLoader.Open(uri);
+                _atlasBitmaps[atlas.File] = new Bitmap(s);
+            }
+            catch
+            {
+                // Missing atlas (e.g. ascendancy WebP on a build without WebP codec)
+                // is non-fatal — affected nodes will simply skip their art.
+            }
+        }
     }
 
     private static Bitmap? TryLoadBackground(string version)
@@ -119,11 +162,24 @@ public sealed class PassiveTreeView : Control
         var connThick = Math.Max(0.5, ConnectorThicknessTree * _scale);
         var connPen = new Pen(ConnectorBrush, connThick);
         var connActivePen = new Pen(AllocatedBrush, connThick);
+        var connHoverPen = new Pen(HoverPathBrush, connThick);
+        var pathEdges = _hoverPath.Edges;
         foreach (var c in _tree.Connectors)
         {
-            var pen = (allocated.Contains(c.FromId) && allocated.Contains(c.ToId))
-                ? connActivePen
-                : connPen;
+            var key = (Math.Min(c.FromId, c.ToId), Math.Max(c.FromId, c.ToId));
+            IPen pen;
+            if (allocated.Contains(c.FromId) && allocated.Contains(c.ToId))
+            {
+                pen = connActivePen;
+            }
+            else if (pathEdges.Contains(key))
+            {
+                pen = connHoverPen;
+            }
+            else
+            {
+                pen = connPen;
+            }
             switch (c)
             {
                 case LineConnector lc:
@@ -183,40 +239,15 @@ public sealed class PassiveTreeView : Control
     private void DrawNodesAndHud(DrawingContext ctx)
     {
         var allocated = _spec.AllocatedNodes;
-        // Draw nodes
-        var r = NodeRadius * _scale;
         foreach (var n in _tree.Nodes.Values)
         {
             if (n.Type == NodeType.Proxy)
             {
                 continue;
             }
-            var alloc = allocated.Contains(n.Id);
-            var hover = _hoverNodeId == n.Id;
-            var brush = alloc
-                ? AllocatedBrush
-                : n.Type switch
-                {
-                    NodeType.Keystone => KeystoneBrush,
-                    NodeType.Notable => NotableBrush,
-                    NodeType.Mastery => MasteryBrush,
-                    NodeType.JewelSocket => JewelBrush,
-                    NodeType.ClassStart => AllocatedBrush,
-                    NodeType.AscendancyStart => AllocatedBrush,
-                    _ => NormalBrush,
-                };
-
-            var nodeR = n.Type switch
-            {
-                NodeType.Keystone => r * 2.0,
-                NodeType.Notable => r * 1.5,
-                NodeType.JewelSocket => r * 1.7,
-                NodeType.Mastery => r * 1.2,
-                NodeType.ClassStart => r * 2.2,
-                _ => r,
-            };
-            var screen = TreeToScreen(n.X, n.Y);
-            ctx.DrawEllipse(brush, hover ? HoverOutlinePen : NodeOutlinePen, screen, nodeR, nodeR);
+            var isHover = _hoverNodeId == n.Id;
+            var onPath = _hoverPathNodes.Contains(n.Id);
+            DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath);
         }
 
         // HUD: alloc count + hover label
@@ -224,16 +255,95 @@ public sealed class PassiveTreeView : Control
         if (HoverNode is { } hn)
         {
             hud += $"  •  hover: {hn.Name} [{hn.Type}]";
+            if (hn.Type == NodeType.Mastery && allocated.Contains(hn.Id)
+                && _spec.SelectedMasteryEffect(hn.Id) is { Stats.Count: > 0 } eff)
+            {
+                hud += $"\n    selected: {string.Join(" | ", eff.Stats)}";
+            }
         }
         var ft = new FormattedText(hud, System.Globalization.CultureInfo.CurrentCulture,
             FlowDirection.LeftToRight, Typeface.Default, 14, Brushes.White);
         ctx.DrawText(ft, new Point(8, 8));
     }
 
+    private void DrawNode(DrawingContext ctx, Node n, bool alloc, bool hover)
+    {
+        var screen = TreeToScreen(n.X, n.Y);
+        // Icon: skills atlas (normal/notable/keystone) or mastery atlas.
+        var (iconAtlas, iconPath) = IconSprite(n, alloc, hover: false);
+        if (iconAtlas is not null && iconPath is not null)
+        {
+            DrawSprite(ctx, iconAtlas, iconPath, screen);
+        }
+        // Hover overlay: for masteries, the masteryConnected sprite glows on top of
+        // the base icon rather than replacing it.
+        if (hover && !alloc && n.Type == NodeType.Mastery && n.InactiveIcon is { } ii)
+        {
+            DrawSprite(ctx, "masteryConnected", ii, screen);
+        }
+        // Frame: ornate border. Mastery has no separate frame (baked in).
+        var frameKey = FrameKey(n.Type, alloc, hover);
+        if (frameKey is not null)
+        {
+            DrawSprite(ctx, "frame", frameKey, screen);
+        }
+        // Fallback for node types we haven't wired art for yet (e.g. class start),
+        // so they don't disappear.
+        if (iconAtlas is null && frameKey is null)
+        {
+            var r = NodeRadius * _scale;
+            ctx.DrawEllipse(alloc ? AllocatedBrush : NormalBrush, NodeOutlinePen, screen, r, r);
+        }
+    }
+
+    private void DrawSprite(DrawingContext ctx, string atlasKey, string spriteKey, Point centre)
+    {
+        if (!_sprites.Atlases.TryGetValue(atlasKey, out var atlas))
+        {
+            return;
+        }
+        if (!atlas.Coords.TryGetValue(spriteKey, out var rect))
+        {
+            return;
+        }
+        if (!_atlasBitmaps.TryGetValue(atlas.File, out var bmp))
+        {
+            return;
+        }
+        var halfW = rect.W * SpriteDisplayScale * _scale;
+        var halfH = rect.H * SpriteDisplayScale * _scale;
+        var dst = new Rect(centre.X - halfW, centre.Y - halfH, halfW * 2, halfH * 2);
+        var src = new Rect(rect.X, rect.Y, rect.W, rect.H);
+        ctx.DrawImage(bmp, src, dst);
+    }
+
+    private static (string? atlas, string? path) IconSprite(Node n, bool alloc, bool hover) => n.Type switch
+    {
+        NodeType.Normal => (alloc ? "normalActive" : "normalInactive", n.Icon),
+        NodeType.Notable => (alloc ? "notableActive" : "notableInactive", n.Icon),
+        NodeType.Keystone => (alloc ? "keystoneActive" : "keystoneInactive", n.Icon),
+        // Clickable masteries (those with InactiveIcon/ActiveIcon) live in dedicated
+        // per-state atlases. The plain `mastery` sheet only carries static cluster
+        // decorations (no effect — e.g. Atlas Tree charm masteries).
+        NodeType.Mastery when alloc && n.ActiveIcon is not null => ("masteryActiveSelected", n.ActiveIcon),
+        NodeType.Mastery when n.InactiveIcon is not null => ("masteryInactive", n.InactiveIcon),
+        NodeType.Mastery => ("mastery", n.Icon),
+        _ => (null, null),
+    };
+
+    private static string? FrameKey(NodeType type, bool alloc, bool hover) => type switch
+    {
+        NodeType.Normal => alloc ? "PSSkillFrameActive" : hover ? "PSSkillFrameHighlighted" : "PSSkillFrame",
+        NodeType.Notable => alloc ? "NotableFrameAllocated" : hover ? "NotableFrameCanAllocate" : "NotableFrameUnallocated",
+        NodeType.Keystone => alloc ? "KeystoneFrameAllocated" : hover ? "KeystoneFrameCanAllocate" : "KeystoneFrameUnallocated",
+        NodeType.JewelSocket => alloc ? "JewelFrameAllocated" : hover ? "JewelFrameCanAllocate" : "JewelFrameUnallocated",
+        _ => null,
+    };
+
     private int? HitTest(Point screen)
     {
         var (tx, ty) = ScreenToTree(screen);
-        var best = HitRadius * HitRadius;
+        var best = double.MaxValue;
         int? bestId = null;
         foreach (var n in _tree.Nodes.Values)
         {
@@ -244,13 +354,15 @@ public sealed class PassiveTreeView : Control
             var dx = tx - n.X;
             var dy = ty - n.Y;
             var d = dx * dx + dy * dy;
-            // Slightly bigger hit radius for big nodes — quick & cheap.
             var rsq = n.Type switch
             {
-                NodeType.Keystone => HitRadius * HitRadius * 4,
-                NodeType.Notable => HitRadius * HitRadius * 2,
-                NodeType.JewelSocket => HitRadius * HitRadius * 2.5,
-                _ => HitRadius * HitRadius,
+                NodeType.Keystone => HitRsqKeystone,
+                NodeType.Notable => HitRsqNotable,
+                NodeType.JewelSocket => HitRsqSocket,
+                NodeType.Mastery => HitRsqMastery,
+                NodeType.ClassStart => HitRsqKeystone,
+                NodeType.AscendancyStart => HitRsqKeystone,
+                _ => HitRsqNormal,
             };
             if (d < rsq && d < best)
             {
@@ -284,6 +396,8 @@ public sealed class PassiveTreeView : Control
         if (hit != _hoverNodeId)
         {
             _hoverNodeId = hit;
+            _hoverPath = hit is { } id ? _spec.HoverPathTo(id) : HoverPath.Empty;
+            _hoverPathNodes = new HashSet<int>(_hoverPath.Nodes);
             HoverChanged?.Invoke();
             InvalidateVisual();
         }
@@ -315,7 +429,16 @@ public sealed class PassiveTreeView : Control
                 var hit = HitTest(e.GetPosition(this));
                 if (hit is { } id)
                 {
-                    _spec.Toggle(id);
+                    if (!_spec.IsAllocated(id) && !_hoverPath.IsEmpty)
+                    {
+                        _spec.AllocateMany(_hoverPath.Nodes);
+                        _hoverPath = HoverPath.Empty;
+                        _hoverPathNodes.Clear();
+                    }
+                    else
+                    {
+                        _spec.Toggle(id);
+                    }
                 }
             }
         }
