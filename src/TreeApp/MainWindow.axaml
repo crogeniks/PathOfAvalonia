@@ -1,7 +1,9 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:PathOfAvalonia.TreeApp"
+        xmlns:vm="clr-namespace:PathOfAvalonia.TreeApp.ViewModels"
         x:Class="PathOfAvalonia.TreeApp.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
         Width="1280" Height="800"
         Title="PathOfAvalonia — passive tree PoC">
     <TabControl Background="#101018">
@@ -13,20 +15,28 @@
                         BorderBrush="#3A3A4A" BorderThickness="1">
                     <StackPanel Orientation="Vertical" Spacing="6" Width="360">
                         <TextBlock Text="Class" Foreground="#EAEAEA" FontWeight="Bold"/>
-                        <ComboBox Name="ClassSelector" HorizontalAlignment="Stretch"/>
+                        <ComboBox ItemsSource="{Binding ClassNames}"
+                                  SelectedIndex="{Binding SelectedClassIndex}"
+                                  HorizontalAlignment="Stretch"/>
                         <TextBlock Text="Import build" Foreground="#EAEAEA" FontWeight="Bold"
                                    Margin="0,6,0,0"/>
                         <TextBlock Text="Paste a PoE tree URL or a PoB build code:"
                                    Foreground="#AAAACC" FontSize="11"/>
                         <TextBox Name="ImportInput"
+                                 Text="{Binding ImportInput}"
                                  AcceptsReturn="False"
                                  TextWrapping="NoWrap"
                                  ScrollViewer.HorizontalScrollBarVisibility="Hidden"
-                                 PlaceholderText="https://www.pathofexile.com/passive-skill-tree/... or PoB code"/>
+                                 PlaceholderText="https://www.pathofexile.com/passive-skill-tree/... or PoB code">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Return" Command="{Binding ImportCommand}"/>
+                            </TextBox.KeyBindings>
+                        </TextBox>
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <Button Name="ImportButton" Content="Import"/>
-                            <Button Name="ClearButton" Content="Clear"/>
-                            <TextBlock Name="ImportStatus" Foreground="#CCCCDD"
+                            <Button Content="Import" Command="{Binding ImportCommand}"/>
+                            <Button Content="Clear" Command="{Binding ClearCommand}"/>
+                            <TextBlock Text="{Binding ImportStatus}"
+                                       Foreground="{Binding ImportStatusForeground}"
                                        VerticalAlignment="Center" TextWrapping="Wrap"/>
                         </StackPanel>
                     </StackPanel>
@@ -34,7 +44,7 @@
             </Grid>
         </TabItem>
         <TabItem Header="Equipment">
-            <local:EquipmentView Name="EquipmentView"/>
+            <local:EquipmentView DataContext="{Binding Equipment}"/>
         </TabItem>
     </TabControl>
 </Window>

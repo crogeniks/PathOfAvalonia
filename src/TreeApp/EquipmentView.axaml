@@ -1,16 +1,107 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PathOfAvalonia.TreeApp.ViewModels"
              x:Class="PathOfAvalonia.TreeApp.EquipmentView"
+             x:DataType="vm:EquipmentViewModel"
              Background="#101018">
     <Grid>
-        <TextBlock Name="EmptyMessage"
-                   Text="Import a build to see equipment."
+        <TextBlock Text="{Binding EmptyMessage}"
+                   IsVisible="{Binding !HasItems}"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
                    Foreground="#AAAACC" FontSize="16"/>
-        <ScrollViewer Name="Scroller" IsVisible="False"
+
+        <ScrollViewer IsVisible="{Binding HasItems}"
                       HorizontalScrollBarVisibility="Disabled">
-            <WrapPanel Name="ItemsPanel" Margin="8" Orientation="Horizontal"/>
+            <ItemsControl ItemsSource="{Binding Items}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Margin="8" Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:ItemViewModel">
+                        <Border Width="260"
+                                Margin="6"
+                                Padding="10"
+                                Background="#141420"
+                                BorderBrush="{Binding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                VerticalAlignment="Top">
+                            <StackPanel Spacing="3">
+
+                                <!-- Slot label -->
+                                <TextBlock Text="{Binding Slot}"
+                                           Foreground="#777799"
+                                           FontSize="10"
+                                           Margin="0,0,0,1"/>
+
+                                <!-- Item name -->
+                                <TextBlock Text="{Binding Name}"
+                                           Foreground="{Binding NameBrush}"
+                                           FontWeight="Bold"
+                                           TextWrapping="Wrap"/>
+
+                                <!-- Base type (only when different from name) -->
+                                <TextBlock Text="{Binding BaseType}"
+                                           IsVisible="{Binding HasSeparateName}"
+                                           Foreground="#AAAAAA"
+                                           FontSize="11"
+                                           TextWrapping="Wrap"/>
+
+                                <!-- Implicit mods -->
+                                <ItemsControl ItemsSource="{Binding Implicits}"
+                                              IsVisible="{Binding HasImplicits}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="vm:ModLineViewModel">
+                                            <TextBlock Text="{Binding Text}"
+                                                       Foreground="{Binding Brush}"
+                                                       FontSize="10"
+                                                       TextWrapping="Wrap"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Separator (always shown between header and body) -->
+                                <Border Height="1"
+                                        Background="{Binding BorderBrush}"
+                                        Margin="0,4,0,4"/>
+
+                                <!-- Explicit mods / body -->
+                                <ItemsControl ItemsSource="{Binding Body}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="vm:ModLineViewModel">
+                                            <TextBlock Text="{Binding Text}"
+                                                       Foreground="{Binding Brush}"
+                                                       FontSize="10"
+                                                       TextWrapping="Wrap"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Status flags (Corrupted, Mirrored, etc.) -->
+                                <Border Height="1"
+                                        Background="{Binding BorderBrush}"
+                                        IsVisible="{Binding HasStatusFlags}"
+                                        Margin="0,4,0,4"/>
+                                <ItemsControl ItemsSource="{Binding StatusFlags}"
+                                              IsVisible="{Binding HasStatusFlags}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="vm:ModLineViewModel">
+                                            <TextBlock Text="{Binding Text}"
+                                                       Foreground="{Binding Brush}"
+                                                       FontSize="10"
+                                                       TextWrapping="Wrap"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </ScrollViewer>
     </Grid>
 </UserControl>
