@@ -76,7 +76,9 @@ public sealed class PassiveTreeView : Control
         foreach (var atlas in _sprites.Atlases.Values)
         {
             if (_atlasBitmaps.ContainsKey(atlas.File))
+            {
                 continue;
+            }
             var uri = new Uri($"avares://PathOfAvalonia.TreeApp/Assets/{atlas.File}");
             try
             {
@@ -109,9 +111,13 @@ public sealed class PassiveTreeView : Control
     private void EnsureViewInitialised()
     {
         if (_viewInitialised)
+        {
             return;
+        }
         if (Bounds.Width <= 0 || Bounds.Height <= 0)
+        {
             return;
+        }
         var b = _vm.Tree.Bounds;
         var sx = Bounds.Width / b.Width;
         var sy = Bounds.Height / b.Height;
@@ -146,11 +152,17 @@ public sealed class PassiveTreeView : Control
             var key = (Math.Min(c.FromId, c.ToId), Math.Max(c.FromId, c.ToId));
             IPen pen;
             if (allocated.Contains(c.FromId) && allocated.Contains(c.ToId))
+            {
                 pen = connActivePen;
+            }
             else if (pathEdges.Contains(key))
+            {
                 pen = connHoverPen;
+            }
             else
+            {
                 pen = connPen;
+            }
 
             switch (c)
             {
@@ -169,7 +181,9 @@ public sealed class PassiveTreeView : Control
     private void DrawBackgroundTile(DrawingContext ctx)
     {
         if (_bgTile is null)
+        {
             return;
+        }
         // Anchor the tile pattern to tree-space (0,0) so it shifts with pan/zoom.
         // Modulo keeps the destination rect close to the visible area; Tile mode
         // fills outward from there.
@@ -212,7 +226,9 @@ public sealed class PassiveTreeView : Control
         foreach (var n in _vm.Tree.Nodes.Values)
         {
             if (n.Type == NodeType.Proxy)
+            {
                 continue;
+            }
             var isHover = _vm.HoverNodeId == n.Id;
             var onPath = _vm.HoverPathNodes.Contains(n.Id);
             DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath);
@@ -240,15 +256,21 @@ public sealed class PassiveTreeView : Control
         // Icon: skills atlas (normal/notable/keystone) or mastery atlas.
         var (iconAtlas, iconPath) = IconSprite(n, alloc, hover: false);
         if (iconAtlas is not null && iconPath is not null)
+        {
             DrawSprite(ctx, iconAtlas, iconPath, screen);
+        }
         // Hover overlay: for masteries, the masteryConnected sprite glows on top of
         // the base icon rather than replacing it.
         if (hover && !alloc && n.Type == NodeType.Mastery && n.InactiveIcon is { } ii)
+        {
             DrawSprite(ctx, "masteryConnected", ii, screen);
+        }
         // Frame: ornate border. Mastery has no separate frame (baked in).
         var frameKey = FrameKey(n.Type, alloc, hover);
         if (frameKey is not null)
+        {
             DrawSprite(ctx, "frame", frameKey, screen);
+        }
         // Fallback for node types we haven't wired art for yet (e.g. class start),
         // so they don't disappear.
         if (iconAtlas is null && frameKey is null)
@@ -261,11 +283,17 @@ public sealed class PassiveTreeView : Control
     private void DrawSprite(DrawingContext ctx, string atlasKey, string spriteKey, Point centre)
     {
         if (!_sprites.Atlases.TryGetValue(atlasKey, out var atlas))
+        {
             return;
+        }
         if (!atlas.Coords.TryGetValue(spriteKey, out var rect))
+        {
             return;
+        }
         if (!_atlasBitmaps.TryGetValue(atlas.File, out var bmp))
+        {
             return;
+        }
         var halfW = rect.W * SpriteDisplayScale * _scale;
         var halfH = rect.H * SpriteDisplayScale * _scale;
         var dst = new Rect(centre.X - halfW, centre.Y - halfH, halfW * 2, halfH * 2);
@@ -304,7 +332,9 @@ public sealed class PassiveTreeView : Control
         foreach (var n in _vm.Tree.Nodes.Values)
         {
             if (n.Type == NodeType.Proxy)
+            {
                 continue;
+            }
             var dx = tx - n.X;
             var dy = ty - n.Y;
             var d = dx * dx + dy * dy;
@@ -339,14 +369,18 @@ public sealed class PassiveTreeView : Control
             var ddx = p.X - _panStartScreen.X;
             var ddy = p.Y - _panStartScreen.Y;
             if (ddx * ddx + ddy * ddy > 16)
+            {
                 _panMoved = true;
+            }
             InvalidateVisual();
             return;
         }
 
         var hit = HitTest(p);
         if (hit != _vm.HoverNodeId)
+        {
             _vm.SetHover(hit); // fires RedrawRequested → InvalidateVisual
+        }
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -376,9 +410,13 @@ public sealed class PassiveTreeView : Control
                 if (hit is { } id)
                 {
                     if (!_vm.IsAllocated(id) && !_vm.HoverPath.IsEmpty)
+                    {
                         _vm.AllocatePath(); // SpecChanged → RedrawRequested → InvalidateVisual
+                    }
                     else
+                    {
                         _vm.ToggleNode(id); // SpecChanged → RedrawRequested → InvalidateVisual
+                    }
                 }
             }
         }

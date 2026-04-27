@@ -59,7 +59,9 @@ public partial class MainWindowViewModel : ObservableObject
     partial void OnSelectedClassIndexChanged(int value)
     {
         if (!_syncingClass && value >= 0)
+        {
             _spec.SetClass(value);
+        }
     }
 
     partial void OnImportInputChanged(string value)
@@ -67,7 +69,9 @@ public partial class MainWindowViewModel : ObservableObject
         // Guard: don't overwrite _pastedBuildCode when we set our own placeholder.
         if (value.StartsWith(PlaceholderPrefix, StringComparison.Ordinal)
             && value.EndsWith(PlaceholderSuffix, StringComparison.Ordinal))
+        {
             return;
+        }
 
         if (value.Length > 500 && PobBuildCodeDecoder.LooksLikeBuildCode(value.Trim()))
         {
@@ -91,7 +95,9 @@ public partial class MainWindowViewModel : ObservableObject
     {
         var text = _pastedBuildCode ?? ImportInput;
         if (string.IsNullOrWhiteSpace(text))
+        {
             return;
+        }
         try
         {
             var build = _importService.Import(text);

@@ -38,7 +38,9 @@ public sealed class PassiveTreeViewModel
     public void SetHover(int? nodeId)
     {
         if (nodeId == _hoverNodeId)
+        {
             return;
+        }
         _hoverNodeId = nodeId;
         _hoverPath = nodeId is { } id ? _spec.HoverPathTo(id) : HoverPath.Empty;
         _hoverPathNodes = new HashSet<int>(_hoverPath.Nodes);

@@ -66,7 +66,9 @@ public sealed class ItemViewModel
     {
         var result = new ModLineViewModel[lines.Count];
         for (var i = 0; i < lines.Count; i++)
+        {
             result[i] = new ModLineViewModel { Text = lines[i].Text, Brush = lines[i].Brush };
+        }
         return result;
     }
 
@@ -90,13 +92,19 @@ public sealed class ItemViewModel
             var line = rawLines[i].Trim();
 
             if (string.IsNullOrEmpty(line))
+            {
                 continue;
+            }
 
             if (line.StartsWith("Unique ID:", StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
             if (line.Contains("BasePercentile: ", StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
             if (line == "--------")
             {
@@ -139,19 +147,29 @@ public sealed class ItemViewModel
         var i = 0;
 
         while (i < lines.Length && string.IsNullOrWhiteSpace(lines[i]))
+        {
             i++;
+        }
 
         if (i < lines.Length && lines[i].Trim().StartsWith("Rarity:", StringComparison.OrdinalIgnoreCase))
+        {
             i++;
+        }
 
         while (i < lines.Length && string.IsNullOrWhiteSpace(lines[i]))
+        {
             i++;
+        }
 
         if (i < lines.Length && !lines[i].Trim().StartsWith("---", StringComparison.Ordinal))
+        {
             i++;
+        }
 
         while (i < lines.Length && string.IsNullOrWhiteSpace(lines[i]))
+        {
             i++;
+        }
 
         var ru = rarity.ToUpperInvariant();
         if ((ru == "RARE" || ru == "UNIQUE")
@@ -170,7 +188,9 @@ public sealed class ItemViewModel
     private static BodyLine ParseModLine(string line)
     {
         if (line == "--------")
+        {
             return new BodyLine("---", BrushSeparator);
+        }
 
         var (text, brush) = StripPrefixes(line);
         return new BodyLine(text, brush);
@@ -186,13 +206,17 @@ public sealed class ItemViewModel
         {
             var close = span.IndexOf('}');
             if (close < 0)
+            {
                 break;
+            }
 
             var tag = span[1..close].ToString();
             span = span[(close + 1)..];
 
             if (tag.StartsWith("range:", StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             brush = tag switch
             {
