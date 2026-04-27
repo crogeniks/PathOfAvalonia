@@ -27,10 +27,8 @@ public partial class MainWindowViewModel : ObservableObject
     private static readonly IBrush StatusErrorBrush   = new SolidColorBrush(Color.FromRgb(0xE0, 0x8A, 0x8A));
 
     public EquipmentViewModel Equipment { get; }
+    public PassiveTreeViewModel TreeViewModel { get; }
     public IReadOnlyList<string> ClassNames => CharacterClasses.Names;
-
-    // PassiveTreeView is a rendering Control that still requires direct spec access.
-    public PassiveSpec Spec => _spec;
 
     [ObservableProperty] private int _selectedClassIndex;
     [ObservableProperty] private string _importInput = string.Empty;
@@ -46,6 +44,7 @@ public partial class MainWindowViewModel : ObservableObject
         _spec = spec;
         _importService = importService;
         Equipment = equipment;
+        TreeViewModel = new PassiveTreeViewModel(spec);
         _selectedClassIndex = spec.SelectedClassIndex;
         _spec.SpecChanged += OnSpecChanged;
     }

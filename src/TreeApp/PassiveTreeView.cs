@@ -6,14 +6,14 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using PathOfAvalonia.TreeApp.ViewModels;
 using PathOfAvalonia.TreeDomain;
 
 namespace PathOfAvalonia.TreeApp;
 
 public sealed class PassiveTreeView : Control
 {
-    private readonly TreeModel _tree;
-    private readonly PassiveSpec _spec;
+    private readonly PassiveTreeViewModel _vm;
     private readonly SpriteMap _sprites;
     // One Bitmap per unique atlas filename (multiple atlas keys share a file).
     private readonly Dictionary<string, Bitmap> _atlasBitmaps = new();
@@ -31,10 +31,6 @@ public sealed class PassiveTreeView : Control
     private Point _panStartScreen;
     private double _panStartOffX, _panStartOffY;
     private bool _panMoved;
-
-    private int? _hoverNodeId;
-    private HoverPath _hoverPath = HoverPath.Empty;
-    private HashSet<int> _hoverPathNodes = new();
 
     private readonly Bitmap? _bgTile;
     private const double BgTileScreen = 98; // tile size in screen-px (matches PoB asset, no zoom scaling)
@@ -64,23 +60,14 @@ public sealed class PassiveTreeView : Control
     private static readonly IBrush HoverPathBrush = new SolidColorBrush(Color.FromArgb(0x80, 0xff, 0xc8, 0x4a));
     private static readonly IPen NodeOutlinePen = new Pen(Brushes.Black, 1.5);
 
-    public PassiveTreeView(TreeModel tree, PassiveSpec spec, SpriteMap sprites)
+    public PassiveTreeView(PassiveTreeViewModel vm, SpriteMap sprites)
     {
-        _tree = tree;
-        _spec = spec;
+        _vm = vm;
         _sprites = sprites;
         ClipToBounds = true;
         Focusable = true;
-        _spec.SpecChanged += () =>
-        {
-            if (_hoverNodeId is { } id)
-            {
-                _hoverPath = _spec.HoverPathTo(id);
-                _hoverPathNodes = new HashSet<int>(_hoverPath.Nodes);
-            }
-            InvalidateVisual();
-        };
-        _bgTile = TryLoadBackground(tree.Version);
+        _vm.RedrawRequested += InvalidateVisual;
+        _bgTile = TryLoadBackground(_vm.Tree.Version);
         LoadAtlasBitmaps();
     }
 
@@ -89,9 +76,7 @@ public sealed class PassiveTreeView : Control
         foreach (var atlas in _sprites.Atlases.Values)
         {
             if (_atlasBitmaps.ContainsKey(atlas.File))
-            {
                 continue;
-            }
             var uri = new Uri($"avares://PathOfAvalonia.TreeApp/Assets/{atlas.File}");
             try
             {
@@ -121,21 +106,13 @@ public sealed class PassiveTreeView : Control
         }
     }
 
-    public int? HoverNodeId => _hoverNodeId;
-    public Node? HoverNode => _hoverNodeId is { } id && _tree.Nodes.TryGetValue(id, out var n) ? n : null;
-    public event Action? HoverChanged;
-
     private void EnsureViewInitialised()
     {
         if (_viewInitialised)
-        {
             return;
-        }
         if (Bounds.Width <= 0 || Bounds.Height <= 0)
-        {
             return;
-        }
-        var b = _tree.Bounds;
+        var b = _vm.Tree.Bounds;
         var sx = Bounds.Width / b.Width;
         var sy = Bounds.Height / b.Height;
         _fitScale = Math.Min(sx, sy) * 0.95;
@@ -158,28 +135,23 @@ public sealed class PassiveTreeView : Control
         DrawBackgroundTile(ctx);
 
         // Draw connectors. Pen thickness is in tree-space so it scales with zoom.
-        var allocated = _spec.AllocatedNodes;
+        var allocated = _vm.AllocatedNodes;
         var connThick = Math.Max(0.5, ConnectorThicknessTree * _scale);
         var connPen = new Pen(ConnectorBrush, connThick);
         var connActivePen = new Pen(AllocatedBrush, connThick);
         var connHoverPen = new Pen(HoverPathBrush, connThick);
-        var pathEdges = _hoverPath.Edges;
-        foreach (var c in _tree.Connectors)
+        var pathEdges = _vm.HoverPath.Edges;
+        foreach (var c in _vm.Tree.Connectors)
         {
             var key = (Math.Min(c.FromId, c.ToId), Math.Max(c.FromId, c.ToId));
             IPen pen;
             if (allocated.Contains(c.FromId) && allocated.Contains(c.ToId))
-            {
                 pen = connActivePen;
-            }
             else if (pathEdges.Contains(key))
-            {
                 pen = connHoverPen;
-            }
             else
-            {
                 pen = connPen;
-            }
+
             switch (c)
             {
                 case LineConnector lc:
@@ -197,9 +169,7 @@ public sealed class PassiveTreeView : Control
     private void DrawBackgroundTile(DrawingContext ctx)
     {
         if (_bgTile is null)
-        {
             return;
-        }
         // Anchor the tile pattern to tree-space (0,0) so it shifts with pan/zoom.
         // Modulo keeps the destination rect close to the visible area; Tile mode
         // fills outward from there.
@@ -238,25 +208,23 @@ public sealed class PassiveTreeView : Control
 
     private void DrawNodesAndHud(DrawingContext ctx)
     {
-        var allocated = _spec.AllocatedNodes;
-        foreach (var n in _tree.Nodes.Values)
+        var allocated = _vm.AllocatedNodes;
+        foreach (var n in _vm.Tree.Nodes.Values)
         {
             if (n.Type == NodeType.Proxy)
-            {
                 continue;
-            }
-            var isHover = _hoverNodeId == n.Id;
-            var onPath = _hoverPathNodes.Contains(n.Id);
+            var isHover = _vm.HoverNodeId == n.Id;
+            var onPath = _vm.HoverPathNodes.Contains(n.Id);
             DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath);
         }
 
         // HUD: alloc count + hover label
-        var hud = $"v{_tree.Version} • allocated: {allocated.Count}";
-        if (HoverNode is { } hn)
+        var hud = $"v{_vm.Tree.Version} • allocated: {allocated.Count}";
+        if (_vm.HoverNode is { } hn)
         {
             hud += $"  •  hover: {hn.Name} [{hn.Type}]";
             if (hn.Type == NodeType.Mastery && allocated.Contains(hn.Id)
-                && _spec.SelectedMasteryEffect(hn.Id) is { Stats.Count: > 0 } eff)
+                && _vm.SelectedMasteryEffect(hn.Id) is { Stats.Count: > 0 } eff)
             {
                 hud += $"\n    selected: {string.Join(" | ", eff.Stats)}";
             }
@@ -272,21 +240,15 @@ public sealed class PassiveTreeView : Control
         // Icon: skills atlas (normal/notable/keystone) or mastery atlas.
         var (iconAtlas, iconPath) = IconSprite(n, alloc, hover: false);
         if (iconAtlas is not null && iconPath is not null)
-        {
             DrawSprite(ctx, iconAtlas, iconPath, screen);
-        }
         // Hover overlay: for masteries, the masteryConnected sprite glows on top of
         // the base icon rather than replacing it.
         if (hover && !alloc && n.Type == NodeType.Mastery && n.InactiveIcon is { } ii)
-        {
             DrawSprite(ctx, "masteryConnected", ii, screen);
-        }
         // Frame: ornate border. Mastery has no separate frame (baked in).
         var frameKey = FrameKey(n.Type, alloc, hover);
         if (frameKey is not null)
-        {
             DrawSprite(ctx, "frame", frameKey, screen);
-        }
         // Fallback for node types we haven't wired art for yet (e.g. class start),
         // so they don't disappear.
         if (iconAtlas is null && frameKey is null)
@@ -299,17 +261,11 @@ public sealed class PassiveTreeView : Control
     private void DrawSprite(DrawingContext ctx, string atlasKey, string spriteKey, Point centre)
     {
         if (!_sprites.Atlases.TryGetValue(atlasKey, out var atlas))
-        {
             return;
-        }
         if (!atlas.Coords.TryGetValue(spriteKey, out var rect))
-        {
             return;
-        }
         if (!_atlasBitmaps.TryGetValue(atlas.File, out var bmp))
-        {
             return;
-        }
         var halfW = rect.W * SpriteDisplayScale * _scale;
         var halfH = rect.H * SpriteDisplayScale * _scale;
         var dst = new Rect(centre.X - halfW, centre.Y - halfH, halfW * 2, halfH * 2);
@@ -345,12 +301,10 @@ public sealed class PassiveTreeView : Control
         var (tx, ty) = ScreenToTree(screen);
         var best = double.MaxValue;
         int? bestId = null;
-        foreach (var n in _tree.Nodes.Values)
+        foreach (var n in _vm.Tree.Nodes.Values)
         {
             if (n.Type == NodeType.Proxy)
-            {
                 continue;
-            }
             var dx = tx - n.X;
             var dy = ty - n.Y;
             var d = dx * dx + dy * dy;
@@ -385,22 +339,14 @@ public sealed class PassiveTreeView : Control
             var ddx = p.X - _panStartScreen.X;
             var ddy = p.Y - _panStartScreen.Y;
             if (ddx * ddx + ddy * ddy > 16)
-            {
                 _panMoved = true;
-            }
             InvalidateVisual();
             return;
         }
 
         var hit = HitTest(p);
-        if (hit != _hoverNodeId)
-        {
-            _hoverNodeId = hit;
-            _hoverPath = hit is { } id ? _spec.HoverPathTo(id) : HoverPath.Empty;
-            _hoverPathNodes = new HashSet<int>(_hoverPath.Nodes);
-            HoverChanged?.Invoke();
-            InvalidateVisual();
-        }
+        if (hit != _vm.HoverNodeId)
+            _vm.SetHover(hit); // fires RedrawRequested → InvalidateVisual
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -429,16 +375,10 @@ public sealed class PassiveTreeView : Control
                 var hit = HitTest(e.GetPosition(this));
                 if (hit is { } id)
                 {
-                    if (!_spec.IsAllocated(id) && !_hoverPath.IsEmpty)
-                    {
-                        _spec.AllocateMany(_hoverPath.Nodes);
-                        _hoverPath = HoverPath.Empty;
-                        _hoverPathNodes.Clear();
-                    }
+                    if (!_vm.IsAllocated(id) && !_vm.HoverPath.IsEmpty)
+                        _vm.AllocatePath(); // SpecChanged → RedrawRequested → InvalidateVisual
                     else
-                    {
-                        _spec.Toggle(id);
-                    }
+                        _vm.ToggleNode(id); // SpecChanged → RedrawRequested → InvalidateVisual
                 }
             }
         }
