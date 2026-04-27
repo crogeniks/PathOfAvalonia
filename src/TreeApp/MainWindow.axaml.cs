@@ -20,7 +20,7 @@ public partial class MainWindow : Window
         // PassiveTreeView is a canvas-rendering Control — it can't be declared in AXAML
         // because it needs the live PassiveSpec instance. Insert it behind the overlay.
         var root = this.FindControl<Grid>("Root")!;
-        root.Children.Insert(0, new PassiveTreeView(vm.Spec.Tree, vm.Spec, sprites));
+        root.Children.Insert(0, new PassiveTreeView(vm.TreeViewModel, sprites));
 
         // CaretIndex is a pure UI concern the ViewModel can't reach: reset to end
         // whenever ImportInput changes so the placeholder marker looks clean.
