@@ -136,6 +136,7 @@ public sealed class PassiveSpec
     // is gone — anything unvisited is a dependent.
     private void DeallocateWithDependents(int id)
     {
+        var affected = AllocatedComponentFrom(id);
         var roots = DependencyRoots(id).ToList();
         if (roots.Count == 0)
         {
@@ -176,13 +177,43 @@ public sealed class PassiveSpec
 
         _allocated.Remove(id);
         _masterySelections.Remove(id);
-        var orphans = _allocated.Where(a => !reachable.Contains(a)).ToList();
+        var orphans = _allocated.Where(a => affected.Contains(a) && !reachable.Contains(a)).ToList();
         foreach (var o in orphans)
         {
             _allocated.Remove(o);
             _masterySelections.Remove(o);
         }
         SpecChanged?.Invoke();
+    }
+
+    private HashSet<int> AllocatedComponentFrom(int id)
+    {
+        var component = new HashSet<int>();
+        if (!TryGetNode(id, out var start) || start is null || !_allocated.Contains(id))
+        {
+            return component;
+        }
+
+        var queue = new Queue<Node>();
+        component.Add(id);
+        queue.Enqueue(start);
+        while (queue.Count > 0)
+        {
+            var node = queue.Dequeue();
+            if (node.Type == NodeType.Mastery)
+            {
+                continue;
+            }
+            foreach (var other in node.LinkedNodes)
+            {
+                if (!_allocated.Contains(other.Id) || !component.Add(other.Id))
+                {
+                    continue;
+                }
+                queue.Enqueue(other);
+            }
+        }
+        return component;
     }
 
     private IEnumerable<Node> DependencyRoots(int excludeId)
