@@ -66,22 +66,27 @@ public partial class MainWindowViewModel : ObservableObject
 
     partial void OnImportInputChanged(string value)
     {
-        // Guard: don't overwrite _pastedBuildCode when we set our own placeholder.
+        // When the view sets the placeholder marker, don't clear _pastedBuildCode.
         if (value.StartsWith(PlaceholderPrefix, StringComparison.Ordinal)
             && value.EndsWith(PlaceholderSuffix, StringComparison.Ordinal))
         {
             return;
         }
+        _pastedBuildCode = null;
+    }
 
-        if (value.Length > 500 && PobBuildCodeDecoder.LooksLikeBuildCode(value.Trim()))
+    // Called by the code-behind TextChanged handler, which sets TextBox.Text directly
+    // (bypassing the TwoWay binding reentrancy guard that would suppress the update).
+    // Returns the placeholder string to display, or null if no replacement is needed.
+    internal string? TryReplaceBuildCode(string text)
+    {
+        if (text.Length <= 500 || !PobBuildCodeDecoder.LooksLikeBuildCode(text.Trim()))
         {
-            _pastedBuildCode = value;
-            ImportInput = $"{PlaceholderPrefix}{value.Length}{PlaceholderSuffix}";
+            return null;
         }
-        else
-        {
-            _pastedBuildCode = null;
-        }
+
+        _pastedBuildCode = text;
+        return $"{PlaceholderPrefix}{text.Length}{PlaceholderSuffix}";
     }
 
     partial void OnImportStatusChanged(string value) =>

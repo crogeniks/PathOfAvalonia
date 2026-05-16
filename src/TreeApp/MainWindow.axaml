@@ -35,10 +35,10 @@
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <Button Content="Import" Command="{Binding ImportCommand}"/>
                             <Button Content="Clear" Command="{Binding ClearCommand}"/>
-                            <TextBlock Text="{Binding ImportStatus}"
-                                       Foreground="{Binding ImportStatusForeground}"
-                                       VerticalAlignment="Center" TextWrapping="Wrap"/>
                         </StackPanel>
+                        <TextBlock Text="{Binding ImportStatus}"
+                                   Foreground="{Binding ImportStatusForeground}"
+                                   TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
             </Grid>
