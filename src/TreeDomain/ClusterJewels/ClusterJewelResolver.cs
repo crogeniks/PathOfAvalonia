@@ -18,7 +18,7 @@ public static class ClusterJewelResolver
         }
 
         var definition = ClusterJewelData.GetDefinition(spec.Size);
-        var passiveCount = Math.Clamp(spec.PassiveCount, definition.MinNodes, definition.MaxNodes);
+        var passiveCount = Math.Clamp(spec.PassiveCount, 0, definition.MaxNodes);
         var socketCount = Math.Clamp(spec.SocketCount, 0, definition.SocketIndices.Count);
 
         if (!tree.Nodes.TryGetValue(expansionSocket.ProxyNodeId, out var proxyNode))
@@ -28,6 +28,11 @@ public static class ClusterJewelResolver
         if (!tree.Groups.TryGetValue(proxyNode.GroupId, out var proxyGroup))
         {
             throw new KeyNotFoundException($"Cluster proxy group {proxyNode.GroupId} was not found");
+        }
+
+        if (spec.KeystoneName is { } keystoneName)
+        {
+            return ResolveKeystoneCluster(tree, socketNode, spec, lineageIdBase, clusterNodeIdBase, proxyNode, proxyGroup, keystoneName);
         }
 
         var orbit = definition.SizeIndex + 1;
@@ -146,7 +151,7 @@ public static class ClusterJewelResolver
 
         void AddNotableNode(int templateIndex, string notableName)
         {
-            var baseNode = tree.Nodes.Values.FirstOrDefault(node => node.Type == NodeType.Notable && node.Name == notableName);
+            tree.ClusterNodeTemplates.TryGetValue(notableName, out var baseNode);
             nodesByTemplateIndex[templateIndex] = AddNode(
                 templateIndex,
                 clusterNodeIdBase + templateIndex,
@@ -209,6 +214,65 @@ public static class ClusterJewelResolver
             nodesById[node.Id] = node;
             return node;
         }
+    }
+
+    private static ClusterSubgraph ResolveKeystoneCluster(
+        TreeModel tree,
+        Node socketNode,
+        ClusterJewelSpec spec,
+        int lineageIdBase,
+        int clusterNodeIdBase,
+        Node proxyNode,
+        GroupPosition proxyGroup,
+        string keystoneName)
+    {
+        tree.ClusterNodeTemplates.TryGetValue(keystoneName, out var template);
+        if (!tree.TryGetPosition(proxyNode.GroupId, 0, 0, out var x, out var y))
+        {
+            x = proxyGroup.X;
+            y = proxyGroup.Y;
+        }
+
+        var node = new Node
+        {
+            Id = clusterNodeIdBase,
+            Name = keystoneName,
+            Type = NodeType.Keystone,
+            X = x,
+            Y = y,
+            Icon = template?.Icon,
+            ActiveIcon = template?.ActiveIcon,
+            InactiveIcon = template?.InactiveIcon,
+            AscendancyName = socketNode.AscendancyName,
+            ClassStartIndex = null,
+            GroupId = proxyNode.GroupId,
+            Orbit = 0,
+            OrbitIndex = 0,
+            ExpansionSocket = null,
+            MasteryEffects = null,
+        };
+
+        var connector = new LineConnector(
+            socketNode.Id,
+            node.Id,
+            socketNode.X,
+            socketNode.Y,
+            node.X,
+            node.Y);
+
+        return new ClusterSubgraph
+        {
+            SocketNodeId = socketNode.Id,
+            EntranceNodeId = node.Id,
+            LineageIdBase = lineageIdBase,
+            Size = spec.Size,
+            CircleRadius = tree.OrbitRadii[0],
+            ClusterCenterX = proxyGroup.X,
+            ClusterCenterY = proxyGroup.Y,
+            Nodes = new[] { node },
+            NodesById = new Dictionary<int, Node> { [node.Id] = node },
+            Connectors = new[] { connector },
+        };
     }
 
     private static Dictionary<int, Node> FindRealSockets(TreeModel tree, int groupId)

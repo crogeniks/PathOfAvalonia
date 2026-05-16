@@ -19,8 +19,10 @@ public sealed class PassiveSpec
     private readonly Dictionary<int, ClusterSubgraph> _activeSubgraphs = new();
     // Flat lookup for all currently-active cluster nodes by ID.
     private readonly Dictionary<int, Node> _clusterNodes = new();
+    private readonly Dictionary<int, ImportedItem> _socketedJewels = new();
 
     public IReadOnlyDictionary<int, ClusterSubgraph> ActiveSubgraphs => _activeSubgraphs;
+    public IReadOnlyDictionary<int, ImportedItem> SocketedJewels => _socketedJewels;
 
     public PassiveSpec(TreeModel tree)
     {
@@ -295,7 +297,7 @@ public sealed class PassiveSpec
     // Passing null for spec removes any existing cluster at that socket.
     public void SetClusterJewel(int socketId, ClusterJewelSpec? spec)
     {
-        RemoveClusterJewel(socketId);
+        RemoveClusterRecursive(socketId);
 
         if (spec is null || !TryGetNode(socketId, out var socket) || socket is null || !CanInsertCluster(socketId, spec.Size))
         {
@@ -322,12 +324,17 @@ public sealed class PassiveSpec
 
     public void RemoveClusterJewel(int socketId)
     {
-        RemoveClusterRecursive(socketId);
+        var changed = RemoveClusterRecursive(socketId);
+        changed |= _socketedJewels.Remove(socketId);
+        if (changed)
+        {
+            SpecChanged?.Invoke();
+        }
     }
 
     public void Clear()
     {
-        if (_allocated.Count == 0 && _masterySelections.Count == 0 && _activeSubgraphs.Count == 0)
+        if (_allocated.Count == 0 && _masterySelections.Count == 0 && _activeSubgraphs.Count == 0 && _socketedJewels.Count == 0)
         {
             return;
         }
@@ -337,6 +344,7 @@ public sealed class PassiveSpec
         }
         _allocated.Clear();
         _masterySelections.Clear();
+        _socketedJewels.Clear();
         if (_classStartNodeByIndex.TryGetValue(_selectedClassIndex, out var nodeId))
         {
             _allocated.Add(nodeId);
@@ -351,6 +359,7 @@ public sealed class PassiveSpec
     {
         _allocated.Clear();
         _masterySelections.Clear();
+        _socketedJewels.Clear();
         foreach (var socketId in _activeSubgraphs.Keys.ToArray())
         {
             RemoveClusterRecursive(socketId);
@@ -368,9 +377,17 @@ public sealed class PassiveSpec
         while (restoredAny && pendingJewels.Count > 0)
         {
             restoredAny = false;
+            var socketIdMap = build.ClusterHashFormatVersion < 2
+                ? BuildLegacyClusterIdMap()
+                : null;
             for (var i = pendingJewels.Count - 1; i >= 0; i--)
             {
-                if (RestoreImportedCluster(pendingJewels[i], build))
+                var socketedJewel = pendingJewels[i];
+                if (socketIdMap is not null && socketIdMap.TryGetValue(socketedJewel.SocketNodeId, out var mappedSocketId))
+                {
+                    socketedJewel = socketedJewel with { SocketNodeId = mappedSocketId };
+                }
+                if (RestoreImportedCluster(socketedJewel, build))
                 {
                     pendingJewels.RemoveAt(i);
                     restoredAny = true;
@@ -378,11 +395,29 @@ public sealed class PassiveSpec
             }
         }
 
+        var legacyClusterIdMap = build.ClusterHashFormatVersion < 2
+            ? BuildLegacyClusterIdMap()
+            : null;
+
+        foreach (var socketedJewel in build.SocketedJewels)
+        {
+            var socketNodeId = legacyClusterIdMap is not null && legacyClusterIdMap.TryGetValue(socketedJewel.SocketNodeId, out var mappedSocketId)
+                ? mappedSocketId
+                : socketedJewel.SocketNodeId;
+            if (build.ItemsById.TryGetValue(socketedJewel.ItemId, out var item))
+            {
+                _socketedJewels[socketNodeId] = item;
+            }
+        }
+
         foreach (var id in build.NodeHashes)
         {
-            if (Tree.Nodes.ContainsKey(id))
+            var mappedId = legacyClusterIdMap is not null && legacyClusterIdMap.TryGetValue(id, out var legacyMappedId)
+                ? legacyMappedId
+                : id;
+            if (Tree.Nodes.ContainsKey(mappedId) || _clusterNodes.ContainsKey(mappedId))
             {
-                _allocated.Add(id);
+                _allocated.Add(mappedId);
                 applied++;
             }
             else
@@ -399,9 +434,12 @@ public sealed class PassiveSpec
         }
         foreach (var id in build.ClusterNodeHashes)
         {
-            if (_clusterNodes.ContainsKey(id))
+            var mappedId = legacyClusterIdMap is not null && legacyClusterIdMap.TryGetValue(id, out var legacyMappedId)
+                ? legacyMappedId
+                : id;
+            if (_clusterNodes.ContainsKey(mappedId))
             {
-                _allocated.Add(id);
+                _allocated.Add(mappedId);
                 applied++;
             }
             else
@@ -410,8 +448,129 @@ public sealed class PassiveSpec
                 clusterSkipped++;
             }
         }
+        var fallbackApplied = AllocateUniqueClusterFallbacks();
+        applied += fallbackApplied;
+        skipped = Math.Max(0, skipped - fallbackApplied);
+        clusterSkipped = Math.Max(0, clusterSkipped - fallbackApplied);
         SpecChanged?.Invoke();
         return new ImportResult(applied, skipped, clusterSkipped, build);
+    }
+
+    private int AllocateUniqueClusterFallbacks()
+    {
+        var applied = 0;
+        foreach (var (socketId, subgraph) in _activeSubgraphs)
+        {
+            if (subgraph.Nodes.Any(node => node.Id >= 65536 && _allocated.Contains(node.Id)))
+            {
+                continue;
+            }
+            if (!TryGetSocketedClusterItem(socketId, out var item, out var cluster))
+            {
+                continue;
+            }
+            if (!IsUniqueClusterFallbackCandidate(item, cluster))
+            {
+                continue;
+            }
+
+            foreach (var node in subgraph.Nodes.Where(node => node.Type != NodeType.JewelSocket))
+            {
+                if (_allocated.Add(node.Id))
+                {
+                    applied++;
+                }
+            }
+        }
+        return applied;
+    }
+
+    private bool TryGetSocketedClusterItem(int socketId, out ImportedItem item, out ImportedClusterJewel cluster)
+    {
+        item = null!;
+        cluster = null!;
+        return _socketedJewels.TryGetValue(socketId, out item!)
+            && ImportedClusterJewelParser.TryParse(item, out cluster);
+    }
+
+    private static bool IsUniqueClusterFallbackCandidate(ImportedItem item, ImportedClusterJewel cluster) =>
+        item.Rarity.Equals("Unique", StringComparison.OrdinalIgnoreCase)
+        && (cluster.KeystoneName is not null
+            || item.Name.Equals("Megalomaniac", StringComparison.OrdinalIgnoreCase));
+
+    private Dictionary<int, int> BuildLegacyClusterIdMap()
+    {
+        var map = new Dictionary<int, int>();
+        foreach (var subgraph in _activeSubgraphs.Values)
+        {
+            if (!TryGetNode(subgraph.SocketNodeId, out var socketNode)
+                || socketNode?.ExpansionSocket is not { } expansionSocket
+                || !Tree.Nodes.TryGetValue(expansionSocket.ProxyNodeId, out var proxyNode))
+            {
+                continue;
+            }
+
+            var definition = ClusterJewelData.GetDefinition(subgraph.Size);
+            var currentNodeBase = subgraph.LineageIdBase + (definition.SizeIndex << 4);
+            var legacyProxyGroupId = BuildLegacyProxyGroup(proxyNode.GroupId, expansionSocket.Size, definition.SizeIndex);
+
+            foreach (var currentSocket in subgraph.Nodes.Where(node => node.Type == NodeType.JewelSocket && node.ExpansionSocket is not null))
+            {
+                if (FindClusterSocket(legacyProxyGroupId, currentSocket.ExpansionSocket!.Index) is { } legacySocket)
+                {
+                    map[legacySocket.Id] = currentSocket.Id;
+                }
+            }
+
+            if (subgraph.Nodes.Count == 1 && subgraph.Nodes[0].Type == NodeType.Keystone)
+            {
+                continue;
+            }
+
+            var currentSkillsPerOrbit = Tree.SkillsPerOrbit[definition.SizeIndex + 1];
+            var legacySkillsPerOrbit = Tree.SkillsPerOrbit[proxyNode.Orbit];
+            var legacyProxyNodeIndex = TranslateClusterOrbitIndex(
+                proxyNode.OrbitIndex,
+                legacySkillsPerOrbit,
+                definition.TotalIndices);
+
+            var legacyNodeIdsByOrbit = new Dictionary<int, int>();
+            var currentNodeIdsByLegacyOrbit = new Dictionary<int, int>();
+            foreach (var node in subgraph.Nodes.Where(node => node.Id >= 65536))
+            {
+                var nodeIndex = node.Id - currentNodeBase;
+                if (nodeIndex < 0 || nodeIndex >= definition.TotalIndices)
+                {
+                    continue;
+                }
+
+                var legacyNodeIndex = (nodeIndex + legacyProxyNodeIndex) % definition.TotalIndices;
+                var legacyOrbitIndex = TranslateClusterOrbitIndex(
+                    legacyNodeIndex,
+                    definition.TotalIndices,
+                    legacySkillsPerOrbit);
+                legacyNodeIdsByOrbit[legacyOrbitIndex] = node.Id;
+
+                var currentNodeIndex = TranslateClusterOrbitIndex(
+                    node.OrbitIndex,
+                    currentSkillsPerOrbit,
+                    definition.TotalIndices);
+                var currentLegacyOrbitIndex = TranslateClusterOrbitIndex(
+                    currentNodeIndex,
+                    definition.TotalIndices,
+                    legacySkillsPerOrbit);
+                currentNodeIdsByLegacyOrbit[currentLegacyOrbitIndex] = node.Id;
+            }
+
+            foreach (var (orbitIndex, legacyNodeId) in legacyNodeIdsByOrbit)
+            {
+                if (currentNodeIdsByLegacyOrbit.TryGetValue(orbitIndex, out var currentNodeId))
+                {
+                    map[legacyNodeId] = currentNodeId;
+                }
+            }
+        }
+        return map;
     }
 
     // Looks up a node by ID in both the base tree and any active cluster subgraphs.
@@ -426,16 +585,17 @@ public sealed class PassiveSpec
 
     public event Action? SpecChanged;
 
-    private void RemoveClusterRecursive(int socketId)
+    private bool RemoveClusterRecursive(int socketId)
     {
         if (!_activeSubgraphs.TryGetValue(socketId, out var old))
         {
-            return;
+            return false;
         }
 
         foreach (var childSocket in old.Nodes.Where(node => node.Type == NodeType.JewelSocket).Select(node => node.Id).ToArray())
         {
             RemoveClusterRecursive(childSocket);
+            _socketedJewels.Remove(childSocket);
         }
 
         if (TryGetNode(socketId, out var oldSocket) && oldSocket is not null
@@ -452,6 +612,8 @@ public sealed class PassiveSpec
         }
 
         _activeSubgraphs.Remove(socketId);
+        _socketedJewels.Remove(socketId);
+        return true;
     }
 
     private bool RestoreImportedCluster(ImportedSocketedJewel socketedJewel, ImportedBuild build)
@@ -474,8 +636,133 @@ public sealed class PassiveSpec
                 cluster.Size,
                 cluster.PassiveCount,
                 cluster.SocketCount,
-                cluster.NotableNames));
+                cluster.NotableNames,
+                cluster.KeystoneName));
         return true;
+    }
+
+    private int BuildLegacyProxyGroup(int proxyGroupId, int expansionJewelSize, int clusterSizeIndex)
+    {
+        var legacyGroupId = proxyGroupId;
+        var groupSize = expansionJewelSize;
+        var guard = 0;
+        while (clusterSizeIndex < groupSize && guard < 4)
+        {
+            var socket = FindClusterSocket(legacyGroupId, 1) ?? FindClusterSocket(legacyGroupId, 0);
+            if (socket?.ExpansionSocket is not { } expansionSocket
+                || !Tree.Nodes.TryGetValue(expansionSocket.ProxyNodeId, out var legacyProxyNode)
+                || !Tree.Groups.ContainsKey(legacyProxyNode.GroupId))
+            {
+                break;
+            }
+
+            legacyGroupId = legacyProxyNode.GroupId;
+            groupSize = expansionSocket.Size;
+            guard++;
+        }
+
+        return legacyGroupId;
+    }
+
+    private Node? FindClusterSocket(int groupId, int index)
+    {
+        foreach (var node in Tree.Nodes.Values)
+        {
+            if (node.GroupId == groupId
+                && node.Type == NodeType.JewelSocket
+                && node.ExpansionSocket?.Index == index)
+            {
+                return node;
+            }
+        }
+        return null;
+    }
+
+    private static int TranslateClusterOrbitIndex(int sourceOrbitIndex, int sourceNodesPerOrbit, int destinationNodesPerOrbit)
+    {
+        if (sourceNodesPerOrbit == destinationNodesPerOrbit)
+        {
+            return sourceOrbitIndex;
+        }
+        if (sourceNodesPerOrbit == 12 && destinationNodesPerOrbit == 16)
+        {
+            return sourceOrbitIndex switch
+            {
+                0 => 0,
+                1 => 1,
+                2 => 3,
+                3 => 4,
+                4 => 5,
+                5 => 7,
+                6 => 8,
+                7 => 9,
+                8 => 11,
+                9 => 12,
+                10 => 13,
+                11 => 15,
+                _ => throw new ArgumentOutOfRangeException(nameof(sourceOrbitIndex)),
+            };
+        }
+        if (sourceNodesPerOrbit == 16 && destinationNodesPerOrbit == 12)
+        {
+            return sourceOrbitIndex switch
+            {
+                0 => 0,
+                1 => 1,
+                2 => 1,
+                3 => 2,
+                4 => 3,
+                5 => 4,
+                6 => 4,
+                7 => 5,
+                8 => 6,
+                9 => 7,
+                10 => 7,
+                11 => 8,
+                12 => 9,
+                13 => 10,
+                14 => 10,
+                15 => 11,
+                _ => throw new ArgumentOutOfRangeException(nameof(sourceOrbitIndex)),
+            };
+        }
+        if (sourceNodesPerOrbit == 6 && destinationNodesPerOrbit == 16)
+        {
+            return sourceOrbitIndex switch
+            {
+                0 => 0,
+                1 => 3,
+                2 => 5,
+                3 => 8,
+                4 => 11,
+                5 => 13,
+                _ => throw new ArgumentOutOfRangeException(nameof(sourceOrbitIndex)),
+            };
+        }
+        if (sourceNodesPerOrbit == 16 && destinationNodesPerOrbit == 6)
+        {
+            return sourceOrbitIndex switch
+            {
+                0 => 0,
+                1 => 0,
+                2 => 0,
+                3 => 1,
+                4 => 1,
+                5 => 2,
+                6 => 2,
+                7 => 2,
+                8 => 3,
+                9 => 3,
+                10 => 3,
+                11 => 4,
+                12 => 4,
+                13 => 5,
+                14 => 5,
+                15 => 5,
+                _ => throw new ArgumentOutOfRangeException(nameof(sourceOrbitIndex)),
+            };
+        }
+        return (int)Math.Floor(sourceOrbitIndex * destinationNodesPerOrbit / (double)sourceNodesPerOrbit);
     }
 
     private int ResolveClusterLineageIdBase(Node socket)

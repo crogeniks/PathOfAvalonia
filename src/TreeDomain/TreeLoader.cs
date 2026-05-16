@@ -33,12 +33,35 @@ public static class TreeLoader
 
         // Per-node placement, plus side-table of orbit info needed for arc detection.
         var nodes = new Dictionary<int, Node>(dto.Nodes.Count);
+        var clusterNodeTemplates = new Dictionary<string, Node>(StringComparer.Ordinal);
         var orbitInfo = new Dictionary<int, (int Group, int Orbit, double Cx, double Cy, double Angle, double Radius)>(dto.Nodes.Count);
 
         foreach (var (_, nd) in dto.Nodes)
         {
             if (nd.Group is null || !dto.Groups.TryGetValue(nd.Group.Value.ToString(), out var grp))
             {
+                var templateType = ClassifyNode(nd);
+                if (nd.Name is not null && templateType is NodeType.Notable or NodeType.Keystone)
+                {
+                    clusterNodeTemplates[nd.Name] = new Node
+                    {
+                        Id = nd.Id,
+                        Name = nd.Name,
+                        Type = templateType,
+                        X = 0,
+                        Y = 0,
+                        Icon = nd.Icon,
+                        ActiveIcon = nd.ActiveIcon,
+                        InactiveIcon = nd.InactiveIcon,
+                        AscendancyName = nd.AscendancyName,
+                        ClassStartIndex = nd.ClassStartIndex,
+                        GroupId = 0,
+                        Orbit = 0,
+                        OrbitIndex = 0,
+                        ExpansionSocket = null,
+                        MasteryEffects = null,
+                    };
+                }
                 continue;
             }
             if (nd.Orbit is null || nd.OrbitIndex is null)
@@ -171,6 +194,7 @@ public static class TreeLoader
         {
             Version = version,
             Nodes = nodes,
+            ClusterNodeTemplates = clusterNodeTemplates,
             Connectors = connectors,
             Bounds = new TreeBounds(dto.MinX, dto.MinY, dto.MaxX, dto.MaxY),
             Groups = groupPositions,

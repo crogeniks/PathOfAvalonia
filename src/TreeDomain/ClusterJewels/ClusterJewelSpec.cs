@@ -5,4 +5,5 @@ public sealed record ClusterJewelSpec(
     ClusterJewelSize Size,
     int PassiveCount,
     int SocketCount,
-    IReadOnlyList<string> NotableNames);
+    IReadOnlyList<string> NotableNames,
+    string? KeystoneName = null);

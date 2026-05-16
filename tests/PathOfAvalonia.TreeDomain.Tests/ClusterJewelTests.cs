@@ -2,6 +2,8 @@ using PathOfAvalonia.TreeDomain;
 using PathOfAvalonia.TreeApp.ViewModels;
 using PathOfAvalonia.TreeDomain.ClusterJewels;
 using PathOfAvalonia.TreeDomain.Import;
+using System.IO.Compression;
+using System.Text;
 using Xunit;
 
 namespace PathOfAvalonia.TreeDomain.Tests;
@@ -30,6 +32,16 @@ public sealed class ClusterJewelTests
         Assert.Equal(0, smallSocket.ExpansionSocket?.Size);
         Assert.Equal(0, smallSocket.ExpansionSocket?.Index);
         Assert.Equal(56439, smallSocket.ExpansionSocket?.ProxyNodeId);
+    }
+
+    [Fact]
+    public void LoaderKeepsClusterOnlyKeystoneTemplates()
+    {
+        var tree = LoadTree();
+
+        Assert.True(tree.ClusterNodeTemplates.TryGetValue("Nature's Patience", out var template));
+        Assert.Equal(NodeType.Keystone, template.Type);
+        Assert.NotNull(template.Icon);
     }
 
     [Fact]
@@ -187,6 +199,62 @@ public sealed class ClusterJewelTests
     }
 
     [Fact]
+    public void ImportedUniqueClusterWithoutSocketLineDoesNotGetDefaultSockets()
+    {
+        var item = UniqueClusterItem(
+            1,
+            "Megalomaniac",
+            "Medium Cluster Jewel",
+            "Adds 4 Passive Skills",
+            "Added Small Passive Skills grant Nothing",
+            "1 Added Passive Skill is Brush with Death",
+            "1 Added Passive Skill is Exposure Therapy",
+            "1 Added Passive Skill is Flow of Life");
+
+        Assert.True(ImportedClusterJewelParser.TryParse(item, out var cluster));
+        Assert.Equal(ClusterJewelSize.Medium, cluster.Size);
+        Assert.Equal(4, cluster.PassiveCount);
+        Assert.Equal(0, cluster.SocketCount);
+        Assert.Equal(
+            new[] { "Brush with Death", "Exposure Therapy", "Flow of Life" },
+            cluster.NotableNames);
+    }
+
+    [Fact]
+    public void ImportedUniqueClusterCanDeriveNodeCountFromNothingnessPassives()
+    {
+        var item = UniqueClusterItem(
+            1,
+            "Voices",
+            "Large Cluster Jewel",
+            "Adds 3 Jewel Socket Passive Skills",
+            "Adds 1 Small Passive Skill which grants nothing");
+
+        Assert.True(ImportedClusterJewelParser.TryParse(item, out var cluster));
+        Assert.Equal(ClusterJewelSize.Large, cluster.Size);
+        Assert.Equal(4, cluster.PassiveCount);
+        Assert.Equal(3, cluster.SocketCount);
+        Assert.Empty(cluster.NotableNames);
+    }
+
+    [Fact]
+    public void ImportedUniqueKeystoneClusterParsesAsSingleKeystone()
+    {
+        var item = UniqueClusterItem(
+            1,
+            "Natural Affinity",
+            "Small Cluster Jewel",
+            "Adds Nature's Patience");
+
+        Assert.True(ImportedClusterJewelParser.TryParse(item, out var cluster));
+        Assert.Equal(ClusterJewelSize.Small, cluster.Size);
+        Assert.Equal(1, cluster.PassiveCount);
+        Assert.Equal(0, cluster.SocketCount);
+        Assert.Empty(cluster.NotableNames);
+        Assert.Equal("Nature's Patience", cluster.KeystoneName);
+    }
+
+    [Fact]
     public void ApplyImportRestoresClusterSubgraphsAndAllocatesImportedClusterHashes()
     {
         var spec = LoadSpec();
@@ -216,6 +284,7 @@ public sealed class ClusterJewelTests
 
         Assert.Contains(55190, spec.ActiveSubgraphs.Keys);
         Assert.Contains(clusterNodeId, spec.AllocatedNodes);
+        Assert.Equal(item, spec.SocketedJewels[55190]);
         Assert.Equal(2, result.Applied);
         Assert.Equal(0, result.Skipped);
     }
@@ -268,6 +337,347 @@ public sealed class ClusterJewelTests
         Assert.Contains(childNodeId, spec.AllocatedNodes);
     }
 
+    [Fact]
+    public void ApplyImportRestoresUniqueClusterWithoutAllocatingDefaultSocket()
+    {
+        var temp = LoadSpec();
+        temp.SetClusterJewel(
+            33753,
+            new ClusterJewelSpec(
+                33753,
+                ClusterJewelSize.Medium,
+                4,
+                0,
+                new[] { "Brush with Death", "Exposure Therapy", "Flow of Life" }));
+        var expectedClusterNodeIds = temp.ActiveSubgraphs[33753].Nodes.Select(node => node.Id).ToArray();
+        var item = UniqueClusterItem(
+            1,
+            "Megalomaniac",
+            "Medium Cluster Jewel",
+            "Adds 4 Passive Skills",
+            "Added Small Passive Skills grant Nothing",
+            "1 Added Passive Skill is Brush with Death",
+            "1 Added Passive Skill is Exposure Therapy",
+            "1 Added Passive Skill is Flow of Life");
+
+        var spec = LoadSpec();
+        var result = spec.ApplyImport(new ImportedBuild(
+            ClassId: 0,
+            AscendClassId: 0,
+            SecondaryAscendClassId: 0,
+            NodeHashes: new[] { 33753 },
+            ClusterNodeHashes: expectedClusterNodeIds,
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: "3.28",
+            Source: "test")
+        {
+            ItemsById = new Dictionary<int, ImportedItem> { [1] = item },
+            SocketedJewels = new[] { new ImportedSocketedJewel(33753, 1) },
+        });
+
+        var subgraph = spec.ActiveSubgraphs[33753];
+        Assert.DoesNotContain(subgraph.Nodes, node => node.Type == NodeType.JewelSocket);
+        Assert.All(expectedClusterNodeIds, nodeId => Assert.Contains(nodeId, spec.AllocatedNodes));
+        Assert.Equal(0, result.ClusterSkipped);
+    }
+
+    [Fact]
+    public void ApplyImportRestoresVoicesWithoutAddingDefaultLargeClusterNodes()
+    {
+        var temp = LoadSpec();
+        temp.SetClusterJewel(
+            55190,
+            new ClusterJewelSpec(
+                55190,
+                ClusterJewelSize.Large,
+                4,
+                3,
+                Array.Empty<string>()));
+        var expectedClusterNodeIds = temp.ActiveSubgraphs[55190].Nodes.Select(node => node.Id).ToArray();
+        var item = UniqueClusterItem(
+            1,
+            "Voices",
+            "Large Cluster Jewel",
+            "Adds 3 Jewel Socket Passive Skills",
+            "Adds 1 Small Passive Skill which grants nothing");
+
+        var spec = LoadSpec();
+        var result = spec.ApplyImport(new ImportedBuild(
+            ClassId: 0,
+            AscendClassId: 0,
+            SecondaryAscendClassId: 0,
+            NodeHashes: new[] { 55190 },
+            ClusterNodeHashes: expectedClusterNodeIds.Where(nodeId => nodeId >= 65536).ToArray(),
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: "3.28",
+            Source: "test")
+        {
+            ItemsById = new Dictionary<int, ImportedItem> { [1] = item },
+            SocketedJewels = new[] { new ImportedSocketedJewel(55190, 1) },
+        });
+
+        var subgraph = spec.ActiveSubgraphs[55190];
+        Assert.Equal(4, subgraph.Nodes.Count);
+        Assert.Equal(3, subgraph.Nodes.Count(node => node.Type == NodeType.JewelSocket));
+        Assert.Equal(1, subgraph.Nodes.Count(node => node.Type == NodeType.Normal));
+        Assert.All(expectedClusterNodeIds.Where(nodeId => nodeId >= 65536), nodeId => Assert.Contains(nodeId, spec.AllocatedNodes));
+        Assert.Equal(0, result.ClusterSkipped);
+    }
+
+    [Fact]
+    public void ApplyImportRestoresNaturalAffinityAsAllocatedKeystoneCluster()
+    {
+        var temp = LoadSpec();
+        temp.SetClusterJewel(
+            22748,
+            new ClusterJewelSpec(
+                22748,
+                ClusterJewelSize.Small,
+                1,
+                0,
+                Array.Empty<string>(),
+                "Nature's Patience"));
+        var expectedNode = Assert.Single(temp.ActiveSubgraphs[22748].Nodes);
+        var item = UniqueClusterItem(
+            1,
+            "Natural Affinity",
+            "Small Cluster Jewel",
+            "Adds Nature's Patience");
+
+        var spec = LoadSpec();
+        var result = spec.ApplyImport(new ImportedBuild(
+            ClassId: 0,
+            AscendClassId: 0,
+            SecondaryAscendClassId: 0,
+            NodeHashes: new[] { 22748 },
+            ClusterNodeHashes: new[] { expectedNode.Id },
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: "3.28",
+            Source: "test")
+        {
+            ItemsById = new Dictionary<int, ImportedItem> { [1] = item },
+            SocketedJewels = new[] { new ImportedSocketedJewel(22748, 1) },
+        });
+
+        var subgraph = spec.ActiveSubgraphs[22748];
+        var node = Assert.Single(subgraph.Nodes);
+        Assert.Equal(expectedNode.Id, node.Id);
+        Assert.Equal("Nature's Patience", node.Name);
+        Assert.Equal(NodeType.Keystone, node.Type);
+        Assert.Contains(expectedNode.Id, spec.AllocatedNodes);
+        Assert.Equal(0, result.ClusterSkipped);
+    }
+
+    [Fact]
+    public void ApplyImportAllocatesNestedUniqueClusters()
+    {
+        var temp = LoadSpec();
+        var largeItem = ClusterItem(
+            1,
+            "Large Cluster Jewel",
+            "{crafted}Adds 8 Passive Skills",
+            "{crafted}2 Added Passive Skills are Jewel Sockets");
+        temp.SetClusterJewel(55190, new ClusterJewelSpec(55190, ClusterJewelSize.Large, 8, 2, Array.Empty<string>()));
+        var childSockets = temp.ActiveSubgraphs[55190].Nodes
+            .Where(node => node.Type == NodeType.JewelSocket)
+            .OrderBy(node => node.ExpansionSocket?.Index)
+            .ToArray();
+        var mediumSocket = childSockets[0];
+        var smallSocket = childSockets[1];
+
+        temp.SetClusterJewel(
+            mediumSocket.Id,
+            new ClusterJewelSpec(
+                mediumSocket.Id,
+                ClusterJewelSize.Medium,
+                4,
+                0,
+                new[] { "Brush with Death", "Exposure Therapy", "Flow of Life" }));
+        temp.SetClusterJewel(
+            smallSocket.Id,
+            new ClusterJewelSpec(
+                smallSocket.Id,
+                ClusterJewelSize.Small,
+                1,
+                0,
+                Array.Empty<string>(),
+                "Nature's Patience"));
+        var expectedClusterNodeIds = temp.ActiveSubgraphs[55190].Nodes
+            .Concat(temp.ActiveSubgraphs[mediumSocket.Id].Nodes)
+            .Concat(temp.ActiveSubgraphs[smallSocket.Id].Nodes)
+            .Where(node => node.Id >= 65536)
+            .Select(node => node.Id)
+            .ToArray();
+        var megalomaniac = UniqueClusterItem(
+            2,
+            "Megalomaniac",
+            "Medium Cluster Jewel",
+            "Adds 4 Passive Skills",
+            "Added Small Passive Skills grant Nothing",
+            "1 Added Passive Skill is Brush with Death",
+            "1 Added Passive Skill is Exposure Therapy",
+            "1 Added Passive Skill is Flow of Life");
+        var naturalAffinity = UniqueClusterItem(
+            3,
+            "Natural Affinity",
+            "Small Cluster Jewel",
+            "Adds Nature's Patience");
+
+        var spec = LoadSpec();
+        var result = spec.ApplyImport(new ImportedBuild(
+            ClassId: 0,
+            AscendClassId: 0,
+            SecondaryAscendClassId: 0,
+            NodeHashes: new[] { 55190, mediumSocket.Id, smallSocket.Id },
+            ClusterNodeHashes: expectedClusterNodeIds,
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: "3.28",
+            Source: "test")
+        {
+            ItemsById = new Dictionary<int, ImportedItem>
+            {
+                [1] = largeItem,
+                [2] = megalomaniac,
+                [3] = naturalAffinity,
+            },
+            SocketedJewels = new[]
+            {
+                new ImportedSocketedJewel(mediumSocket.Id, 2),
+                new ImportedSocketedJewel(smallSocket.Id, 3),
+                new ImportedSocketedJewel(55190, 1),
+            },
+        });
+
+        Assert.Equal(0, result.ClusterSkipped);
+        Assert.Contains(mediumSocket.Id, spec.ActiveSubgraphs.Keys);
+        Assert.Contains(smallSocket.Id, spec.ActiveSubgraphs.Keys);
+        Assert.All(expectedClusterNodeIds, nodeId => Assert.Contains(nodeId, spec.AllocatedNodes));
+    }
+
+    [Fact]
+    public void ApplyImportFallsBackForUniqueClusterHashesThatDoNotMatchGeneratedIds()
+    {
+        var temp = LoadSpec();
+        temp.SetClusterJewel(55190, new ClusterJewelSpec(55190, ClusterJewelSize.Large, 8, 2, Array.Empty<string>()));
+        var mediumSocket = temp.ActiveSubgraphs[55190].Nodes
+            .Where(node => node.Type == NodeType.JewelSocket)
+            .OrderBy(node => node.ExpansionSocket?.Index)
+            .First();
+        temp.SetClusterJewel(
+            mediumSocket.Id,
+            new ClusterJewelSpec(
+                mediumSocket.Id,
+                ClusterJewelSize.Medium,
+                4,
+                0,
+                new[] { "Brush with Death", "Exposure Therapy", "Flow of Life" }));
+        var expectedClusterNodeIds = temp.ActiveSubgraphs[mediumSocket.Id].Nodes
+            .Where(node => node.Id >= 65536)
+            .Select(node => node.Id)
+            .ToArray();
+        var largeItem = ClusterItem(
+            1,
+            "Large Cluster Jewel",
+            "{crafted}Adds 8 Passive Skills",
+            "{crafted}2 Added Passive Skills are Jewel Sockets");
+        var megalomaniac = UniqueClusterItem(
+            2,
+            "Megalomaniac",
+            "Medium Cluster Jewel",
+            "Adds 4 Passive Skills",
+            "Added Small Passive Skills grant Nothing",
+            "1 Added Passive Skill is Brush with Death",
+            "1 Added Passive Skill is Exposure Therapy",
+            "1 Added Passive Skill is Flow of Life");
+
+        var spec = LoadSpec();
+        var result = spec.ApplyImport(new ImportedBuild(
+            ClassId: 0,
+            AscendClassId: 0,
+            SecondaryAscendClassId: 0,
+            NodeHashes: new[] { 55190, mediumSocket.Id },
+            ClusterNodeHashes: expectedClusterNodeIds.Select(id => id + 0x4000).ToArray(),
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: "3.28",
+            Source: "test")
+        {
+            ItemsById = new Dictionary<int, ImportedItem>
+            {
+                [1] = largeItem,
+                [2] = megalomaniac,
+            },
+            SocketedJewels = new[]
+            {
+                new ImportedSocketedJewel(mediumSocket.Id, 2),
+                new ImportedSocketedJewel(55190, 1),
+            },
+        });
+
+        Assert.Equal(0, result.ClusterSkipped);
+        Assert.All(expectedClusterNodeIds, nodeId => Assert.Contains(nodeId, spec.AllocatedNodes));
+    }
+
+    [Fact]
+    public void PobBuildCodeWithoutClusterHashFormatVersionIsTreatedAsLegacy()
+    {
+        var build = PobBuildCodeDecoder.Decode(EncodeBuildXml("""
+            <PathOfBuilding>
+              <Tree activeSpec="1">
+                <Spec title="legacy" treeVersion="3.28" classId="0" ascendClassId="0" nodes="55190,65600" />
+              </Tree>
+            </PathOfBuilding>
+            """));
+
+        Assert.Equal(1, build.ClusterHashFormatVersion);
+        Assert.Contains(65600, build.ClusterNodeHashes);
+    }
+
+    [Fact]
+    public void PobBuildCodeReadsExplicitCurrentClusterHashFormatVersion()
+    {
+        var build = PobBuildCodeDecoder.Decode(EncodeBuildXml("""
+            <PathOfBuilding>
+              <Tree activeSpec="1">
+                <Spec title="current" treeVersion="3.28" clusterHashFormatVersion="2" classId="0" ascendClassId="0" nodes="55190,65600" />
+              </Tree>
+            </PathOfBuilding>
+            """));
+
+        Assert.Equal(2, build.ClusterHashFormatVersion);
+    }
+
+    [Fact]
+    public void EquipmentViewModelGroupsSocketedJewelsAfterEquipment()
+    {
+        var helmet = new ImportedItem("Helmet", "Rare", "Victory Hood", "Lion Pelt", "Rarity: Rare\nVictory Hood\nLion Pelt") { Id = 1 };
+        var jewel = ClusterItem(
+            2,
+            "Large Cluster Jewel",
+            "{crafted}Adds 8 Passive Skills",
+            "{crafted}2 Added Passive Skills are Jewel Sockets");
+        var build = new ImportedBuild(
+            ClassId: 0,
+            AscendClassId: 0,
+            SecondaryAscendClassId: 0,
+            NodeHashes: Array.Empty<int>(),
+            ClusterNodeHashes: Array.Empty<int>(),
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: "3.28",
+            Source: "test")
+        {
+            Items = new[] { helmet },
+            ItemsById = new Dictionary<int, ImportedItem> { [1] = helmet, [2] = jewel },
+            SocketedJewels = new[] { new ImportedSocketedJewel(55190, 2) },
+        };
+
+        var vm = new EquipmentViewModel();
+        vm.LoadBuild(build);
+
+        Assert.Equal(new[] { "Equipment", "Jewels" }, vm.Groups.Select(group => group.Header).ToArray());
+        Assert.Equal("Helmet", Assert.Single(vm.Groups[0].Items).Slot);
+        Assert.Equal("Jewel 55190", Assert.Single(vm.Groups[1].Items).Slot);
+    }
+
     private static TreeModel LoadTree()
     {
         var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "tree_3_28.json"));
@@ -276,6 +686,17 @@ public sealed class ClusterJewelTests
     }
 
     private static PassiveSpec LoadSpec() => new(LoadTree());
+
+    private static string EncodeBuildXml(string xml)
+    {
+        using var output = new MemoryStream();
+        using (var zlib = new ZLibStream(output, CompressionLevel.SmallestSize, leaveOpen: true))
+        {
+            var bytes = Encoding.UTF8.GetBytes(xml);
+            zlib.Write(bytes, 0, bytes.Length);
+        }
+        return Convert.ToBase64String(output.ToArray()).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
 
     private static ImportedItem ClusterItem(int id, string baseType, params string[] bodyLines)
     {
@@ -286,6 +707,17 @@ public sealed class ClusterJewelTests
             baseType,
         }.Concat(bodyLines));
         return new ImportedItem(string.Empty, "RARE", "New Item", baseType, raw) { Id = id };
+    }
+
+    private static ImportedItem UniqueClusterItem(int id, string name, string baseType, params string[] bodyLines)
+    {
+        var raw = string.Join('\n', new[]
+        {
+            "Rarity: UNIQUE",
+            name,
+            baseType,
+        }.Concat(bodyLines));
+        return new ImportedItem(string.Empty, "UNIQUE", name, baseType, raw) { Id = id };
     }
 
     private static int ClusterNodeBase(TreeModel tree, int socketId, ClusterJewelSize size)

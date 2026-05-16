@@ -11,94 +11,91 @@
                    VerticalAlignment="Center"
                    Foreground="#AAAACC" FontSize="16"/>
 
-        <ScrollViewer IsVisible="{Binding HasItems}"
-                      HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl ItemsSource="{Binding Items}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel Margin="8" Orientation="Horizontal"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
+        <ScrollViewer IsVisible="{Binding HasItems}">
+            <ItemsControl ItemsSource="{Binding Groups}">
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="vm:ItemViewModel">
-                        <Border Width="260"
-                                Margin="6"
-                                Padding="10"
-                                Background="#141420"
-                                BorderBrush="{Binding BorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="4"
-                                VerticalAlignment="Top">
-                            <StackPanel Spacing="3">
-
-                                <!-- Slot label -->
-                                <TextBlock Text="{Binding Slot}"
-                                           Foreground="#777799"
-                                           FontSize="10"
-                                           Margin="0,0,0,1"/>
-
-                                <!-- Item name -->
-                                <TextBlock Text="{Binding Name}"
-                                           Foreground="{Binding NameBrush}"
-                                           FontWeight="Bold"
-                                           TextWrapping="Wrap"/>
-
-                                <!-- Base type (only when different from name) -->
-                                <TextBlock Text="{Binding BaseType}"
-                                           IsVisible="{Binding HasSeparateName}"
-                                           Foreground="#AAAAAA"
-                                           FontSize="11"
-                                           TextWrapping="Wrap"/>
-
-                                <!-- Implicit mods -->
-                                <ItemsControl ItemsSource="{Binding Implicits}"
-                                              IsVisible="{Binding HasImplicits}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate DataType="vm:ModLineViewModel">
-                                            <TextBlock Text="{Binding Text}"
-                                                       Foreground="{Binding Brush}"
-                                                       FontSize="10"
-                                                       TextWrapping="Wrap"/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-
-                                <!-- Separator (always shown between header and body) -->
-                                <Border Height="1"
-                                        Background="{Binding BorderBrush}"
-                                        Margin="0,4,0,4"/>
-
-                                <!-- Explicit mods / body -->
-                                <ItemsControl ItemsSource="{Binding Body}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate DataType="vm:ModLineViewModel">
-                                            <TextBlock Text="{Binding Text}"
-                                                       Foreground="{Binding Brush}"
-                                                       FontSize="10"
-                                                       TextWrapping="Wrap"/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-
-                                <!-- Status flags (Corrupted, Mirrored, etc.) -->
-                                <Border Height="1"
-                                        Background="{Binding BorderBrush}"
-                                        IsVisible="{Binding HasStatusFlags}"
-                                        Margin="0,4,0,4"/>
-                                <ItemsControl ItemsSource="{Binding StatusFlags}"
-                                              IsVisible="{Binding HasStatusFlags}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate DataType="vm:ModLineViewModel">
-                                            <TextBlock Text="{Binding Text}"
-                                                       Foreground="{Binding Brush}"
-                                                       FontSize="10"
-                                                       TextWrapping="Wrap"/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-
-                            </StackPanel>
-                        </Border>
+                    <DataTemplate DataType="vm:ItemGroupViewModel">
+                        <StackPanel Margin="8,10,8,2" Spacing="6">
+                            <TextBlock Text="{Binding Header}"
+                                       Foreground="#DDDDEE"
+                                       FontWeight="Bold"
+                                       FontSize="14"
+                                       Margin="4,0,0,0"/>
+                            <ItemsControl ItemsSource="{Binding Items}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:ItemViewModel">
+                                        <Border Width="260"
+                                                Margin="6"
+                                                Padding="10"
+                                                Background="#141420"
+                                                BorderBrush="{Binding BorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="4"
+                                                VerticalAlignment="Top">
+                                            <StackPanel Spacing="3">
+                                                <TextBlock Text="{Binding Slot}"
+                                                           Foreground="#777799"
+                                                           FontSize="10"
+                                                           Margin="0,0,0,1"/>
+                                                <TextBlock Text="{Binding Name}"
+                                                           Foreground="{Binding NameBrush}"
+                                                           FontWeight="Bold"
+                                                           TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding BaseType}"
+                                                           IsVisible="{Binding HasSeparateName}"
+                                                           Foreground="#AAAAAA"
+                                                           FontSize="11"
+                                                           TextWrapping="Wrap"/>
+                                                <ItemsControl ItemsSource="{Binding Implicits}"
+                                                              IsVisible="{Binding HasImplicits}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate DataType="vm:ModLineViewModel">
+                                                            <TextBlock Text="{Binding Text}"
+                                                                       Foreground="{Binding Brush}"
+                                                                       FontSize="10"
+                                                                       TextWrapping="Wrap"/>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <Border Height="1"
+                                                        Background="{Binding BorderBrush}"
+                                                        Margin="0,4,0,4"/>
+                                                <ItemsControl ItemsSource="{Binding Body}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate DataType="vm:ModLineViewModel">
+                                                            <TextBlock Text="{Binding Text}"
+                                                                       Foreground="{Binding Brush}"
+                                                                       FontSize="10"
+                                                                       TextWrapping="Wrap"/>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <Border Height="1"
+                                                        Background="{Binding BorderBrush}"
+                                                        IsVisible="{Binding HasStatusFlags}"
+                                                        Margin="0,4,0,4"/>
+                                                <ItemsControl ItemsSource="{Binding StatusFlags}"
+                                                              IsVisible="{Binding HasStatusFlags}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate DataType="vm:ModLineViewModel">
+                                                            <TextBlock Text="{Binding Text}"
+                                                                       Foreground="{Binding Brush}"
+                                                                       FontSize="10"
+                                                                       TextWrapping="Wrap"/>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
