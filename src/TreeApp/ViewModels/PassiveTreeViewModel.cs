@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using PathOfAvalonia.TreeDomain;
+using PathOfAvalonia.TreeDomain.ClusterJewels;
 
 namespace PathOfAvalonia.TreeApp.ViewModels;
 
@@ -28,12 +29,42 @@ public sealed class PassiveTreeViewModel
     public int? HoverNodeId => _hoverNodeId;
     public HoverPath HoverPath => _hoverPath;
     public HashSet<int> HoverPathNodes => _hoverPathNodes;
-    public Node? HoverNode =>
-        _hoverNodeId is { } id && _spec.Tree.Nodes.TryGetValue(id, out var n) ? n : null;
+    public Node? HoverNode
+    {
+        get
+        {
+            if (_hoverNodeId is not { } id)
+            {
+                return null;
+            }
+            if (_spec.Tree.Nodes.TryGetValue(id, out var n))
+            {
+                return n;
+            }
+            // Cluster nodes aren't in the base tree — check active subgraphs.
+            foreach (var sub in _spec.ActiveSubgraphs.Values)
+            {
+                foreach (var cn in sub.Nodes)
+                {
+                    if (cn.Id == id)
+                    {
+                        return cn;
+                    }
+                }
+            }
+            return null;
+        }
+    }
+
+    public IReadOnlyDictionary<int, ClusterSubgraph> ActiveClusters => _spec.ActiveSubgraphs;
 
     public bool IsAllocated(int id) => _spec.IsAllocated(id);
 
     public MasteryEffect? SelectedMasteryEffect(int nodeId) => _spec.SelectedMasteryEffect(nodeId);
+
+    // Returns the cluster size for the given socket node, or null if no cluster is active there.
+    public ClusterJewelSize? ClusterSizeAt(int socketNodeId) =>
+        _spec.ActiveSubgraphs.TryGetValue(socketNodeId, out var sub) ? sub.Size : null;
 
     public void SetHover(int? nodeId)
     {

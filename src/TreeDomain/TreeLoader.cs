@@ -53,6 +53,11 @@ public static class TreeLoader
             var y = grp.Y - Math.Cos(angle) * radius;
 
             var type = ClassifyNode(nd);
+            if (type == NodeType.JewelSocket
+                && (nd.Name == "Small Jewel Socket" || nd.Name == "Medium Jewel Socket"))
+            {
+                continue;
+            }
             IReadOnlyList<MasteryEffect>? effects = null;
             if (nd.MasteryEffects is { Length: > 0 } meArr)
             {

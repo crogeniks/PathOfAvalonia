@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -8,6 +9,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using PathOfAvalonia.TreeApp.ViewModels;
 using PathOfAvalonia.TreeDomain;
+using PathOfAvalonia.TreeDomain.ClusterJewels;
 
 namespace PathOfAvalonia.TreeApp;
 
@@ -52,13 +54,20 @@ public sealed class PassiveTreeView : Control
     private static readonly double HitRsqMastery  = Sq(65 * SpriteDisplayScale);
     private static double Sq(double x) => x * x;
 
-    // Cached brushes
+    // Cached brushes / pens
     private static readonly IBrush BgBrush = new SolidColorBrush(Color.FromRgb(0x10, 0x10, 0x18));
     private static readonly IBrush NormalBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x60));
     private static readonly IBrush AllocatedBrush = new SolidColorBrush(Color.FromRgb(0xff, 0xc8, 0x4a));
     private static readonly IBrush ConnectorBrush = new SolidColorBrush(Color.FromRgb(0x40, 0x40, 0x48));
     private static readonly IBrush HoverPathBrush = new SolidColorBrush(Color.FromArgb(0x80, 0xff, 0xc8, 0x4a));
     private static readonly IPen NodeOutlinePen = new Pen(Brushes.Black, 1.5);
+    // Cluster background disc layers (programmatic stand-in for the missing art asset).
+    // Colors approximate the PoB golden-medallion aesthetic.
+    private static readonly IBrush ClusterDiscFillBrush   = new SolidColorBrush(Color.FromArgb(0xD8, 0x12, 0x14, 0x1C));
+    private static readonly IBrush ClusterDiscBorderBrush = new SolidColorBrush(Color.FromRgb(0x7A, 0x68, 0x3E));
+    private static readonly IBrush ClusterDiscRing1Brush  = new SolidColorBrush(Color.FromRgb(0x5E, 0x52, 0x32));
+    private static readonly IBrush ClusterDiscRing2Brush  = new SolidColorBrush(Color.FromRgb(0x42, 0x3C, 0x24));
+    private static readonly IBrush ClusterOrbitLineBrush  = new SolidColorBrush(Color.FromArgb(0x60, 0x90, 0x82, 0x56));
 
     public PassiveTreeView(PassiveTreeViewModel vm, SpriteMap sprites)
     {
@@ -140,14 +149,59 @@ public sealed class PassiveTreeView : Control
         ctx.FillRectangle(BgBrush, new Rect(Bounds.Size));
         DrawBackgroundTile(ctx);
 
-        // Draw connectors. Pen thickness is in tree-space so it scales with zoom.
+        var activeClusters = _vm.ActiveClusters;
+
+        // Cluster background discs, drawn under connectors and nodes.
+        // We don't have the actual medallion art asset, so we approximate it with
+        // concentric golden rings on a dark fill.
+        // The disc is centred on the ring centre (offset outward from the socket).
+        foreach (var sub in activeClusters.Values)
+        {
+            var centre = TreeToScreen(sub.ClusterCenterX, sub.ClusterCenterY);
+            var r = sub.CircleRadius * _scale;
+
+            // Proportional thicknesses so the disc looks reasonable at any zoom.
+            var borderThick = Math.Max(1.5, r * 0.10);
+            var ringThick1  = Math.Max(1.0, r * 0.04);
+            var ringThick2  = Math.Max(0.5, r * 0.025);
+
+            // Dark fill + outer golden border (the "edge" of the medallion).
+            ctx.DrawEllipse(ClusterDiscFillBrush,
+                new Pen(ClusterDiscBorderBrush, borderThick),
+                centre, r * 0.88, r * 0.88);
+
+            // First inner decorative ring.
+            ctx.DrawEllipse(null,
+                new Pen(ClusterDiscRing1Brush, ringThick1),
+                centre, r * 0.66, r * 0.66);
+
+            // Second inner ring (tighter).
+            ctx.DrawEllipse(null,
+                new Pen(ClusterDiscRing2Brush, ringThick2),
+                centre, r * 0.46, r * 0.46);
+
+            // Orbit ring at the node positions (semi-transparent, scales like connectors).
+            var orbitThick = Math.Max(0.5, ConnectorThicknessTree * _scale * 0.5);
+            ctx.DrawEllipse(null,
+                new Pen(ClusterOrbitLineBrush, orbitThick),
+                centre, r, r);
+        }
+
+        // Draw connectors: base tree first, then cluster subgraph connectors.
         var allocated = _vm.AllocatedNodes;
         var connThick = Math.Max(0.5, ConnectorThicknessTree * _scale);
         var connPen = new Pen(ConnectorBrush, connThick);
         var connActivePen = new Pen(AllocatedBrush, connThick);
         var connHoverPen = new Pen(HoverPathBrush, connThick);
         var pathEdges = _vm.HoverPath.Edges;
-        foreach (var c in _vm.Tree.Connectors)
+
+        IEnumerable<Connector> allConnectors = _vm.Tree.Connectors;
+        foreach (var sub in activeClusters.Values)
+        {
+            allConnectors = allConnectors.Concat(sub.Connectors);
+        }
+
+        foreach (var c in allConnectors)
         {
             var key = (Math.Min(c.FromId, c.ToId), Math.Max(c.FromId, c.ToId));
             IPen pen;
@@ -223,15 +277,33 @@ public sealed class PassiveTreeView : Control
     private void DrawNodesAndHud(DrawingContext ctx)
     {
         var allocated = _vm.AllocatedNodes;
+
+        // Base-tree nodes (skip proxies; skip jewel sockets that have an active cluster —
+        // the cluster ring's slot 0 sits at the socket position and replaces it visually).
         foreach (var n in _vm.Tree.Nodes.Values)
         {
             if (n.Type == NodeType.Proxy)
             {
                 continue;
             }
+            if (n.Type == NodeType.JewelSocket && _vm.ActiveClusters.ContainsKey(n.Id))
+            {
+                continue;
+            }
             var isHover = _vm.HoverNodeId == n.Id;
             var onPath = _vm.HoverPathNodes.Contains(n.Id);
             DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath);
+        }
+
+        // Cluster subgraph nodes (only rendered when the jewel is active).
+        foreach (var sub in _vm.ActiveClusters.Values)
+        {
+            foreach (var n in sub.Nodes)
+            {
+                var isHover = _vm.HoverNodeId == n.Id;
+                var onPath = _vm.HoverPathNodes.Contains(n.Id);
+                DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath);
+            }
         }
 
         // HUD: alloc count + hover label
@@ -266,7 +338,9 @@ public sealed class PassiveTreeView : Control
             DrawSprite(ctx, "masteryConnected", ii, screen);
         }
         // Frame: ornate border. Mastery has no separate frame (baked in).
-        var frameKey = FrameKey(n.Type, alloc, hover);
+        // For JewelSocket nodes, check whether a cluster is active to pick the right sprite.
+        var clusterSize = n.Type == NodeType.JewelSocket ? _vm.ClusterSizeAt(n.Id) : null;
+        var frameKey = FrameKey(n.Type, alloc, hover, clusterSize);
         if (frameKey is not null)
         {
             DrawSprite(ctx, "frame", frameKey, screen);
@@ -315,13 +389,27 @@ public sealed class PassiveTreeView : Control
         _ => (null, null),
     };
 
-    private static string? FrameKey(NodeType type, bool alloc, bool hover) => type switch
+    private static string? FrameKey(NodeType type, bool alloc, bool hover,
+        ClusterJewelSize? clusterSize = null) => type switch
     {
-        NodeType.Normal => alloc ? "PSSkillFrameActive" : hover ? "PSSkillFrameHighlighted" : "PSSkillFrame",
-        NodeType.Notable => alloc ? "NotableFrameAllocated" : hover ? "NotableFrameCanAllocate" : "NotableFrameUnallocated",
+        NodeType.Normal   => alloc ? "PSSkillFrameActive" : hover ? "PSSkillFrameHighlighted" : "PSSkillFrame",
+        NodeType.Notable  => alloc ? "NotableFrameAllocated" : hover ? "NotableFrameCanAllocate" : "NotableFrameUnallocated",
         NodeType.Keystone => alloc ? "KeystoneFrameAllocated" : hover ? "KeystoneFrameCanAllocate" : "KeystoneFrameUnallocated",
+        // Cluster socket: use size-specific sprites when a cluster jewel is active.
+        // There is no cluster-specific active sprite, so allocated falls back to the base jewel frame.
+        NodeType.JewelSocket when clusterSize is { } size =>
+            alloc ? "JewelFrameAllocated" :
+            hover ? $"JewelSocketClusterAltCanAllocate1{SizeLabel(size)}" :
+                    $"JewelSocketClusterAltNormal1{SizeLabel(size)}",
         NodeType.JewelSocket => alloc ? "JewelFrameAllocated" : hover ? "JewelFrameCanAllocate" : "JewelFrameUnallocated",
         _ => null,
+    };
+
+    private static string SizeLabel(ClusterJewelSize size) => size switch
+    {
+        ClusterJewelSize.Large  => "Large",
+        ClusterJewelSize.Medium => "Medium",
+        _                       => "Small",
     };
 
     private int? HitTest(Point screen)
@@ -329,12 +417,34 @@ public sealed class PassiveTreeView : Control
         var (tx, ty) = ScreenToTree(screen);
         var best = double.MaxValue;
         int? bestId = null;
+
+        // Base-tree nodes (same exclusions as drawing: skip proxy, skip cluster-replaced sockets).
         foreach (var n in _vm.Tree.Nodes.Values)
         {
             if (n.Type == NodeType.Proxy)
             {
                 continue;
             }
+            if (n.Type == NodeType.JewelSocket && _vm.ActiveClusters.ContainsKey(n.Id))
+            {
+                continue;
+            }
+            CheckNode(n);
+        }
+
+        // Cluster subgraph nodes.
+        foreach (var sub in _vm.ActiveClusters.Values)
+        {
+            foreach (var n in sub.Nodes)
+            {
+                CheckNode(n);
+            }
+        }
+
+        return bestId;
+
+        void CheckNode(Node n)
+        {
             var dx = tx - n.X;
             var dy = ty - n.Y;
             var d = dx * dx + dy * dy;
@@ -354,7 +464,6 @@ public sealed class PassiveTreeView : Control
                 bestId = n.Id;
             }
         }
-        return bestId;
     }
 
     protected override Size MeasureOverride(Size availableSize) => availableSize;
@@ -419,7 +528,9 @@ public sealed class PassiveTreeView : Control
                     }
                 }
             }
+            return;
         }
+
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
