@@ -172,6 +172,22 @@ public sealed class ClusterJewelTests
     }
 
     [Fact]
+    public void DeallocatingUnrelatedNodePreservesDetachedNonNormalClusterAllocations()
+    {
+        var spec = LoadSpec();
+        spec.SetClusterJewel(33753, new ClusterJewelSpec(33753, ClusterJewelSize.Medium, 4, 0, new[] { "Eye to Eye" }));
+
+        var detachedBaseNode = spec.Tree.Nodes.Values.First(node => node.Type == NodeType.Normal).Id;
+        var detachedClusterNotable = Assert.Single(spec.ActiveSubgraphs[33753].Nodes.Where(node => node.Type == NodeType.Notable));
+        spec.AllocateMany(new[] { detachedBaseNode, detachedClusterNotable.Id });
+
+        spec.Toggle(detachedBaseNode);
+
+        Assert.DoesNotContain(detachedBaseNode, spec.AllocatedNodes);
+        Assert.Contains(detachedClusterNotable.Id, spec.AllocatedNodes);
+    }
+
+    [Fact]
     public void ViewModelManualInsertionSupportsPassiveAndNotableCounts()
     {
         var spec = LoadSpec();
