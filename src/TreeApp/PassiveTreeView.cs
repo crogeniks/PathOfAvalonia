@@ -32,6 +32,7 @@ public sealed class PassiveTreeView : Control
     // Pan state
     private bool _panning;
     private Point _panStartScreen;
+    private Point _lastPointerPosition;
     private double _panStartOffX, _panStartOffY;
     private bool _panMoved;
 
@@ -59,6 +60,13 @@ public sealed class PassiveTreeView : Control
     private static readonly IBrush BgBrush = new SolidColorBrush(Color.FromRgb(0x10, 0x10, 0x18));
     private static readonly IBrush NormalBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x60));
     private static readonly IBrush AllocatedBrush = new SolidColorBrush(Color.FromRgb(0xff, 0xc8, 0x4a));
+    private static readonly IBrush TooltipFillBrush = new SolidColorBrush(Color.FromArgb(0xEE, 0x06, 0x08, 0x0B));
+    private static readonly IBrush TooltipHeaderBrush = new SolidColorBrush(Color.FromArgb(0xEE, 0x39, 0x2B, 0x16));
+    private static readonly IBrush TooltipBorderBrush = new SolidColorBrush(Color.FromRgb(0xA8, 0x76, 0x22));
+    private static readonly IBrush TooltipTitleBrush = new SolidColorBrush(Color.FromRgb(0xF0, 0xDF, 0xC4));
+    private static readonly IBrush TooltipStatBrush = new SolidColorBrush(Color.FromRgb(0x8D, 0x98, 0xFF));
+    private static readonly IBrush TooltipReminderBrush = new SolidColorBrush(Color.FromRgb(0xA6, 0xB1, 0xA4));
+    private static readonly IBrush TooltipFlavourBrush = new SolidColorBrush(Color.FromRgb(0xD2, 0x84, 0x2E));
     private static readonly IBrush ConnectorBrush = new SolidColorBrush(Color.FromRgb(0x40, 0x40, 0x48));
     private static readonly IBrush HoverPathBrush = new SolidColorBrush(Color.FromArgb(0x80, 0xff, 0xc8, 0x4a));
     private static readonly IPen NodeOutlinePen = new Pen(Brushes.Black, 1.5);
@@ -332,21 +340,167 @@ public sealed class PassiveTreeView : Control
             }
         }
 
-        // HUD: alloc count + hover label
+        // HUD: alloc count. The hovered node details are drawn as a tooltip below.
         var hud = $"v{_vm.Tree.Version} • allocated: {allocated.Count}";
-        if (_vm.HoverNode is { } hn)
-        {
-            hud += $"  •  hover: {hn.Name} [{hn.Type}]";
-            if (hn.Type == NodeType.Mastery && allocated.Contains(hn.Id)
-                && _vm.SelectedMasteryEffect(hn.Id) is { Stats.Count: > 0 } eff)
-            {
-                hud += $"\n    selected: {string.Join(" | ", eff.Stats)}";
-            }
-        }
         var ft = new FormattedText(hud, System.Globalization.CultureInfo.CurrentCulture,
             FlowDirection.LeftToRight, Typeface.Default, 14, Brushes.White);
         ctx.DrawText(ft, new Point(8, 8));
+        DrawNodeTooltip(ctx);
     }
+
+    private void DrawNodeTooltip(DrawingContext ctx)
+    {
+        if (_vm.HoverNode is not { } node)
+        {
+            return;
+        }
+
+        var contentWidth = 380.0;
+        var paddingX = 12.0;
+        var paddingY = 9.0;
+        var headerHeight = 32.0;
+        var title = CreateText(node.Name, 20, TooltipTitleBrush);
+        var lines = BuildTooltipLines(node, contentWidth);
+
+        var width = Math.Max(260, Math.Min(430, Math.Max(title.Width + paddingX * 2, contentWidth + paddingX * 2)));
+        var height = headerHeight + paddingY;
+        foreach (var line in lines)
+        {
+            height += line.IsGap ? 8 : line.Text.Height + 2;
+        }
+        height += paddingY;
+
+        var x = _lastPointerPosition.X + 18;
+        var y = _lastPointerPosition.Y + 18;
+        if (x + width > Bounds.Width - 8)
+        {
+            x = _lastPointerPosition.X - width - 18;
+        }
+        if (y + height > Bounds.Height - 8)
+        {
+            y = Bounds.Height - height - 8;
+        }
+        x = Math.Clamp(x, 8, Math.Max(8, Bounds.Width - width - 8));
+        y = Math.Clamp(y, 8, Math.Max(8, Bounds.Height - height - 8));
+
+        var rect = new Rect(x, y, width, height);
+        ctx.FillRectangle(TooltipFillBrush, rect);
+        ctx.FillRectangle(TooltipHeaderBrush, new Rect(x, y, width, headerHeight));
+        ctx.DrawRectangle(null, new Pen(TooltipBorderBrush, 1.5), rect);
+        ctx.DrawLine(new Pen(TooltipBorderBrush, 1), new Point(x, y + headerHeight), new Point(x + width, y + headerHeight));
+
+        ctx.DrawText(title, new Point(x + (width - title.Width) * 0.5, y + (headerHeight - title.Height) * 0.5 - 1));
+
+        var cy = y + headerHeight + paddingY;
+        foreach (var line in lines)
+        {
+            if (line.IsGap)
+            {
+                cy += 8;
+                continue;
+            }
+            ctx.DrawText(line.Text, new Point(x + paddingX, cy));
+            cy += line.Text.Height + 2;
+        }
+    }
+
+    private List<TooltipLine> BuildTooltipLines(Node node, double contentWidth)
+    {
+        var lines = new List<TooltipLine>();
+
+        AddWrappedLines(lines, PassiveEffectLines(node), contentWidth, TooltipStatBrush, 14, Typeface.Default);
+        AddAllocationPreviewLines(lines, node, contentWidth);
+        AddWrappedLines(lines, node.FlavourText, contentWidth, TooltipFlavourBrush, 14,
+            new Typeface(FontFamily.Default, FontStyle.Italic, FontWeight.Normal));
+        AddWrappedLines(lines, node.ReminderText, contentWidth, TooltipReminderBrush, 12, Typeface.Default, gapBefore: lines.Count > 0);
+
+        return lines;
+    }
+
+    private IEnumerable<string> PassiveEffectLines(Node node)
+    {
+        if (node.Type == NodeType.Mastery)
+        {
+            if (_vm.SelectedMasteryEffect(node.Id) is { Stats.Count: > 0 } selected)
+            {
+                return selected.Stats;
+            }
+            if (node.MasteryEffects is { Count: > 0 } effects)
+            {
+                var result = new List<string>();
+                foreach (var effect in effects)
+                {
+                    result.AddRange(effect.Stats);
+                }
+                return result;
+            }
+        }
+
+        return node.Stats;
+    }
+
+    private void AddAllocationPreviewLines(List<TooltipLine> lines, Node node, double contentWidth)
+    {
+        _ = node;
+        _ = contentWidth;
+        // Future home for "Allocating this node will give you" and DPS/stat deltas.
+        // The app does not yet have the calculation skeleton needed for this section.
+    }
+
+    private static void AddWrappedLines(
+        List<TooltipLine> lines,
+        IEnumerable<string> source,
+        double maxWidth,
+        IBrush brush,
+        double size,
+        Typeface typeface,
+        bool gapBefore = false)
+    {
+        var added = false;
+        foreach (var raw in source)
+        {
+            foreach (var line in WrapText(raw, maxWidth, size, typeface, brush))
+            {
+                if (!added && gapBefore)
+                {
+                    lines.Add(TooltipLine.Gap);
+                }
+                lines.Add(new TooltipLine(CreateText(line, size, brush, typeface)));
+                added = true;
+            }
+        }
+    }
+
+    private static IEnumerable<string> WrapText(string text, double maxWidth, double size, Typeface typeface, IBrush brush)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            yield break;
+        }
+
+        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var current = string.Empty;
+        foreach (var word in words)
+        {
+            var candidate = current.Length == 0 ? word : $"{current} {word}";
+            if (CreateText(candidate, size, brush, typeface).Width <= maxWidth || current.Length == 0)
+            {
+                current = candidate;
+                continue;
+            }
+
+            yield return current;
+            current = word;
+        }
+        if (current.Length > 0)
+        {
+            yield return current;
+        }
+    }
+
+    private static FormattedText CreateText(string text, double size, IBrush brush, Typeface? typeface = null) =>
+        new(text, System.Globalization.CultureInfo.CurrentCulture,
+            FlowDirection.LeftToRight, typeface ?? Typeface.Default, size, brush);
 
     private void DrawNode(DrawingContext ctx, Node n, bool alloc, bool hover, bool useClusterSocketFrame)
     {
@@ -498,6 +652,7 @@ public sealed class PassiveTreeView : Control
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         var p = e.GetPosition(this);
+        _lastPointerPosition = p;
         if (_panning)
         {
             _offsetX = _panStartOffX + (p.X - _panStartScreen.X);
@@ -517,12 +672,17 @@ public sealed class PassiveTreeView : Control
         {
             _vm.SetHover(hit); // fires RedrawRequested → InvalidateVisual
         }
+        else if (hit is not null)
+        {
+            InvalidateVisual();
+        }
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         var props = e.GetCurrentPoint(this).Properties;
         var p = e.GetPosition(this);
+        _lastPointerPosition = p;
         if (props.IsLeftButtonPressed)
         {
             _panning = true;
@@ -686,5 +846,10 @@ public sealed class PassiveTreeView : Control
             items.Add(item);
         }
         return items;
+    }
+
+    private readonly record struct TooltipLine(FormattedText Text, bool IsGap = false)
+    {
+        public static TooltipLine Gap { get; } = new(CreateText(string.Empty, 1, Brushes.Transparent), IsGap: true);
     }
 }

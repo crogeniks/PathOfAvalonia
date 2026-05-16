@@ -45,6 +45,20 @@ public sealed class ClusterJewelTests
     }
 
     [Fact]
+    public void LoaderPreservesPassiveTooltipText()
+    {
+        var tree = LoadTree();
+
+        var keystone = tree.Nodes[31961];
+        Assert.Equal("Resolute Technique", keystone.Name);
+        Assert.Equal(new[] { "Your hits can't be Evaded", "Never deal Critical Strikes" }, keystone.Stats);
+        Assert.Equal(new[] { "Great tacticians learn that consistency often trumps potential." }, keystone.FlavourText);
+
+        var smallPassive = tree.Nodes[63027];
+        Assert.Equal(new[] { "Exerted Attacks deal 20% increased Damage" }, smallPassive.Stats);
+    }
+
+    [Fact]
     public void ValidationRulesMatchSocketSizeRestrictions()
     {
         var spec = LoadSpec();
