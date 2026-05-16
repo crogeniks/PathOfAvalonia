@@ -1,4 +1,5 @@
 using PathOfAvalonia.TreeDomain;
+using PathOfAvalonia.TreeApp.ViewModels;
 using PathOfAvalonia.TreeDomain.ClusterJewels;
 using Xunit;
 
@@ -133,6 +134,24 @@ public sealed class ClusterJewelTests
 
         spec.RemoveClusterJewel(55190);
         Assert.Empty(spec.ActiveSubgraphs);
+    }
+
+    [Fact]
+    public void ViewModelManualInsertionSupportsPassiveAndNotableCounts()
+    {
+        var spec = LoadSpec();
+        var vm = new PassiveTreeViewModel(spec);
+
+        Assert.Equal(new[] { 8, 9, 10, 11, 12 }, vm.ManualPassiveCounts(ClusterJewelSize.Large));
+        Assert.Equal(new[] { 0, 1, 2, 3 }, vm.ManualNotableCounts(ClusterJewelSize.Large, 8));
+
+        vm.InsertCluster(55190, ClusterJewelSize.Large, 12, 3);
+
+        var subgraph = Assert.Single(spec.ActiveSubgraphs.Values);
+        Assert.Equal(12, subgraph.Nodes.Count);
+        Assert.Equal(2, subgraph.Nodes.Count(node => node.Type == NodeType.JewelSocket));
+        Assert.Equal(3, subgraph.Nodes.Count(node => node.Type == NodeType.Notable));
+        Assert.Equal(7, subgraph.Nodes.Count(node => node.Type == NodeType.Normal));
     }
 
     private static TreeModel LoadTree()

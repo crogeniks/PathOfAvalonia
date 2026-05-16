@@ -650,8 +650,38 @@ public sealed class PassiveTreeView : Control
         foreach (var size in sizes)
         {
             var label = replacePrefix ? $"Replace with {size} Cluster" : $"Insert {size} Cluster";
-            var item = new MenuItem { Header = label };
-            item.Click += (_, _) => _vm.InsertCluster(socketId, size);
+            items.Add(new MenuItem
+            {
+                Header = label,
+                ItemsSource = BuildPassiveCountMenuItems(socketId, size),
+            });
+        }
+        return items;
+    }
+
+    private IReadOnlyList<MenuItem> BuildPassiveCountMenuItems(int socketId, ClusterJewelSize size)
+    {
+        var passiveCounts = _vm.ManualPassiveCounts(size);
+        var items = new List<MenuItem>(passiveCounts.Count);
+        foreach (var passiveCount in passiveCounts)
+        {
+            items.Add(new MenuItem
+            {
+                Header = $"{passiveCount} passives",
+                ItemsSource = BuildNotableCountMenuItems(socketId, size, passiveCount),
+            });
+        }
+        return items;
+    }
+
+    private IReadOnlyList<MenuItem> BuildNotableCountMenuItems(int socketId, ClusterJewelSize size, int passiveCount)
+    {
+        var notableCounts = _vm.ManualNotableCounts(size, passiveCount);
+        var items = new List<MenuItem>(notableCounts.Count);
+        foreach (var notableCount in notableCounts)
+        {
+            var item = new MenuItem { Header = $"{notableCount} notables" };
+            item.Click += (_, _) => _vm.InsertCluster(socketId, size, passiveCount, notableCount);
             items.Add(item);
         }
         return items;

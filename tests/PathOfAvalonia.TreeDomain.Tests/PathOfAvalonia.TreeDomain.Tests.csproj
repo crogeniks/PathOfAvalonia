@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\TreeApp\PathOfAvalonia.TreeApp.csproj" />
     <ProjectReference Include="..\..\src\TreeDomain\PathOfAvalonia.TreeDomain.csproj" />
   </ItemGroup>
 
