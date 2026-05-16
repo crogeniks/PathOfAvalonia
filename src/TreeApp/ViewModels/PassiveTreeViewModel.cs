@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using PathOfAvalonia.TreeDomain;
 using PathOfAvalonia.TreeDomain.ClusterJewels;
 
@@ -70,6 +71,20 @@ public sealed class PassiveTreeViewModel
 
     public bool HasClusterAt(int socketId) => _spec.ActiveSubgraphs.ContainsKey(socketId);
 
+    public IReadOnlyList<int> ManualPassiveCounts(ClusterJewelSize size)
+    {
+        var definition = ClusterJewelData.GetDefinition(size);
+        return Enumerable.Range(definition.MinNodes, definition.MaxNodes - definition.MinNodes + 1).ToArray();
+    }
+
+    public IReadOnlyList<int> ManualNotableCounts(ClusterJewelSize size, int passiveCount)
+    {
+        var socketCount = DefaultSocketCount(size);
+        var maxByStructure = Math.Max(0, passiveCount - socketCount - 1);
+        var max = Math.Min(MaxManualNotables(size), maxByStructure);
+        return Enumerable.Range(0, max + 1).ToArray();
+    }
+
     public void SetHover(int? nodeId)
     {
         if (nodeId == _hoverNodeId)
@@ -89,16 +104,52 @@ public sealed class PassiveTreeViewModel
 
     public void InsertCluster(int socketId, ClusterJewelSize size)
     {
-        var spec = size switch
-        {
-            ClusterJewelSize.Large => new ClusterJewelSpec(socketId, size, 8, 2, Array.Empty<string>()),
-            ClusterJewelSize.Medium => new ClusterJewelSpec(socketId, size, 4, 1, Array.Empty<string>()),
-            _ => new ClusterJewelSpec(socketId, size, 2, 0, Array.Empty<string>()),
-        };
+        InsertCluster(socketId, size, DefaultPassiveCount(size), 0);
+    }
+
+    public void InsertCluster(int socketId, ClusterJewelSize size, int passiveCount, int notableCount)
+    {
+        var definition = ClusterJewelData.GetDefinition(size);
+        passiveCount = Math.Clamp(passiveCount, definition.MinNodes, definition.MaxNodes);
+        var allowedNotables = ManualNotableCounts(size, passiveCount);
+        notableCount = allowedNotables.Count == 0 ? 0 : Math.Clamp(notableCount, allowedNotables[0], allowedNotables[^1]);
+
+        var spec = new ClusterJewelSpec(
+            socketId,
+            size,
+            passiveCount,
+            DefaultSocketCount(size),
+            BuildPlaceholderNotables(size, notableCount));
         _spec.SetClusterJewel(socketId, spec);
     }
 
     public void RemoveCluster(int socketId) => _spec.RemoveClusterJewel(socketId);
+
+    private static int DefaultPassiveCount(ClusterJewelSize size) => size switch
+    {
+        ClusterJewelSize.Large => 8,
+        ClusterJewelSize.Medium => 4,
+        _ => 2,
+    };
+
+    private static int DefaultSocketCount(ClusterJewelSize size) => size switch
+    {
+        ClusterJewelSize.Large => 2,
+        ClusterJewelSize.Medium => 1,
+        _ => 0,
+    };
+
+    private static int MaxManualNotables(ClusterJewelSize size) => size switch
+    {
+        ClusterJewelSize.Large => 3,
+        ClusterJewelSize.Medium => 2,
+        _ => 1,
+    };
+
+    private static IReadOnlyList<string> BuildPlaceholderNotables(ClusterJewelSize size, int notableCount) =>
+        Enumerable.Range(1, notableCount)
+            .Select(index => $"{size} Cluster Notable {index}")
+            .ToArray();
 
     private void OnSpecChanged()
     {
