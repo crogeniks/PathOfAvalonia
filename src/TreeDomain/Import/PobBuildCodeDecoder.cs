@@ -99,7 +99,11 @@ public static class PobBuildCodeDecoder
                 MasterySelections: masteries,
                 TreeVersion: treeVersion,
                 Source: "pob-code")
-            { Items = items };
+            {
+                Items = items.ActiveItems,
+                ItemsById = items.ItemsById,
+                SocketedJewels = ParseSocketedJewels(spec),
+            };
         }
 
         var urlElement = spec.Element("URL");
@@ -108,7 +112,14 @@ public static class PobBuildCodeDecoder
             throw new InvalidDataException("Spec has neither 'nodes' attribute nor <URL> child");
         }
         var embedded = PobTreeUrlDecoder.Decode(urlElement.Value);
-        return embedded with { TreeVersion = treeVersion, Source = "pob-code", Items = items };
+        return embedded with
+        {
+            TreeVersion = treeVersion,
+            Source = "pob-code",
+            Items = items.ActiveItems,
+            ItemsById = items.ItemsById,
+            SocketedJewels = ParseSocketedJewels(spec),
+        };
     }
 
     private static List<XElement> ExtractSpecElements(string xml)
@@ -262,18 +273,22 @@ public static class PobBuildCodeDecoder
         return result;
     }
 
-    private static IReadOnlyList<ImportedItem> ParseItemsSection(string xml)
+    private sealed record ParsedItems(
+        IReadOnlyList<ImportedItem> ActiveItems,
+        IReadOnlyDictionary<int, ImportedItem> ItemsById);
+
+    private static ParsedItems ParseItemsSection(string xml)
     {
         var start = FindTagBoundary(xml, "Items", 0);
         if (start < 0)
         {
-            return [];
+            return new ParsedItems([], new Dictionary<int, ImportedItem>());
         }
 
         var end = xml.IndexOf("</Items>", start, StringComparison.Ordinal);
         if (end < 0)
         {
-            return [];
+            return new ParsedItems([], new Dictionary<int, ImportedItem>());
         }
 
         var block = xml[start..(end + 8)];
@@ -284,16 +299,18 @@ public static class PobBuildCodeDecoder
         }
         catch
         {
-            return [];
+            return new ParsedItems([], new Dictionary<int, ImportedItem>());
         }
 
         // Build id → raw text map
         var texts = new Dictionary<int, string>();
+        var itemsById = new Dictionary<int, ImportedItem>();
         foreach (var el in itemsEl.Elements("Item"))
         {
             if ((int?)el.Attribute("id") is int id)
             {
                 texts[id] = el.Value;
+                itemsById[id] = ParseRawItem(string.Empty, rawText: el.Value.Trim()) with { Id = id };
             }
         }
 
@@ -318,7 +335,7 @@ public static class PobBuildCodeDecoder
         }
         if (activeSet is null)
         {
-            return [];
+            return new ParsedItems([], itemsById);
         }
 
         var result = new List<ImportedItem>();
@@ -328,11 +345,32 @@ public static class PobBuildCodeDecoder
             var itemId = (int?)slotEl.Attribute("itemId") ?? 0;
             if (itemId > 0 && texts.TryGetValue(itemId, out var raw))
             {
-                result.Add(ParseRawItem(slotName, raw.Trim()));
+                result.Add(ParseRawItem(slotName, raw.Trim()) with { Id = itemId });
             }
         }
 
         result.Sort((a, b) => SlotIndex(a.Slot).CompareTo(SlotIndex(b.Slot)));
+        return new ParsedItems(result, itemsById);
+    }
+
+    private static IReadOnlyList<ImportedSocketedJewel> ParseSocketedJewels(XElement spec)
+    {
+        var sockets = spec.Element("Sockets");
+        if (sockets is null)
+        {
+            return [];
+        }
+
+        var result = new List<ImportedSocketedJewel>();
+        foreach (var socket in sockets.Elements("Socket"))
+        {
+            var socketId = (int?)socket.Attribute("nodeId") ?? 0;
+            var itemId = (int?)socket.Attribute("itemId") ?? 0;
+            if (socketId > 0 && itemId > 0)
+            {
+                result.Add(new ImportedSocketedJewel(socketId, itemId));
+            }
+        }
         return result;
     }
 

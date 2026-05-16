@@ -12,4 +12,6 @@ public sealed record ImportedBuild(
 {
     public int TotalAllocatedCount => NodeHashes.Count + ClusterNodeHashes.Count;
     public IReadOnlyList<ImportedItem> Items { get; init; } = [];
+    public IReadOnlyDictionary<int, ImportedItem> ItemsById { get; init; } = new Dictionary<int, ImportedItem>();
+    public IReadOnlyList<ImportedSocketedJewel> SocketedJewels { get; init; } = [];
 }

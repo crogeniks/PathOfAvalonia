@@ -19,7 +19,6 @@ public sealed class PassiveSpec
     private readonly Dictionary<int, ClusterSubgraph> _activeSubgraphs = new();
     // Flat lookup for all currently-active cluster nodes by ID.
     private readonly Dictionary<int, Node> _clusterNodes = new();
-    private int _nextClusterBaseId = 0x10000;
 
     public IReadOnlyDictionary<int, ClusterSubgraph> ActiveSubgraphs => _activeSubgraphs;
 
@@ -304,7 +303,9 @@ public sealed class PassiveSpec
             return;
         }
 
-        var subgraph = ClusterJewelResolver.Resolve(Tree, socket, spec, AllocateClusterBaseId());
+        var lineageIdBase = ResolveClusterLineageIdBase(socket);
+        var clusterNodeIdBase = lineageIdBase + (ClusterJewelData.GetDefinition(spec.Size).SizeIndex << 4);
+        var subgraph = ClusterJewelResolver.Resolve(Tree, socket, spec, lineageIdBase, clusterNodeIdBase);
         _activeSubgraphs[socketId] = subgraph;
         foreach (var n in subgraph.Nodes)
         {
@@ -336,7 +337,6 @@ public sealed class PassiveSpec
         }
         _allocated.Clear();
         _masterySelections.Clear();
-        _nextClusterBaseId = 0x10000;
         if (_classStartNodeByIndex.TryGetValue(_selectedClassIndex, out var nodeId))
         {
             _allocated.Add(nodeId);
@@ -351,6 +351,10 @@ public sealed class PassiveSpec
     {
         _allocated.Clear();
         _masterySelections.Clear();
+        foreach (var socketId in _activeSubgraphs.Keys.ToArray())
+        {
+            RemoveClusterRecursive(socketId);
+        }
         if (_classStartNodeByIndex.ContainsKey(build.ClassId))
         {
             _selectedClassIndex = build.ClassId;
@@ -358,6 +362,22 @@ public sealed class PassiveSpec
         _allocated.Add(_classStartNodeByIndex[_selectedClassIndex]);
         var applied = 0;
         var skipped = 0;
+        var clusterSkipped = 0;
+        var pendingJewels = build.SocketedJewels.ToList();
+        var restoredAny = true;
+        while (restoredAny && pendingJewels.Count > 0)
+        {
+            restoredAny = false;
+            for (var i = pendingJewels.Count - 1; i >= 0; i--)
+            {
+                if (RestoreImportedCluster(pendingJewels[i], build))
+                {
+                    pendingJewels.RemoveAt(i);
+                    restoredAny = true;
+                }
+            }
+        }
+
         foreach (var id in build.NodeHashes)
         {
             if (Tree.Nodes.ContainsKey(id))
@@ -379,22 +399,29 @@ public sealed class PassiveSpec
         }
         foreach (var id in build.ClusterNodeHashes)
         {
-            // Cluster jewel subgraph nodes aren't in the base tree — record as skipped but
-            // don't treat as an error. Rendering them requires the cluster-jewel resolver.
-            skipped++;
+            if (_clusterNodes.ContainsKey(id))
+            {
+                _allocated.Add(id);
+                applied++;
+            }
+            else
+            {
+                skipped++;
+                clusterSkipped++;
+            }
         }
         SpecChanged?.Invoke();
-        return new ImportResult(applied, skipped, build.ClusterNodeHashes.Count, build);
+        return new ImportResult(applied, skipped, clusterSkipped, build);
     }
 
     // Looks up a node by ID in both the base tree and any active cluster subgraphs.
     private bool TryGetNode(int id, out Node? node)
     {
-        if (Tree.Nodes.TryGetValue(id, out node))
+        if (_clusterNodes.TryGetValue(id, out node))
         {
             return true;
         }
-        return _clusterNodes.TryGetValue(id, out node);
+        return Tree.Nodes.TryGetValue(id, out node);
     }
 
     public event Action? SpecChanged;
@@ -427,11 +454,53 @@ public sealed class PassiveSpec
         _activeSubgraphs.Remove(socketId);
     }
 
-    private int AllocateClusterBaseId()
+    private bool RestoreImportedCluster(ImportedSocketedJewel socketedJewel, ImportedBuild build)
     {
-        var baseId = _nextClusterBaseId;
-        _nextClusterBaseId += 0x100;
-        return baseId;
+        if (!build.ItemsById.TryGetValue(socketedJewel.ItemId, out var item)
+            || !ImportedClusterJewelParser.TryParse(item, out var cluster))
+        {
+            return false;
+        }
+
+        if (!CanInsertCluster(socketedJewel.SocketNodeId, cluster.Size))
+        {
+            return false;
+        }
+
+        SetClusterJewel(
+            socketedJewel.SocketNodeId,
+            new ClusterJewelSpec(
+                socketedJewel.SocketNodeId,
+                cluster.Size,
+                cluster.PassiveCount,
+                cluster.SocketCount,
+                cluster.NotableNames));
+        return true;
+    }
+
+    private int ResolveClusterLineageIdBase(Node socket)
+    {
+        var baseId = 0x10000;
+        foreach (var subgraph in _activeSubgraphs.Values)
+        {
+            if (subgraph.NodesById.ContainsKey(socket.Id))
+            {
+                baseId = subgraph.LineageIdBase;
+                break;
+            }
+        }
+
+        if (socket.ExpansionSocket is not { } expansionSocket)
+        {
+            return baseId;
+        }
+
+        return expansionSocket.Size switch
+        {
+            2 => baseId + (expansionSocket.Index << 6),
+            1 => baseId + (expansionSocket.Index << 9),
+            _ => baseId,
+        };
     }
 }
 
