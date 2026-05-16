@@ -1,3 +1,4 @@
+using PathOfAvalonia.TreeDomain.ClusterJewels;
 using PathOfAvalonia.TreeDomain.Import;
 
 namespace PathOfAvalonia.TreeDomain;
@@ -9,6 +10,12 @@ public sealed class PassiveSpec
     private readonly Dictionary<int, int> _masterySelections = new();
     private readonly Dictionary<int, int> _classStartNodeByIndex;
     private int _selectedClassIndex;
+
+    private readonly Dictionary<int, ClusterSubgraph> _activeSubgraphs = new();
+    // Flat lookup for all currently-active cluster nodes by ID.
+    private readonly Dictionary<int, Node> _clusterNodes = new();
+
+    public IReadOnlyDictionary<int, ClusterSubgraph> ActiveSubgraphs => _activeSubgraphs;
 
     public PassiveSpec(TreeModel tree)
     {
@@ -87,6 +94,11 @@ public sealed class PassiveSpec
             DeallocateWithDependents(id);
             return;
         }
+        // Reject IDs that don't belong to either the base tree or an active cluster subgraph.
+        if (!Tree.Nodes.ContainsKey(id) && !_clusterNodes.ContainsKey(id))
+        {
+            return;
+        }
         _allocated.Add(id);
         SpecChanged?.Invoke();
     }
@@ -161,7 +173,7 @@ public sealed class PassiveSpec
         var changed = false;
         foreach (var id in ids)
         {
-            if (Tree.Nodes.ContainsKey(id) && _allocated.Add(id))
+            if ((Tree.Nodes.ContainsKey(id) || _clusterNodes.ContainsKey(id)) && _allocated.Add(id))
             {
                 changed = true;
             }
@@ -178,23 +190,22 @@ public sealed class PassiveSpec
     // already filtered out at load time (TreeLoader.cs:110).
     public HoverPath HoverPathTo(int targetId)
     {
-        if (!Tree.Nodes.TryGetValue(targetId, out var target)
+        if (!TryGetNode(targetId, out var target)
             || _allocated.Contains(targetId)
-            || target.Type is NodeType.Proxy or NodeType.ClassStart or NodeType.AscendancyStart)
+            || target!.Type is NodeType.Proxy or NodeType.ClassStart or NodeType.AscendancyStart)
         {
             return HoverPath.Empty;
         }
 
-        var roots = _allocated.Select(id => Tree.Nodes[id]);
-
+        // Seed the BFS from all currently-allocated nodes (including cluster nodes).
         var parent = new Dictionary<int, int>();
         var visited = new HashSet<int>();
         var queue = new Queue<Node>();
-        foreach (var r in roots)
+        foreach (var id in _allocated)
         {
-            if (visited.Add(r.Id))
+            if (TryGetNode(id, out var root) && visited.Add(id))
             {
-                queue.Enqueue(r);
+                queue.Enqueue(root!);
             }
         }
         if (queue.Count == 0)
@@ -254,6 +265,46 @@ public sealed class PassiveSpec
         return new HoverPath(nodes, edges);
     }
 
+    // Inserts or removes a cluster jewel in a base-tree JewelSocket.
+    // Passing null for spec removes any existing cluster at that socket.
+    public void SetClusterJewel(int socketId, ClusterJewelSpec? spec)
+    {
+        // Remove existing subgraph at this socket (if any).
+        if (_activeSubgraphs.TryGetValue(socketId, out var old))
+        {
+            if (Tree.Nodes.TryGetValue(socketId, out var oldSocket))
+            {
+                // Disconnect the entry node from the socket's linked list.
+                oldSocket.LinkedNodes.Remove(old.Nodes[0]);
+            }
+            foreach (var n in old.Nodes)
+            {
+                _allocated.Remove(n.Id);
+                _clusterNodes.Remove(n.Id);
+            }
+            _activeSubgraphs.Remove(socketId);
+        }
+
+        if (spec is null || !Tree.Nodes.TryGetValue(socketId, out var socket))
+        {
+            SpecChanged?.Invoke();
+            return;
+        }
+
+        var subgraph = ClusterJewelResolver.Resolve(socket, spec, Tree.Bounds.CenterX, Tree.Bounds.CenterY);
+        _activeSubgraphs[socketId] = subgraph;
+        foreach (var n in subgraph.Nodes)
+        {
+            _clusterNodes[n.Id] = n;
+        }
+
+        // Wire socket ↔ entry node bidirectionally so the cluster is reachable from the tree.
+        socket.LinkedNodes.Add(subgraph.Nodes[0]);
+        subgraph.Nodes[0].LinkedNodes.Add(socket);
+
+        SpecChanged?.Invoke();
+    }
+
     public void Clear()
     {
         if (_allocated.Count == 0 && _masterySelections.Count == 0)
@@ -310,6 +361,16 @@ public sealed class PassiveSpec
         }
         SpecChanged?.Invoke();
         return new ImportResult(applied, skipped, build.ClusterNodeHashes.Count, build);
+    }
+
+    // Looks up a node by ID in both the base tree and any active cluster subgraphs.
+    private bool TryGetNode(int id, out Node? node)
+    {
+        if (Tree.Nodes.TryGetValue(id, out node))
+        {
+            return true;
+        }
+        return _clusterNodes.TryGetValue(id, out node);
     }
 
     public event Action? SpecChanged;
