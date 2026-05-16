@@ -6,6 +6,11 @@ namespace PathOfAvalonia.TreeDomain;
 public sealed class PassiveSpec
 {
     public TreeModel Tree { get; }
+    private static readonly ClusterJewelSize[] LargeSocketAllowedSizes = [ClusterJewelSize.Large, ClusterJewelSize.Medium, ClusterJewelSize.Small];
+    private static readonly ClusterJewelSize[] MediumSocketAllowedSizes = [ClusterJewelSize.Medium, ClusterJewelSize.Small];
+    private static readonly ClusterJewelSize[] SmallSocketAllowedSizes = [ClusterJewelSize.Small];
+    private static readonly ClusterJewelSize[] NoClusterSizes = [];
+
     private readonly HashSet<int> _allocated = new();
     private readonly Dictionary<int, int> _masterySelections = new();
     private readonly Dictionary<int, int> _classStartNodeByIndex;
@@ -14,6 +19,7 @@ public sealed class PassiveSpec
     private readonly Dictionary<int, ClusterSubgraph> _activeSubgraphs = new();
     // Flat lookup for all currently-active cluster nodes by ID.
     private readonly Dictionary<int, Node> _clusterNodes = new();
+    private int _nextClusterBaseId = 0x10000;
 
     public IReadOnlyDictionary<int, ClusterSubgraph> ActiveSubgraphs => _activeSubgraphs;
 
@@ -39,6 +45,27 @@ public sealed class PassiveSpec
     public bool IsAllocated(int id) => _allocated.Contains(id);
 
     public int SelectedClassIndex => _selectedClassIndex;
+
+    public IReadOnlyList<ClusterJewelSize> AllowedClusterSizes(int socketId)
+    {
+        if (!TryGetNode(socketId, out var socket)
+            || socket?.Type != NodeType.JewelSocket
+            || socket.ExpansionSocket is not { } expansionSocket)
+        {
+            return NoClusterSizes;
+        }
+
+        return expansionSocket.Size switch
+        {
+            2 => LargeSocketAllowedSizes,
+            1 => MediumSocketAllowedSizes,
+            0 => SmallSocketAllowedSizes,
+            _ => NoClusterSizes,
+        };
+    }
+
+    public bool CanInsertCluster(int socketId, ClusterJewelSize size) =>
+        AllowedClusterSizes(socketId).Contains(size);
 
     // Switch to a different starting class. Resets the allocation to just that class-start
     // node — paths valid under the old class don't carry over.
@@ -269,29 +296,15 @@ public sealed class PassiveSpec
     // Passing null for spec removes any existing cluster at that socket.
     public void SetClusterJewel(int socketId, ClusterJewelSpec? spec)
     {
-        // Remove existing subgraph at this socket (if any).
-        if (_activeSubgraphs.TryGetValue(socketId, out var old))
-        {
-            if (Tree.Nodes.TryGetValue(socketId, out var oldSocket))
-            {
-                // Disconnect the entry node from the socket's linked list.
-                oldSocket.LinkedNodes.Remove(old.Nodes[0]);
-            }
-            foreach (var n in old.Nodes)
-            {
-                _allocated.Remove(n.Id);
-                _clusterNodes.Remove(n.Id);
-            }
-            _activeSubgraphs.Remove(socketId);
-        }
+        RemoveClusterJewel(socketId);
 
-        if (spec is null || !Tree.Nodes.TryGetValue(socketId, out var socket))
+        if (spec is null || !TryGetNode(socketId, out var socket) || socket is null || !CanInsertCluster(socketId, spec.Size))
         {
             SpecChanged?.Invoke();
             return;
         }
 
-        var subgraph = ClusterJewelResolver.Resolve(socket, spec, Tree.Bounds.CenterX, Tree.Bounds.CenterY);
+        var subgraph = ClusterJewelResolver.Resolve(Tree, socket, spec, AllocateClusterBaseId());
         _activeSubgraphs[socketId] = subgraph;
         foreach (var n in subgraph.Nodes)
         {
@@ -299,20 +312,31 @@ public sealed class PassiveSpec
         }
 
         // Wire socket ↔ entry node bidirectionally so the cluster is reachable from the tree.
-        socket.LinkedNodes.Add(subgraph.Nodes[0]);
-        subgraph.Nodes[0].LinkedNodes.Add(socket);
+        var entranceNode = subgraph.NodesById[subgraph.EntranceNodeId];
+        socket.LinkedNodes.Add(entranceNode);
+        entranceNode.LinkedNodes.Add(socket);
 
         SpecChanged?.Invoke();
     }
 
+    public void RemoveClusterJewel(int socketId)
+    {
+        RemoveClusterRecursive(socketId);
+    }
+
     public void Clear()
     {
-        if (_allocated.Count == 0 && _masterySelections.Count == 0)
+        if (_allocated.Count == 0 && _masterySelections.Count == 0 && _activeSubgraphs.Count == 0)
         {
             return;
         }
+        foreach (var socketId in _activeSubgraphs.Keys.ToArray())
+        {
+            RemoveClusterRecursive(socketId);
+        }
         _allocated.Clear();
         _masterySelections.Clear();
+        _nextClusterBaseId = 0x10000;
         if (_classStartNodeByIndex.TryGetValue(_selectedClassIndex, out var nodeId))
         {
             _allocated.Add(nodeId);
@@ -374,6 +398,41 @@ public sealed class PassiveSpec
     }
 
     public event Action? SpecChanged;
+
+    private void RemoveClusterRecursive(int socketId)
+    {
+        if (!_activeSubgraphs.TryGetValue(socketId, out var old))
+        {
+            return;
+        }
+
+        foreach (var childSocket in old.Nodes.Where(node => node.Type == NodeType.JewelSocket).Select(node => node.Id).ToArray())
+        {
+            RemoveClusterRecursive(childSocket);
+        }
+
+        if (TryGetNode(socketId, out var oldSocket) && oldSocket is not null
+            && old.NodesById.TryGetValue(old.EntranceNodeId, out var entranceNode))
+        {
+            oldSocket.LinkedNodes.Remove(entranceNode);
+            entranceNode.LinkedNodes.Remove(oldSocket);
+        }
+
+        foreach (var n in old.Nodes)
+        {
+            _allocated.Remove(n.Id);
+            _clusterNodes.Remove(n.Id);
+        }
+
+        _activeSubgraphs.Remove(socketId);
+    }
+
+    private int AllocateClusterBaseId()
+    {
+        var baseId = _nextClusterBaseId;
+        _nextClusterBaseId += 0x100;
+        return baseId;
+    }
 }
 
 public sealed record ImportResult(int Applied, int Skipped, int ClusterSkipped, ImportedBuild Build);

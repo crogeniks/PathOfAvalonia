@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives.PopupPositioning;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -17,6 +17,7 @@ public sealed class PassiveTreeView : Control
 {
     private readonly PassiveTreeViewModel _vm;
     private readonly SpriteMap _sprites;
+    private ContextMenu? _clusterMenu;
     // One Bitmap per unique atlas filename (multiple atlas keys share a file).
     private readonly Dictionary<string, Bitmap> _atlasBitmaps = new();
 
@@ -195,13 +196,40 @@ public sealed class PassiveTreeView : Control
         var connHoverPen = new Pen(HoverPathBrush, connThick);
         var pathEdges = _vm.HoverPath.Edges;
 
-        IEnumerable<Connector> allConnectors = _vm.Tree.Connectors;
-        foreach (var sub in activeClusters.Values)
+        foreach (var c in _vm.Tree.Connectors)
         {
-            allConnectors = allConnectors.Concat(sub.Connectors);
+            if (ShouldDrawBaseConnector(c))
+            {
+                DrawConnector(c);
+            }
         }
 
-        foreach (var c in allConnectors)
+        foreach (var sub in activeClusters.Values)
+        {
+            foreach (var c in sub.Connectors)
+            {
+                DrawConnector(c);
+            }
+        }
+
+        DrawNodesAndHud(ctx);
+        return;
+
+        bool ShouldDrawBaseConnector(Connector c)
+        {
+            return _vm.Tree.Nodes.TryGetValue(c.FromId, out var from)
+                && _vm.Tree.Nodes.TryGetValue(c.ToId, out var to)
+                && IsVisibleBaseTreeNode(from)
+                && IsVisibleBaseTreeNode(to);
+        }
+
+        static bool IsVisibleBaseTreeNode(Node n)
+        {
+            return n.Type != NodeType.Proxy
+                && n.ExpansionSocket?.ParentSocketId is null;
+        }
+
+        void DrawConnector(Connector c)
         {
             var key = (Math.Min(c.FromId, c.ToId), Math.Max(c.FromId, c.ToId));
             IPen pen;
@@ -228,8 +256,6 @@ public sealed class PassiveTreeView : Control
                     break;
             }
         }
-
-        DrawNodesAndHud(ctx);
     }
 
     private void DrawBackgroundTile(DrawingContext ctx)
@@ -286,13 +312,13 @@ public sealed class PassiveTreeView : Control
             {
                 continue;
             }
-            if (n.Type == NodeType.JewelSocket && _vm.ActiveClusters.ContainsKey(n.Id))
+            if (n.ExpansionSocket?.ParentSocketId is not null)
             {
                 continue;
             }
             var isHover = _vm.HoverNodeId == n.Id;
             var onPath = _vm.HoverPathNodes.Contains(n.Id);
-            DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath);
+            DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath, useClusterSocketFrame: false);
         }
 
         // Cluster subgraph nodes (only rendered when the jewel is active).
@@ -302,7 +328,7 @@ public sealed class PassiveTreeView : Control
             {
                 var isHover = _vm.HoverNodeId == n.Id;
                 var onPath = _vm.HoverPathNodes.Contains(n.Id);
-                DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath);
+                DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath, useClusterSocketFrame: true);
             }
         }
 
@@ -322,7 +348,7 @@ public sealed class PassiveTreeView : Control
         ctx.DrawText(ft, new Point(8, 8));
     }
 
-    private void DrawNode(DrawingContext ctx, Node n, bool alloc, bool hover)
+    private void DrawNode(DrawingContext ctx, Node n, bool alloc, bool hover, bool useClusterSocketFrame)
     {
         var screen = TreeToScreen(n.X, n.Y);
         // Icon: skills atlas (normal/notable/keystone) or mastery atlas.
@@ -339,7 +365,7 @@ public sealed class PassiveTreeView : Control
         }
         // Frame: ornate border. Mastery has no separate frame (baked in).
         // For JewelSocket nodes, check whether a cluster is active to pick the right sprite.
-        var clusterSize = n.Type == NodeType.JewelSocket ? _vm.ClusterSizeAt(n.Id) : null;
+        var clusterSize = useClusterSocketFrame && n.Type == NodeType.JewelSocket ? _vm.ClusterSizeAt(n.Id) : null;
         var frameKey = FrameKey(n.Type, alloc, hover, clusterSize);
         if (frameKey is not null)
         {
@@ -425,7 +451,7 @@ public sealed class PassiveTreeView : Control
             {
                 continue;
             }
-            if (n.Type == NodeType.JewelSocket && _vm.ActiveClusters.ContainsKey(n.Id))
+            if (n.ExpansionSocket?.ParentSocketId is not null)
             {
                 continue;
             }
@@ -531,6 +557,15 @@ public sealed class PassiveTreeView : Control
             return;
         }
 
+        if (e.InitialPressMouseButton == MouseButton.Right)
+        {
+            var p = e.GetPosition(this);
+            var hit = HitTest(p);
+            if (hit is { } socketId && ShowClusterContextMenu(socketId, p))
+            {
+                e.Handled = true;
+            }
+        }
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
@@ -544,5 +579,81 @@ public sealed class PassiveTreeView : Control
         _offsetY = p.Y - tyBefore * _scale;
         InvalidateVisual();
         e.Handled = true;
+    }
+
+    private bool ShowClusterContextMenu(int socketId, Point pointerPosition)
+    {
+        _vm.SetHover(socketId);
+        var socket = _vm.HoverNodeId == socketId ? _vm.HoverNode : null;
+        if (socket?.Type != NodeType.JewelSocket)
+        {
+            return false;
+        }
+
+        var allowedSizes = _vm.AllowedClusterSizes(socketId);
+        if (allowedSizes.Count == 0)
+        {
+            return false;
+        }
+
+        var items = new List<MenuItem>();
+        if (_vm.HasClusterAt(socketId))
+        {
+            items.Add(new MenuItem
+            {
+                Header = "Replace Cluster",
+                ItemsSource = BuildSizeMenuItems(socketId, allowedSizes, replacePrefix: true),
+            });
+            var removeItem = new MenuItem { Header = "Remove Cluster" };
+            removeItem.Click += (_, _) => _vm.RemoveCluster(socketId);
+            items.Add(removeItem);
+        }
+        else
+        {
+            items.AddRange(BuildSizeMenuItems(socketId, allowedSizes, replacePrefix: false));
+        }
+
+        if (items.Count == 0)
+        {
+            return false;
+        }
+
+        _clusterMenu?.Close();
+        _clusterMenu = new ContextMenu
+        {
+            Placement = PlacementMode.Custom,
+            PlacementTarget = this,
+            CustomPopupPlacementCallback = placement =>
+            {
+                placement.AnchorRectangle = new Rect(pointerPosition, new Size(1, 1));
+                placement.Anchor = PopupAnchor.TopLeft;
+                placement.Gravity = PopupGravity.BottomRight;
+                placement.ConstraintAdjustment =
+                    PopupPositionerConstraintAdjustment.SlideX |
+                    PopupPositionerConstraintAdjustment.SlideY |
+                    PopupPositionerConstraintAdjustment.FlipX |
+                    PopupPositionerConstraintAdjustment.FlipY;
+            },
+            ItemsSource = items,
+        };
+        _clusterMenu.Closed += (_, _) =>
+        {
+            _clusterMenu = null;
+        };
+        _clusterMenu.Open(this);
+        return true;
+    }
+
+    private IReadOnlyList<MenuItem> BuildSizeMenuItems(int socketId, IReadOnlyList<ClusterJewelSize> sizes, bool replacePrefix)
+    {
+        var items = new List<MenuItem>(sizes.Count);
+        foreach (var size in sizes)
+        {
+            var label = replacePrefix ? $"Replace with {size} Cluster" : $"Insert {size} Cluster";
+            var item = new MenuItem { Header = label };
+            item.Click += (_, _) => _vm.InsertCluster(socketId, size);
+            items.Add(item);
+        }
+        return items;
     }
 }

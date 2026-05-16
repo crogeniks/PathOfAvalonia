@@ -22,6 +22,14 @@ public static class TreeLoader
     {
         var orbitAngles = BuildOrbitAngles(dto.Constants.SkillsPerOrbit);
         var orbitRadii = dto.Constants.OrbitRadii;
+        var groupPositions = new Dictionary<int, GroupPosition>(dto.Groups.Count);
+        foreach (var (groupId, group) in dto.Groups)
+        {
+            if (int.TryParse(groupId, out var gid))
+            {
+                groupPositions[gid] = new GroupPosition(group.X, group.Y);
+            }
+        }
 
         // Per-node placement, plus side-table of orbit info needed for arc detection.
         var nodes = new Dictionary<int, Node>(dto.Nodes.Count);
@@ -53,11 +61,6 @@ public static class TreeLoader
             var y = grp.Y - Math.Cos(angle) * radius;
 
             var type = ClassifyNode(nd);
-            if (type == NodeType.JewelSocket
-                && (nd.Name == "Small Jewel Socket" || nd.Name == "Medium Jewel Socket"))
-            {
-                continue;
-            }
             IReadOnlyList<MasteryEffect>? effects = null;
             if (nd.MasteryEffects is { Length: > 0 } meArr)
             {
@@ -68,6 +71,7 @@ public static class TreeLoader
                 }
                 effects = list;
             }
+            var expansionSocket = ParseExpansionSocket(nd);
             nodes[nd.Id] = new Node
             {
                 Id = nd.Id,
@@ -80,6 +84,10 @@ public static class TreeLoader
                 InactiveIcon = nd.InactiveIcon,
                 AscendancyName = nd.AscendancyName,
                 ClassStartIndex = nd.ClassStartIndex,
+                GroupId = nd.Group.Value,
+                Orbit = orbit,
+                OrbitIndex = nd.OrbitIndex.Value,
+                ExpansionSocket = expansionSocket,
                 MasteryEffects = effects,
             };
             orbitInfo[nd.Id] = (nd.Group.Value, orbit, grp.X, grp.Y, angle, radius);
@@ -165,7 +173,24 @@ public static class TreeLoader
             Nodes = nodes,
             Connectors = connectors,
             Bounds = new TreeBounds(dto.MinX, dto.MinY, dto.MaxX, dto.MaxY),
+            Groups = groupPositions,
+            SkillsPerOrbit = dto.Constants.SkillsPerOrbit,
+            OrbitRadii = dto.Constants.OrbitRadii,
+            OrbitAngles = orbitAngles,
         };
+    }
+
+    private static ExpansionSocketInfo? ParseExpansionSocket(NodeDto nd)
+    {
+        if (nd.ExpansionJewel is null)
+        {
+            return null;
+        }
+        return new ExpansionSocketInfo(
+            nd.ExpansionJewel.Size,
+            nd.ExpansionJewel.Index,
+            int.Parse(nd.ExpansionJewel.Proxy),
+            string.IsNullOrEmpty(nd.ExpansionJewel.Parent) ? null : int.Parse(nd.ExpansionJewel.Parent));
     }
 
     private static NodeType ClassifyNode(NodeDto nd)
@@ -297,11 +322,20 @@ public static class TreeLoader
         [JsonPropertyName("ascendancyName")] public string? AscendancyName { get; set; }
         [JsonPropertyName("classStartIndex")] public int? ClassStartIndex { get; set; }
         [JsonPropertyName("masteryEffects")] public MasteryEffectDto[]? MasteryEffects { get; set; }
+        [JsonPropertyName("expansionJewel")] public ExpansionJewelDto? ExpansionJewel { get; set; }
     }
 
     private sealed class MasteryEffectDto
     {
         [JsonPropertyName("effect")] public int Effect { get; set; }
         [JsonPropertyName("stats")] public string[]? Stats { get; set; }
+    }
+
+    private sealed class ExpansionJewelDto
+    {
+        [JsonPropertyName("size")] public int Size { get; set; }
+        [JsonPropertyName("index")] public int Index { get; set; }
+        [JsonPropertyName("proxy")] public string Proxy { get; set; } = string.Empty;
+        [JsonPropertyName("parent")] public string? Parent { get; set; }
     }
 }
