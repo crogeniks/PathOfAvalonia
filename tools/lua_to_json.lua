@@ -128,6 +128,12 @@ for key, n in pairs(tree.nodes or {}) do
                 classStartIndex = n.classStartIndex,
                 isAscendancyStart = n.isAscendancyStart or false,
                 masteryEffects = masteryEffects,
+                expansionJewel = n.expansionJewel and {
+                    size = n.expansionJewel.size,
+                    index = n.expansionJewel.index,
+                    proxy = n.expansionJewel.proxy,
+                    parent = n.expansionJewel.parent,
+                } or nil,
             }
         end
     end

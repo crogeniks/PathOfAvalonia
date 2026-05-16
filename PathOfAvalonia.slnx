@@ -6,4 +6,8 @@
   <Folder Name="/src/TreeDomain/">
     <Project Path="src/TreeDomain/PathOfAvalonia.TreeDomain.csproj" />
   </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/PathOfAvalonia.TreeDomain.Tests/">
+    <Project Path="tests/PathOfAvalonia.TreeDomain.Tests/PathOfAvalonia.TreeDomain.Tests.csproj" />
+  </Folder>
 </Solution>

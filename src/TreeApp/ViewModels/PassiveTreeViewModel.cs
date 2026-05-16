@@ -66,6 +66,10 @@ public sealed class PassiveTreeViewModel
     public ClusterJewelSize? ClusterSizeAt(int socketNodeId) =>
         _spec.ActiveSubgraphs.TryGetValue(socketNodeId, out var sub) ? sub.Size : null;
 
+    public IReadOnlyList<ClusterJewelSize> AllowedClusterSizes(int socketId) => _spec.AllowedClusterSizes(socketId);
+
+    public bool HasClusterAt(int socketId) => _spec.ActiveSubgraphs.ContainsKey(socketId);
+
     public void SetHover(int? nodeId)
     {
         if (nodeId == _hoverNodeId)
@@ -82,6 +86,19 @@ public sealed class PassiveTreeViewModel
 
     // Allocates all nodes on the current hover path (the queued path-to-target).
     public void AllocatePath() => _spec.AllocateMany(_hoverPath.Nodes);
+
+    public void InsertCluster(int socketId, ClusterJewelSize size)
+    {
+        var spec = size switch
+        {
+            ClusterJewelSize.Large => new ClusterJewelSpec(socketId, size, 8, 2, Array.Empty<string>()),
+            ClusterJewelSize.Medium => new ClusterJewelSpec(socketId, size, 4, 1, Array.Empty<string>()),
+            _ => new ClusterJewelSpec(socketId, size, 2, 0, Array.Empty<string>()),
+        };
+        _spec.SetClusterJewel(socketId, spec);
+    }
+
+    public void RemoveCluster(int socketId) => _spec.RemoveClusterJewel(socketId);
 
     private void OnSpecChanged()
     {

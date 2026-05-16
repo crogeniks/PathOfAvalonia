@@ -14,6 +14,10 @@ public sealed class Node
     public string? InactiveIcon { get; init; }
     public string? AscendancyName { get; init; }
     public int? ClassStartIndex { get; init; }
+    public required int GroupId { get; init; }
+    public required int Orbit { get; init; }
+    public required int OrbitIndex { get; init; }
+    public ExpansionSocketInfo? ExpansionSocket { get; init; }
 
     // Effect options for mastery nodes. null for non-masteries and for masteries that
     // are static cluster decorations (Atlas Tree charm masteries have no selectable effect).
@@ -24,3 +28,4 @@ public sealed class Node
 }
 
 public sealed record MasteryEffect(int Id, IReadOnlyList<string> Stats);
+public sealed record ExpansionSocketInfo(int Size, int Index, int ProxyNodeId, int? ParentSocketId);
