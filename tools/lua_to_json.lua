@@ -1,5 +1,6 @@
 -- Converts PoB tree.lua to a slim JSON for the Avalonia port.
 -- Keeps only the fields the PoC needs: node id/position/flags/edges/icon,
+-- display text,
 -- group x/y/orbits, and orbit constants.
 --
 -- Optionally converts sprites.lua → sprites JSON (atlas filenames + UV coords)
@@ -92,6 +93,16 @@ local function asIntList(t)
     return out
 end
 
+local function asStringList(t)
+    if type(t) == 'string' then return { t } end
+    if type(t) ~= 'table' then return nil end
+    local out = {}
+    for _, v in ipairs(t) do
+        if type(v) == 'string' then out[#out + 1] = v end
+    end
+    return #out > 0 and out or nil
+end
+
 local nodes = {}
 for key, n in pairs(tree.nodes or {}) do
     if key ~= 'root' then
@@ -114,6 +125,9 @@ for key, n in pairs(tree.nodes or {}) do
                 icon = n.icon,
                 activeIcon = n.activeIcon,
                 inactiveIcon = n.inactiveIcon,
+                stats = asStringList(n.stats),
+                reminderText = asStringList(n.reminderText),
+                flavourText = asStringList(n.flavourText),
                 group = n.group,
                 orbit = n.orbit,
                 orbitIndex = n.orbitIndex,

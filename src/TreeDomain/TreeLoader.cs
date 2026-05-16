@@ -51,6 +51,9 @@ public static class TreeLoader
                         X = 0,
                         Y = 0,
                         Icon = nd.Icon,
+                        Stats = NormalizeLines(nd.Stats),
+                        ReminderText = NormalizeLines(nd.ReminderText),
+                        FlavourText = NormalizeLines(nd.FlavourText),
                         ActiveIcon = nd.ActiveIcon,
                         InactiveIcon = nd.InactiveIcon,
                         AscendancyName = nd.AscendancyName,
@@ -103,6 +106,9 @@ public static class TreeLoader
                 X = x,
                 Y = y,
                 Icon = nd.Icon,
+                Stats = NormalizeLines(nd.Stats),
+                ReminderText = NormalizeLines(nd.ReminderText),
+                FlavourText = NormalizeLines(nd.FlavourText),
                 ActiveIcon = nd.ActiveIcon,
                 InactiveIcon = nd.InactiveIcon,
                 AscendancyName = nd.AscendancyName,
@@ -215,6 +221,28 @@ public static class TreeLoader
             nd.ExpansionJewel.Index,
             int.Parse(nd.ExpansionJewel.Proxy),
             string.IsNullOrEmpty(nd.ExpansionJewel.Parent) ? null : int.Parse(nd.ExpansionJewel.Parent));
+    }
+
+    private static IReadOnlyList<string> NormalizeLines(string[]? values)
+    {
+        if (values is null || values.Length == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var lines = new List<string>();
+        foreach (var value in values)
+        {
+            foreach (var line in value.Replace("\r\n", "\n").Split('\n'))
+            {
+                var trimmed = line.Trim();
+                if (trimmed.Length > 0)
+                {
+                    lines.Add(trimmed);
+                }
+            }
+        }
+        return lines;
     }
 
     private static NodeType ClassifyNode(NodeDto nd)
@@ -332,6 +360,9 @@ public static class TreeLoader
         [JsonPropertyName("icon")] public string? Icon { get; set; }
         [JsonPropertyName("activeIcon")] public string? ActiveIcon { get; set; }
         [JsonPropertyName("inactiveIcon")] public string? InactiveIcon { get; set; }
+        [JsonPropertyName("stats")] public string[]? Stats { get; set; }
+        [JsonPropertyName("reminderText")] public string[]? ReminderText { get; set; }
+        [JsonPropertyName("flavourText")] public string[]? FlavourText { get; set; }
         [JsonPropertyName("group")] public int? Group { get; set; }
         [JsonPropertyName("orbit")] public int? Orbit { get; set; }
         [JsonPropertyName("orbitIndex")] public int? OrbitIndex { get; set; }

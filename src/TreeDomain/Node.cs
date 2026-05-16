@@ -8,6 +8,9 @@ public sealed class Node
     public required double X { get; init; }
     public required double Y { get; init; }
     public string? Icon { get; init; }
+    public IReadOnlyList<string> Stats { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> ReminderText { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> FlavourText { get; init; } = Array.Empty<string>();
     // Masteries have separate sprite keys per state, in different atlases
     // (masteryActiveSelected / masteryConnected). Non-mastery nodes use Icon.
     public string? ActiveIcon { get; init; }
