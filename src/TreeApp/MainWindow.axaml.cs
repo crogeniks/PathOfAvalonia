@@ -22,13 +22,19 @@ public partial class MainWindow : Window
         var root = this.FindControl<Grid>("Root")!;
         root.Children.Insert(0, new PassiveTreeView(vm.TreeViewModel, sprites));
 
-        // CaretIndex is a pure UI concern the ViewModel can't reach: reset to end
-        // whenever ImportInput changes so the placeholder marker looks clean.
+        // Replace large build codes with a short placeholder directly in the TextBox.
+        // Direct TextBox.Text write bypasses the TwoWay binding's reentrancy guard,
+        // which would otherwise suppress the source→target update from inside the
+        // PropertyChanged cycle triggered by the user's paste.
         var inputBox = this.FindControl<TextBox>("ImportInput")!;
-        vm.PropertyChanged += (_, e) =>
+        inputBox.TextChanged += (_, _) =>
         {
-            if (e.PropertyName == nameof(MainWindowViewModel.ImportInput))
-                inputBox.CaretIndex = inputBox.Text?.Length ?? 0;
+            var placeholder = vm.TryReplaceBuildCode(inputBox.Text ?? string.Empty);
+            if (placeholder != null)
+            {
+                inputBox.Text = placeholder;
+                inputBox.CaretIndex = placeholder.Length;
+            }
         };
     }
 }
