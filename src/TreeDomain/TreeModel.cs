@@ -14,6 +14,7 @@ public sealed class TreeModel
 {
     public required string Version { get; init; }
     public required IReadOnlyDictionary<int, Node> Nodes { get; init; }
+    public required IReadOnlyDictionary<string, Node> ClusterNodeTemplates { get; init; }
     public required IReadOnlyList<Connector> Connectors { get; init; }
     public required TreeBounds Bounds { get; init; }
     public required IReadOnlyDictionary<int, GroupPosition> Groups { get; init; }

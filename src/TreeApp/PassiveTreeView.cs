@@ -318,7 +318,7 @@ public sealed class PassiveTreeView : Control
             }
             var isHover = _vm.HoverNodeId == n.Id;
             var onPath = _vm.HoverPathNodes.Contains(n.Id);
-            DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath, useClusterSocketFrame: false);
+            DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath, useClusterSocketFrame: true);
         }
 
         // Cluster subgraph nodes (only rendered when the jewel is active).
@@ -364,7 +364,8 @@ public sealed class PassiveTreeView : Control
             DrawSprite(ctx, "masteryConnected", ii, screen);
         }
         // Frame: ornate border. Mastery has no separate frame (baked in).
-        // For JewelSocket nodes, check whether a cluster is active to pick the right sprite.
+        // Only active cluster subgraphs alter the socket frame. A socketed jewel by
+        // itself must not make the node look allocated.
         var clusterSize = useClusterSocketFrame && n.Type == NodeType.JewelSocket ? _vm.ClusterSizeAt(n.Id) : null;
         var frameKey = FrameKey(n.Type, alloc, hover, clusterSize);
         if (frameKey is not null)

@@ -84,6 +84,7 @@ public static class PobBuildCodeDecoder
         var ascendClassId = (int?)spec.Attribute("ascendClassId") ?? 0;
         var secondaryAscendClassId = ParseIntOrZero((string?)spec.Attribute("secondaryAscendClassId"));
         var treeVersion = (string?)spec.Attribute("treeVersion");
+        var clusterHashFormatVersion = ParseClusterHashFormatVersion(spec);
 
         var nodesAttr = (string?)spec.Attribute("nodes");
         if (!string.IsNullOrWhiteSpace(nodesAttr))
@@ -100,6 +101,7 @@ public static class PobBuildCodeDecoder
                 TreeVersion: treeVersion,
                 Source: "pob-code")
             {
+                ClusterHashFormatVersion = clusterHashFormatVersion,
                 Items = items.ActiveItems,
                 ItemsById = items.ItemsById,
                 SocketedJewels = ParseSocketedJewels(spec),
@@ -116,6 +118,7 @@ public static class PobBuildCodeDecoder
         {
             TreeVersion = treeVersion,
             Source = "pob-code",
+            ClusterHashFormatVersion = clusterHashFormatVersion,
             Items = items.ActiveItems,
             ItemsById = items.ItemsById,
             SocketedJewels = ParseSocketedJewels(spec),
@@ -223,6 +226,16 @@ public static class PobBuildCodeDecoder
 
     private static int ParseIntOrZero(string? s) =>
         int.TryParse(s, out var v) ? v : 0;
+
+    private static int ParseClusterHashFormatVersion(XElement spec)
+    {
+        if (int.TryParse((string?)spec.Attribute("clusterHashFormatVersion"), out var version))
+        {
+            return version;
+        }
+
+        return spec.Attribute("nodes") is null ? 2 : 1;
+    }
 
     private static (int[] Main, int[] Cluster) SplitNodes(string csv)
     {

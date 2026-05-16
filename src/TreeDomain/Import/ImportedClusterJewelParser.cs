@@ -7,7 +7,8 @@ public sealed record ImportedClusterJewel(
     ClusterJewelSize Size,
     int PassiveCount,
     int SocketCount,
-    IReadOnlyList<string> NotableNames);
+    IReadOnlyList<string> NotableNames,
+    string? KeystoneName = null);
 
 public static class ImportedClusterJewelParser
 {
@@ -21,7 +22,9 @@ public static class ImportedClusterJewelParser
 
         var definition = ClusterJewelData.GetDefinition(size);
         var passiveCount = definition.MinNodes;
-        var socketCount = DefaultSocketCount(size);
+        var passiveCountWasExplicit = false;
+        var socketCount = 0;
+        var nothingnessCount = 0;
         var notables = new List<string>();
 
         foreach (var raw in item.RawText.Split('\n'))
@@ -36,6 +39,7 @@ public static class ImportedClusterJewelParser
             if (metadataPassiveMatch.Success && int.TryParse(metadataPassiveMatch.Groups["count"].Value, out var metadataPassiveCount))
             {
                 passiveCount = metadataPassiveCount;
+                passiveCountWasExplicit = true;
                 continue;
             }
 
@@ -43,12 +47,34 @@ public static class ImportedClusterJewelParser
             if (passiveMatch.Success && int.TryParse(passiveMatch.Groups["count"].Value, out var parsedPassiveCount))
             {
                 passiveCount = parsedPassiveCount;
+                passiveCountWasExplicit = true;
+                continue;
+            }
+
+            var keystoneMatch = Regex.Match(line, @"^Adds (?<name>.+)$", RegexOptions.IgnoreCase);
+            if (keystoneMatch.Success)
+            {
+                var name = keystoneMatch.Groups["name"].Value.Trim();
+                if (ClusterKeystones.Contains(name))
+                {
+                    cluster = new ImportedClusterJewel(size, 1, 0, Array.Empty<string>(), name);
+                    return true;
+                }
+            }
+
+            var nothingnessMatch = Regex.Match(
+                line,
+                @"^Adds (?<count>\d+) Small Passive Skills? which grants? nothing$",
+                RegexOptions.IgnoreCase);
+            if (nothingnessMatch.Success && int.TryParse(nothingnessMatch.Groups["count"].Value, out var parsedNothingnessCount))
+            {
+                nothingnessCount = parsedNothingnessCount;
                 continue;
             }
 
             var socketMatch = Regex.Match(
                 line,
-                @"^(?:(?<count>\d+) Added Passive Skills are Jewel Sockets|(?<single>1) Added Passive Skill is a Jewel Socket|Adds (?<adds>\d+) Jewel Socket Passive Skills)$",
+                @"^(?:(?<count>\d+) Added Passive Skills are Jewel Sockets|(?<single>1) Added Passive Skill is a Jewel Socket|Adds (?<adds>\d+) Jewel Socket Passive Skills?)$",
                 RegexOptions.IgnoreCase);
             if (socketMatch.Success)
             {
@@ -67,11 +93,29 @@ public static class ImportedClusterJewelParser
             }
         }
 
-        passiveCount = Math.Clamp(passiveCount, definition.MinNodes, definition.MaxNodes);
         socketCount = Math.Clamp(socketCount, 0, definition.SocketIndices.Count);
+        if (!passiveCountWasExplicit && nothingnessCount > 0)
+        {
+            passiveCount = socketCount + notables.Count + nothingnessCount;
+        }
+        passiveCount = passiveCountWasExplicit
+            ? Math.Clamp(passiveCount, definition.MinNodes, definition.MaxNodes)
+            : Math.Clamp(passiveCount, 0, definition.MaxNodes);
         cluster = new ImportedClusterJewel(size, passiveCount, socketCount, notables);
         return true;
     }
+
+    private static readonly HashSet<string> ClusterKeystones = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Disciple of Kitava",
+        "Lone Messenger",
+        "Nature's Patience",
+        "Secrets of Suffering",
+        "Kineticism",
+        "Veteran's Awareness",
+        "Hollow Palm Technique",
+        "Pitfighter",
+    };
 
     private static bool TryParseSize(ImportedItem item, out ClusterJewelSize size)
     {
@@ -98,13 +142,6 @@ public static class ImportedClusterJewelParser
     private static bool ContainsClusterBase(ImportedItem item, string baseType) =>
         item.BaseType.Equals(baseType, StringComparison.OrdinalIgnoreCase)
         || item.RawText.Split('\n').Any(line => StripTags(line.Trim()).Equals(baseType, StringComparison.OrdinalIgnoreCase));
-
-    private static int DefaultSocketCount(ClusterJewelSize size) => size switch
-    {
-        ClusterJewelSize.Large => 2,
-        ClusterJewelSize.Medium => 1,
-        _ => 0,
-    };
 
     private static int ParseMatchedCount(Match match)
     {

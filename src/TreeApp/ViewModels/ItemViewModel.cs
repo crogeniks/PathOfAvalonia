@@ -29,9 +29,9 @@ public sealed class ItemViewModel
     public IReadOnlyList<ModLineViewModel> StatusFlags { get; }
     public bool HasStatusFlags { get; }
 
-    private ItemViewModel(ImportedItem item)
+    private ItemViewModel(ImportedItem item, string? slotOverride = null)
     {
-        Slot = item.Slot;
+        Slot = slotOverride ?? item.Slot;
         Name = item.Name;
         BaseType = item.BaseType;
         HasSeparateName = !string.Equals(item.Name, item.BaseType, StringComparison.Ordinal);
@@ -60,7 +60,7 @@ public sealed class ItemViewModel
         HasStatusFlags = StatusFlags.Count > 0;
     }
 
-    public static ItemViewModel FromImported(ImportedItem item) => new(item);
+    public static ItemViewModel FromImported(ImportedItem item, string? slotOverride = null) => new(item, slotOverride);
 
     private static IReadOnlyList<ModLineViewModel> ToModLines(IReadOnlyList<BodyLine> lines)
     {
