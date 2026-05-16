@@ -105,6 +105,13 @@ public static class ClusterJewelResolver
                 to.Id,
                 orbitIndicesByTemplateIndex[next]));
         }
+        connectors.Add(new LineConnector(
+            socketNode.Id,
+            entranceNode.Id,
+            socketNode.X,
+            socketNode.Y,
+            entranceNode.X,
+            entranceNode.Y));
 
         return new ClusterSubgraph
         {

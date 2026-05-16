@@ -61,6 +61,9 @@ public sealed class ClusterJewelTests
 
         Assert.Equal(proxyGroup.X, subgraph.ClusterCenterX);
         Assert.Equal(proxyGroup.Y, subgraph.ClusterCenterY);
+        Assert.Contains(subgraph.Connectors, connector =>
+            connector.FromId == 55190 && connector.ToId == subgraph.EntranceNodeId
+            || connector.FromId == subgraph.EntranceNodeId && connector.ToId == 55190);
 
         var generatedSockets = subgraph.Nodes.Where(node => node.Type == NodeType.JewelSocket).OrderBy(node => node.ExpansionSocket?.Index).ToArray();
         Assert.Equal(2, generatedSockets.Length);
