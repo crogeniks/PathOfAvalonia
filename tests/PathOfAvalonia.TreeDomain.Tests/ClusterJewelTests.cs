@@ -1,6 +1,7 @@
 using PathOfAvalonia.TreeDomain;
 using PathOfAvalonia.TreeApp.ViewModels;
 using PathOfAvalonia.TreeDomain.ClusterJewels;
+using PathOfAvalonia.TreeDomain.Import;
 using Xunit;
 
 namespace PathOfAvalonia.TreeDomain.Tests;
@@ -75,7 +76,8 @@ public sealed class ClusterJewelTests
             tree,
             tree.Nodes[33753],
             new ClusterJewelSpec(33753, ClusterJewelSize.Medium, 4, 0, new[] { "Eye to Eye", "Repeater" }),
-            0x10000);
+            0x10000,
+            0x10010);
 
         var notables = subgraph.Nodes.Where(node => node.Type == NodeType.Notable).OrderBy(node => node.OrbitIndex).ToArray();
         Assert.Equal(2, notables.Length);
@@ -96,7 +98,8 @@ public sealed class ClusterJewelTests
             tree,
             tree.Nodes[33753],
             new ClusterJewelSpec(33753, ClusterJewelSize.Medium, 4, 1, new[] { "Eye to Eye" }),
-            0x11000);
+            0x11000,
+            0x11010);
 
         var notable = Assert.Single(subgraph.Nodes.Where(node => node.Type == NodeType.Notable));
         Assert.Equal(ResolveOrbitIndex(tree, 50179, ClusterJewelSize.Medium, 9), notable.OrbitIndex);
@@ -117,7 +120,10 @@ public sealed class ClusterJewelTests
         var spec = LoadSpec();
         spec.SetClusterJewel(55190, new ClusterJewelSpec(55190, ClusterJewelSize.Large, 8, 2, Array.Empty<string>()));
 
-        var firstNodeIds = spec.ActiveSubgraphs[55190].Nodes.Select(node => node.Id).ToHashSet();
+        var firstGeneratedPassiveIds = spec.ActiveSubgraphs[55190].Nodes
+            .Where(node => node.Type != NodeType.JewelSocket)
+            .Select(node => node.Id)
+            .ToHashSet();
         var mediumSocket = spec.ActiveSubgraphs[55190].Nodes
             .Where(node => node.Type == NodeType.JewelSocket && node.Name == "Medium Jewel Socket")
             .OrderBy(node => node.ExpansionSocket?.Index)
@@ -129,7 +135,7 @@ public sealed class ClusterJewelTests
         Assert.Contains(mediumSocket.Id, spec.ActiveSubgraphs.Keys);
 
         spec.SetClusterJewel(55190, new ClusterJewelSpec(55190, ClusterJewelSize.Medium, 4, 1, Array.Empty<string>()));
-        Assert.DoesNotContain(spec.ActiveSubgraphs[55190].Nodes, node => firstNodeIds.Contains(node.Id));
+        Assert.DoesNotContain(spec.ActiveSubgraphs[55190].Nodes, node => firstGeneratedPassiveIds.Contains(node.Id));
         Assert.DoesNotContain(mediumSocket.Id, spec.ActiveSubgraphs.Keys);
 
         spec.RemoveClusterJewel(55190);
@@ -154,6 +160,111 @@ public sealed class ClusterJewelTests
         Assert.Equal(7, subgraph.Nodes.Count(node => node.Type == NodeType.Normal));
     }
 
+    [Fact]
+    public void ImportedClusterJewelParserReadsStructureFromPobItemText()
+    {
+        var item = ClusterItem(
+            1,
+            "Large Cluster Jewel",
+            "Cluster Jewel Node Count: 8",
+            "{crafted}Adds 8 Passive Skills",
+            "{crafted}2 Added Passive Skills are Jewel Sockets",
+            "{crafted}Added Small Passive Skills grant: 12% increased Chaos Damage",
+            "1 Added Passive Skill is Misery Everlasting",
+            "1 Added Passive Skill is Unholy Grace",
+            "1 Added Passive Skill is Wicked Pall");
+
+        Assert.True(ImportedClusterJewelParser.TryParse(item, out var cluster));
+        Assert.Equal(ClusterJewelSize.Large, cluster.Size);
+        Assert.Equal(8, cluster.PassiveCount);
+        Assert.Equal(2, cluster.SocketCount);
+        Assert.Equal(
+            new[] { "Misery Everlasting", "Unholy Grace", "Wicked Pall" },
+            cluster.NotableNames);
+    }
+
+    [Fact]
+    public void ApplyImportRestoresClusterSubgraphsAndAllocatesImportedClusterHashes()
+    {
+        var spec = LoadSpec();
+        var clusterNodeId = ClusterNodeBase(spec.Tree, 55190, ClusterJewelSize.Large);
+        var item = ClusterItem(
+            1,
+            "Large Cluster Jewel",
+            "{crafted}Adds 8 Passive Skills",
+            "{crafted}2 Added Passive Skills are Jewel Sockets",
+            "1 Added Passive Skill is Misery Everlasting",
+            "1 Added Passive Skill is Unholy Grace",
+            "1 Added Passive Skill is Wicked Pall");
+
+        var result = spec.ApplyImport(new ImportedBuild(
+            ClassId: 0,
+            AscendClassId: 0,
+            SecondaryAscendClassId: 0,
+            NodeHashes: new[] { 55190 },
+            ClusterNodeHashes: new[] { clusterNodeId },
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: "3.28",
+            Source: "test")
+        {
+            ItemsById = new Dictionary<int, ImportedItem> { [1] = item },
+            SocketedJewels = new[] { new ImportedSocketedJewel(55190, 1) },
+        });
+
+        Assert.Contains(55190, spec.ActiveSubgraphs.Keys);
+        Assert.Contains(clusterNodeId, spec.AllocatedNodes);
+        Assert.Equal(2, result.Applied);
+        Assert.Equal(0, result.Skipped);
+    }
+
+    [Fact]
+    public void ApplyImportRestoresNestedClustersAfterTheirParent()
+    {
+        var temp = LoadSpec();
+        temp.SetClusterJewel(55190, new ClusterJewelSpec(55190, ClusterJewelSize.Large, 8, 2, Array.Empty<string>()));
+        var childSocket = temp.ActiveSubgraphs[55190].Nodes
+            .Where(node => node.Type == NodeType.JewelSocket)
+            .OrderBy(node => node.ExpansionSocket?.Index)
+            .First();
+
+        var spec = LoadSpec();
+        var childNodeId = ClusterNodeBase(spec.Tree, 55190, ClusterJewelSize.Large, childSocket, ClusterJewelSize.Medium);
+        var large = ClusterItem(
+            1,
+            "Large Cluster Jewel",
+            "{crafted}Adds 8 Passive Skills",
+            "{crafted}2 Added Passive Skills are Jewel Sockets");
+        var medium = ClusterItem(
+            2,
+            "Medium Cluster Jewel",
+            "{crafted}Adds 4 Passive Skills",
+            "{crafted}1 Added Passive Skill is a Jewel Socket",
+            "1 Added Passive Skill is Brush with Death",
+            "1 Added Passive Skill is Exposure Therapy");
+
+        spec.ApplyImport(new ImportedBuild(
+            ClassId: 0,
+            AscendClassId: 0,
+            SecondaryAscendClassId: 0,
+            NodeHashes: new[] { 55190, childSocket.Id },
+            ClusterNodeHashes: new[] { childNodeId },
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: "3.28",
+            Source: "test")
+        {
+            ItemsById = new Dictionary<int, ImportedItem> { [1] = large, [2] = medium },
+            SocketedJewels = new[]
+            {
+                new ImportedSocketedJewel(childSocket.Id, 2),
+                new ImportedSocketedJewel(55190, 1),
+            },
+        });
+
+        Assert.Contains(55190, spec.ActiveSubgraphs.Keys);
+        Assert.Contains(childSocket.Id, spec.ActiveSubgraphs.Keys);
+        Assert.Contains(childNodeId, spec.AllocatedNodes);
+    }
+
     private static TreeModel LoadTree()
     {
         var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "tree_3_28.json"));
@@ -162,6 +273,32 @@ public sealed class ClusterJewelTests
     }
 
     private static PassiveSpec LoadSpec() => new(LoadTree());
+
+    private static ImportedItem ClusterItem(int id, string baseType, params string[] bodyLines)
+    {
+        var raw = string.Join('\n', new[]
+        {
+            "Rarity: RARE",
+            "New Item",
+            baseType,
+        }.Concat(bodyLines));
+        return new ImportedItem(string.Empty, "RARE", "New Item", baseType, raw) { Id = id };
+    }
+
+    private static int ClusterNodeBase(TreeModel tree, int socketId, ClusterJewelSize size)
+    {
+        var socket = tree.Nodes[socketId];
+        var lineage = 0x10000 + (socket.ExpansionSocket!.Index << 6);
+        return lineage + (ClusterJewelData.GetDefinition(size).SizeIndex << 4);
+    }
+
+    private static int ClusterNodeBase(TreeModel tree, int outerSocketId, ClusterJewelSize outerSize, Node childSocket, ClusterJewelSize childSize)
+    {
+        var outerSocket = tree.Nodes[outerSocketId];
+        var lineage = 0x10000 + (outerSocket.ExpansionSocket!.Index << 6);
+        lineage += childSocket.ExpansionSocket!.Size == 1 ? childSocket.ExpansionSocket.Index << 9 : 0;
+        return lineage + (ClusterJewelData.GetDefinition(childSize).SizeIndex << 4);
+    }
 
     private static void AssertSocketMatchesRealNode(TreeModel tree, Node generatedSocket, int groupId, int expansionIndex)
     {

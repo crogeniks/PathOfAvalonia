@@ -10,7 +10,7 @@ public static class ClusterJewelResolver
         [6] = 8, [7] = 9, [8] = 11, [9] = 12, [10] = 13, [11] = 15,
     };
 
-    public static ClusterSubgraph Resolve(TreeModel tree, Node socketNode, ClusterJewelSpec spec, int clusterBaseId)
+    public static ClusterSubgraph Resolve(TreeModel tree, Node socketNode, ClusterJewelSpec spec, int lineageIdBase, int clusterNodeIdBase)
     {
         if (socketNode.ExpansionSocket is not { } expansionSocket)
         {
@@ -110,6 +110,7 @@ public static class ClusterJewelResolver
         {
             SocketNodeId = socketNode.Id,
             EntranceNodeId = entranceNode.Id,
+            LineageIdBase = lineageIdBase,
             Size = spec.Size,
             CircleRadius = orbitRadius,
             ClusterCenterX = proxyGroup.X,
@@ -127,6 +128,7 @@ public static class ClusterJewelResolver
             }
             nodesByTemplateIndex[templateIndex] = AddNode(
                 templateIndex,
+                realSocket.Id,
                 realSocket.Name,
                 NodeType.JewelSocket,
                 realSocket.Icon,
@@ -140,6 +142,7 @@ public static class ClusterJewelResolver
             var baseNode = tree.Nodes.Values.FirstOrDefault(node => node.Type == NodeType.Notable && node.Name == notableName);
             nodesByTemplateIndex[templateIndex] = AddNode(
                 templateIndex,
+                clusterNodeIdBase + templateIndex,
                 notableName,
                 NodeType.Notable,
                 baseNode?.Icon,
@@ -152,6 +155,7 @@ public static class ClusterJewelResolver
         {
             nodesByTemplateIndex[templateIndex] = AddNode(
                 templateIndex,
+                clusterNodeIdBase + templateIndex,
                 "Cluster Passive",
                 NodeType.Normal,
                 null,
@@ -162,6 +166,7 @@ public static class ClusterJewelResolver
 
         Node AddNode(
             int templateIndex,
+            int nodeId,
             string name,
             NodeType type,
             string? icon,
@@ -178,7 +183,7 @@ public static class ClusterJewelResolver
 
             var node = new Node
             {
-                Id = clusterBaseId + templateIndex,
+                Id = nodeId,
                 Name = name,
                 Type = type,
                 X = x,
