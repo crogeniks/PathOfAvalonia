@@ -14,6 +14,7 @@ public sealed class Poe2SpriteMapTests
 
         Assert.True(sprites.Atlases["poe2NodeIcons"].Coords.Count > 0);
         Assert.True(sprites.Atlases["poe2Frames"].Coords.Count > 0);
+        Assert.True(sprites.Atlases["poe2Jewels"].Coords.Count > 0);
         Assert.NotEqual(
             sprites.Atlases["poe2NodeIcons"].Coords["Art/2DArt/SkillIcons/passives/life1.dds"],
             sprites.Atlases["poe2NodeIcons"].Coords["Art/2DArt/SkillIcons/passives/mana.dds"]);
@@ -35,6 +36,18 @@ public sealed class Poe2SpriteMapTests
         Assert.NotEqual(
             sprites.Atlases["poe2Frames"].Coords["PSSkillFrame"],
             sprites.Atlases["poe2Frames"].Coords["OracleFrameSmallNormal"]);
+        foreach (var key in new[]
+        {
+            "Ruby",
+            "Emerald",
+            "Sapphire",
+            "Diamond",
+            "Time-Lost Diamond",
+            "Timeless Jewel",
+        })
+        {
+            Assert.NotNull(sprites.Lookup("poe2Jewels", key));
+        }
         foreach (var atlas in sprites.Atlases.Values)
         {
             var atlasPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path)!, atlas.File));
