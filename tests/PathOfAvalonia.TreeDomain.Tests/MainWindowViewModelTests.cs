@@ -37,7 +37,7 @@ public sealed class MainWindowViewModelTests
 
     private static TreeModel LoadTree()
     {
-        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "tree_3_28.json"));
+        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE1", "tree_3_28.json"));
         using var stream = File.OpenRead(path);
         return TreeLoader.LoadFromJson(stream, "3.28");
     }

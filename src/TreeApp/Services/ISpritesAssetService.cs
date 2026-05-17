@@ -13,7 +13,7 @@ public sealed class SpritesAssetService : ISpritesAssetService
 {
     public SpriteMap Load(string version)
     {
-        var uri = new Uri($"avares://PathOfAvalonia.TreeApp/Assets/sprites_{version.Replace('.', '_')}.json");
+        var uri = new Uri($"avares://PathOfAvalonia.TreeApp/Assets/PoE1/sprites_{version.Replace('.', '_')}.json");
         using var stream = AssetLoader.Open(uri);
         return SpriteMap.LoadFromJson(stream);
     }

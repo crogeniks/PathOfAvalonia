@@ -22,6 +22,9 @@ public partial class App : Application
     {
         var sc = new ServiceCollection();
 
+        sc.AddSingleton<GameRegistry>();
+        sc.AddSingleton<IUserSettingsService, UserSettingsService>();
+        sc.AddSingleton<IGameAssetService, GameAssetService>();
         sc.AddSingleton<ITreeAssetService, TreeAssetService>();
         sc.AddSingleton<ISpritesAssetService, SpritesAssetService>();
         sc.AddSingleton<IImportService, ImportService>();
@@ -34,7 +37,7 @@ public partial class App : Application
         sc.AddSingleton<PassiveSpec>();
 
         sc.AddSingleton<EquipmentViewModel>();
-        sc.AddSingleton<MainWindowViewModel>();
+        sc.AddSingleton<ShellViewModel>();
         sc.AddSingleton<MainWindow>();
 
         Services = sc.BuildServiceProvider();

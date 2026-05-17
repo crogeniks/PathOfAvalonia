@@ -6,6 +6,8 @@ namespace PathOfAvalonia.TreeDomain;
 public sealed class PassiveSpec
 {
     public TreeModel Tree { get; }
+    public ClassCatalog Classes { get; }
+    public GameFeatureFlags Features { get; }
     private static readonly ClusterJewelSize[] LargeSocketAllowedSizes = [ClusterJewelSize.Large, ClusterJewelSize.Medium, ClusterJewelSize.Small];
     private static readonly ClusterJewelSize[] MediumSocketAllowedSizes = [ClusterJewelSize.Medium, ClusterJewelSize.Small];
     private static readonly ClusterJewelSize[] SmallSocketAllowedSizes = [ClusterJewelSize.Small];
@@ -27,8 +29,15 @@ public sealed class PassiveSpec
     public IReadOnlyDictionary<int, ImportedItem> SocketedJewels => _socketedJewels;
 
     public PassiveSpec(TreeModel tree)
+        : this(tree, tree.Classes, tree.GameId == GameId.PathOfExile2 ? GameFeatureFlags.Poe2Milestone1 : GameFeatureFlags.Poe1)
+    {
+    }
+
+    public PassiveSpec(TreeModel tree, ClassCatalog classes, GameFeatureFlags features)
     {
         Tree = tree;
+        Classes = classes;
+        Features = features;
         _classStartNodeByIndex = new Dictionary<int, int>();
         _ascendancyStartNodeByName = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var n in tree.Nodes.Values)
@@ -36,6 +45,13 @@ public sealed class PassiveSpec
             if (n.Type == NodeType.ClassStart && n.ClassStartIndex is int idx)
             {
                 _classStartNodeByIndex[idx] = n.Id;
+            }
+            if (n.Type == NodeType.ClassStart)
+            {
+                foreach (var classStartIdx in n.ClassStartIndexes)
+                {
+                    _classStartNodeByIndex[classStartIdx] = n.Id;
+                }
             }
             if (n.Type == NodeType.AscendancyStart && n.AscendancyName is { } ascendancyName)
             {
@@ -61,6 +77,10 @@ public sealed class PassiveSpec
 
     public IReadOnlyList<ClusterJewelSize> AllowedClusterSizes(int socketId)
     {
+        if (!Features.SupportsClusterJewels)
+        {
+            return NoClusterSizes;
+        }
         if (!TryGetNode(socketId, out var socket)
             || socket?.Type != NodeType.JewelSocket
             || socket.ExpansionSocket is not { } expansionSocket)
@@ -102,7 +122,7 @@ public sealed class PassiveSpec
 
     public void SetAscendancy(int ascendancyIndex)
     {
-        var names = CharacterClasses.AscendancyNames(_selectedClassIndex);
+        var names = Classes.AscendancyNames(_selectedClassIndex);
         if (ascendancyIndex < 0 || ascendancyIndex >= names.Count || _selectedAscendancyIndex == ascendancyIndex)
         {
             return;
@@ -443,12 +463,13 @@ public sealed class PassiveSpec
         {
             RemoveClusterRecursive(socketId);
         }
-        if (_classStartNodeByIndex.ContainsKey(build.ClassId))
+        var importedClassIndex = Classes.ResolveClassIndexFromImportedId(build.ClassId);
+        if (_classStartNodeByIndex.ContainsKey(importedClassIndex))
         {
-            _selectedClassIndex = build.ClassId;
+            _selectedClassIndex = importedClassIndex;
         }
         _allocated.Add(_classStartNodeByIndex[_selectedClassIndex]);
-        _selectedAscendancyIndex = ResolveAscendancyIndex(_selectedClassIndex, build.AscendClassId);
+        _selectedAscendancyIndex = Classes.ResolveAscendancyIndex(_selectedClassIndex, build.AscendClassId);
         if (SelectedAscendancyStartNodeId() is { } ascendancyStartId)
         {
             _allocated.Add(ascendancyStartId);
@@ -743,7 +764,7 @@ public sealed class PassiveSpec
         return true;
     }
 
-    private string? SelectedAscendancyName => CharacterClasses.AscendancyName(_selectedClassIndex, _selectedAscendancyIndex);
+    private string? SelectedAscendancyName => Classes.AscendancyTreeName(_selectedClassIndex, _selectedAscendancyIndex);
 
     private int? SelectedAscendancyStartNodeId()
     {
@@ -768,12 +789,6 @@ public sealed class PassiveSpec
                 _masterySelections.Remove(id);
             }
         }
-    }
-
-    private static int ResolveAscendancyIndex(int classIndex, int importedAscendancyId)
-    {
-        var names = CharacterClasses.AscendancyNames(classIndex);
-        return importedAscendancyId >= 0 && importedAscendancyId < names.Count ? importedAscendancyId : 0;
     }
 
     private int BuildLegacyProxyGroup(int proxyGroupId, int expansionJewelSize, int clusterSizeIndex)
@@ -932,44 +947,4 @@ public sealed record HoverPath(IReadOnlyList<int> Nodes, IReadOnlySet<(int Min, 
 {
     public static readonly HoverPath Empty = new(Array.Empty<int>(), new HashSet<(int, int)>());
     public bool IsEmpty => Nodes.Count == 0;
-}
-
-// Classes are indexed by the tree's classStartIndex. The 3.28 tree still uses the
-// original 7-class lineup; newer POE2 trees would need a different table.
-public static class CharacterClasses
-{
-    public static readonly IReadOnlyList<string> Names = new[]
-    {
-        "Scion", "Marauder", "Ranger", "Witch", "Duelist", "Templar", "Shadow",
-    };
-
-    private static readonly IReadOnlyList<IReadOnlyList<string>> Ascendancies = new IReadOnlyList<string>[]
-    {
-        new[] { "None", "Ascendant", "Scavenger" },
-        new[] { "None", "Juggernaut", "Berserker", "Chieftain" },
-        new[] { "None", "Deadeye", "Raider", "Pathfinder", "Warden" },
-        new[] { "None", "Necromancer", "Occultist", "Elementalist" },
-        new[] { "None", "Slayer", "Gladiator", "Champion" },
-        new[] { "None", "Inquisitor", "Hierophant", "Guardian" },
-        new[] { "None", "Assassin", "Trickster", "Saboteur" },
-    };
-
-    public static IReadOnlyList<string> AscendancyNames(int classIndex) =>
-        classIndex >= 0 && classIndex < Ascendancies.Count
-            ? Ascendancies[classIndex]
-            : Ascendancies[0];
-
-    public static string? AscendancyName(int classIndex, int ascendancyIndex)
-    {
-        var names = AscendancyNames(classIndex);
-        if (ascendancyIndex <= 0 || ascendancyIndex >= names.Count)
-        {
-            return null;
-        }
-        return names[ascendancyIndex] switch
-        {
-            "Scavenger" => "Reliquarian",
-            var name => name,
-        };
-    }
 }

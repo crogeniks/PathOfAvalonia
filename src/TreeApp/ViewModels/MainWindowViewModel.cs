@@ -12,7 +12,7 @@ namespace PathOfAvalonia.TreeApp.ViewModels;
 public partial class MainWindowViewModel : ObservableObject
 {
     private readonly PassiveSpec _spec;
-    private readonly IImportService _importService;
+    private readonly IImportStrategy _importStrategy;
     private bool _syncingClass;
     private bool _syncingAscendancy;
 
@@ -29,8 +29,11 @@ public partial class MainWindowViewModel : ObservableObject
 
     public EquipmentViewModel Equipment { get; }
     public PassiveTreeViewModel TreeViewModel { get; }
-    public IReadOnlyList<string> ClassNames => CharacterClasses.Names;
-    public IReadOnlyList<string> AscendancyNames => CharacterClasses.AscendancyNames(SelectedClassIndex);
+    public IReadOnlyList<string> ClassNames => _spec.Classes.ClassNames;
+    public IReadOnlyList<string> AscendancyNames => _spec.Classes.AscendancyNames(SelectedClassIndex);
+    public bool IsImportSupported => _importStrategy.IsSupported;
+    public bool IsImportUnsupported => !_importStrategy.IsSupported;
+    public string UnsupportedImportStatus => "Build import is not available for Path of Exile 2 yet.";
 
     [ObservableProperty] private int _selectedClassIndex;
     [ObservableProperty] private int _selectedAscendancyIndex;
@@ -44,9 +47,14 @@ public partial class MainWindowViewModel : ObservableObject
         ImportStatusIsError ? StatusErrorBrush : StatusSuccessBrush;
 
     public MainWindowViewModel(PassiveSpec spec, IImportService importService, EquipmentViewModel equipment)
+        : this(spec, new ImportServiceStrategyAdapter(importService), equipment)
+    {
+    }
+
+    public MainWindowViewModel(PassiveSpec spec, IImportStrategy importStrategy, EquipmentViewModel equipment)
     {
         _spec = spec;
-        _importService = importService;
+        _importStrategy = importStrategy;
         Equipment = equipment;
         TreeViewModel = new PassiveTreeViewModel(spec);
         _selectedClassIndex = spec.SelectedClassIndex;
@@ -139,7 +147,7 @@ public partial class MainWindowViewModel : ObservableObject
         }
         try
         {
-            var build = _importService.Import(text);
+            var build = _importStrategy.Import(text);
             var result = _spec.ApplyImport(build);
             Equipment.LoadBuild(build);
             ImportStatus = $"{build.Source}: {result.Applied} nodes (+{result.ClusterSkipped} cluster skipped)";
@@ -163,9 +171,9 @@ public partial class MainWindowViewModel : ObservableObject
         ImportStatusIsError = false;
     }
 
-    private static string AscendancyNameAt(int classIndex, int ascendancyIndex)
+    private string AscendancyNameAt(int classIndex, int ascendancyIndex)
     {
-        var names = CharacterClasses.AscendancyNames(classIndex);
+        var names = _spec.Classes.AscendancyNames(classIndex);
         return ascendancyIndex >= 0 && ascendancyIndex < names.Count ? names[ascendancyIndex] : names[0];
     }
 
@@ -179,5 +187,11 @@ public partial class MainWindowViewModel : ObservableObject
             }
         }
         return -1;
+    }
+
+    private sealed class ImportServiceStrategyAdapter(IImportService importService) : IImportStrategy
+    {
+        public bool IsSupported => true;
+        public ImportedBuild Import(string text) => importService.Import(text);
     }
 }
