@@ -8,6 +8,7 @@ public sealed class Node
     public required double X { get; init; }
     public required double Y { get; init; }
     public string? Icon { get; init; }
+    public NodeVisual? Visual { get; init; }
     public IReadOnlyList<string> Stats { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> ReminderText { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> FlavourText { get; init; } = Array.Empty<string>();
@@ -33,3 +34,10 @@ public sealed class Node
 
 public sealed record MasteryEffect(int Id, IReadOnlyList<string> Stats);
 public sealed record ExpansionSocketInfo(int Size, int Index, int ProxyNodeId, int? ParentSocketId);
+public sealed record NodeVisual(
+    string? Icon,
+    string? AllocatedFrame,
+    string? HoverFrame,
+    string? UnallocatedFrame,
+    string? ConnectionArt,
+    bool IconPathIsAssetPath);

@@ -77,6 +77,13 @@ public sealed class Poe2TreeLoader : ITreeLoader
                 X = x,
                 Y = y,
                 Icon = nd.Icon,
+                Visual = new NodeVisual(
+                    nd.Icon,
+                    nd.NodeOverlay?.Alloc,
+                    nd.NodeOverlay?.Path,
+                    nd.NodeOverlay?.Unalloc,
+                    nd.ConnectionArt,
+                    IconPathIsAssetPath: true),
                 Stats = NormalizeLines(nd.Stats),
                 AscendancyName = nd.AscendancyName,
                 ClassStartIndex = classStartIndex,

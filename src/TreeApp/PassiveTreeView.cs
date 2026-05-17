@@ -29,6 +29,7 @@ public sealed class PassiveTreeView : Control
     private double _fitScale = 0.05;     // scale where the whole tree just fits the viewport
     private const double MinZoomFactor = 0.9;  // can't shrink below fit
     private const double MaxZoomFactor = 10.0; // can zoom 10× past fit to inspect a single cluster
+    private const double Poe2MaxZoomFactor = 40.0;
 
     // Pan state
     private bool _panning;
@@ -70,6 +71,12 @@ public sealed class PassiveTreeView : Control
     private static readonly IBrush TooltipFlavourBrush = new SolidColorBrush(Color.FromRgb(0xD2, 0x84, 0x2E));
     private static readonly IBrush ConnectorBrush = new SolidColorBrush(Color.FromRgb(0x40, 0x40, 0x48));
     private static readonly IBrush HoverPathBrush = new SolidColorBrush(Color.FromArgb(0x80, 0xff, 0xc8, 0x4a));
+    private static readonly IBrush Poe2NormalFrameBrush = new SolidColorBrush(Color.FromArgb(0xE0, 0x4E, 0x46, 0x35));
+    private static readonly IBrush Poe2NotableFrameBrush = new SolidColorBrush(Color.FromArgb(0xF0, 0x8C, 0x75, 0x42));
+    private static readonly IBrush Poe2SocketFrameBrush = new SolidColorBrush(Color.FromArgb(0xE0, 0x70, 0x82, 0x28));
+    private static readonly IBrush Poe2HoverFrameBrush = new SolidColorBrush(Color.FromArgb(0xF0, 0xD8, 0xC0, 0x78));
+    private static readonly IBrush Poe2AllocatedFrameBrush = new SolidColorBrush(Color.FromArgb(0xF0, 0xE0, 0xB8, 0x58));
+    private static readonly IBrush Poe2SocketFillBrush = new SolidColorBrush(Color.FromArgb(0xD0, 0x05, 0x06, 0x05));
     private static readonly IPen NodeOutlinePen = new Pen(Brushes.Black, 1.5);
     // Cluster background disc layers (programmatic stand-in for the missing art asset).
     // Colors approximate the PoB golden-medallion aesthetic.
@@ -588,6 +595,15 @@ public sealed class PassiveTreeView : Control
     private void DrawNode(DrawingContext ctx, Node n, bool alloc, bool hover, bool useClusterSocketFrame)
     {
         var screen = TreeToScreen(n.X, n.Y);
+        if (TryDrawGameSpecificNode(ctx, n, alloc, hover, screen))
+        {
+            if (n.Type == NodeType.JewelSocket && _vm.SocketedJewelOverlayAt(n) is { } jewelOverlay)
+            {
+                DrawSocketedJewelOverlay(ctx, jewelOverlay, screen);
+            }
+            return;
+        }
+
         // Icon: skills atlas (normal/notable/keystone) or mastery atlas.
         var (iconAtlas, iconPath) = IconSprite(n, alloc, hover: false);
         if (iconAtlas is not null && iconPath is not null)
@@ -610,9 +626,9 @@ public sealed class PassiveTreeView : Control
         {
             drewFrame = DrawSprite(ctx, "frame", frameKey, screen);
         }
-        if (n.Type == NodeType.JewelSocket && _vm.SocketedJewelOverlayAt(n) is { } jewelOverlay)
+        if (n.Type == NodeType.JewelSocket && _vm.SocketedJewelOverlayAt(n) is { } socketOverlay)
         {
-            DrawSocketedJewelOverlay(ctx, jewelOverlay, screen);
+            DrawSocketedJewelOverlay(ctx, socketOverlay, screen);
         }
         // Fallback for node types we haven't wired art for yet (e.g. class start),
         // so they don't disappear.
@@ -622,6 +638,132 @@ public sealed class PassiveTreeView : Control
             ctx.DrawEllipse(alloc ? AllocatedBrush : NormalBrush, NodeOutlinePen, screen, r, r);
         }
     }
+
+    private bool TryDrawGameSpecificNode(DrawingContext ctx, Node node, bool allocated, bool hover, Point screen)
+    {
+        if (node.Visual is not { } visual)
+        {
+            return false;
+        }
+
+        var drewAny = false;
+        if (!string.IsNullOrWhiteSpace(visual.Icon))
+        {
+            drewAny |= DrawPoe2Sprite(ctx, "poe2NodeIcons", visual.Icon, screen, Poe2IconHalfSize(node));
+        }
+
+        drewAny |= DrawPoe2VectorFrame(ctx, node, allocated, hover, screen);
+
+        return drewAny;
+    }
+
+    private bool DrawPoe2VectorFrame(DrawingContext ctx, Node node, bool allocated, bool hover, Point centre)
+    {
+        if (node.Type is NodeType.ClassStart or NodeType.AscendancyStart or NodeType.Proxy or NodeType.Mastery)
+        {
+            return false;
+        }
+
+        var half = Poe2FrameHalfSize(node, string.Empty);
+        var rx = half.Width * _scale;
+        var ry = half.Height * _scale;
+        if (rx <= 0 || ry <= 0)
+        {
+            return false;
+        }
+
+        var baseBrush = node.Type switch
+        {
+            NodeType.Notable or NodeType.Keystone => Poe2NotableFrameBrush,
+            NodeType.JewelSocket => Poe2SocketFrameBrush,
+            _ => Poe2NormalFrameBrush,
+        };
+        var brush = allocated ? Poe2AllocatedFrameBrush : hover ? Poe2HoverFrameBrush : baseBrush;
+        var thickness = Math.Max(1.0, (node.Type switch
+        {
+            NodeType.Keystone => 5.0,
+            NodeType.Notable => 3.5,
+            NodeType.JewelSocket => 3.0,
+            _ => 2.2,
+        }) * _scale);
+
+        if (node.Type == NodeType.JewelSocket)
+        {
+            ctx.DrawEllipse(Poe2SocketFillBrush, new Pen(brush, thickness), centre, rx * 0.72, ry * 0.72);
+            ctx.DrawEllipse(null, new Pen(baseBrush, Math.Max(0.75, thickness * 0.45)), centre, rx, ry);
+            return true;
+        }
+
+        ctx.DrawEllipse(null, new Pen(brush, thickness), centre, rx, ry);
+        if (node.Type is NodeType.Notable or NodeType.Keystone)
+        {
+            ctx.DrawEllipse(null, new Pen(Poe2NormalFrameBrush, Math.Max(0.75, thickness * 0.45)), centre, rx * 0.83, ry * 0.83);
+        }
+        return true;
+    }
+
+    private bool DrawPoe2Sprite(DrawingContext ctx, string atlasKey, string spriteKey, Point centre, Size halfSizeTree)
+    {
+        if (!_sprites.Atlases.TryGetValue(atlasKey, out var atlas))
+        {
+            return false;
+        }
+        if (!atlas.Coords.TryGetValue(spriteKey, out var rect))
+        {
+            return false;
+        }
+        if (!_atlasBitmaps.TryGetValue(atlas.File, out var bmp))
+        {
+            return false;
+        }
+
+        var halfW = halfSizeTree.Width * _scale;
+        var halfH = halfSizeTree.Height * _scale;
+        var dst = new Rect(centre.X - halfW, centre.Y - halfH, halfW * 2, halfH * 2);
+        var src = new Rect(rect.X, rect.Y, rect.W, rect.H);
+        ctx.DrawImage(bmp, src, dst);
+        return true;
+    }
+
+    private static Size Poe2IconHalfSize(Node node) => node.Type switch
+    {
+        NodeType.Keystone => new Size(82, 82),
+        NodeType.Notable => new Size(54, 54),
+        NodeType.JewelSocket => new Size(76, 76),
+        NodeType.AscendancyStart => new Size(16, 16),
+        NodeType.Mastery => new Size(37, 37),
+        _ when node.AscendancyName is not null => new Size(54, 54),
+        _ => new Size(37, 37),
+    };
+
+    private static Size Poe2FrameHalfSize(Node node, string frameKey)
+    {
+        if (frameKey.Contains("FrameLarge", StringComparison.Ordinal))
+        {
+            return new Size(100, 100);
+        }
+        if (frameKey.Contains("FrameSmall", StringComparison.Ordinal))
+        {
+            return new Size(80, 80);
+        }
+        return node.Type switch
+        {
+            NodeType.Keystone => new Size(120, 120),
+            NodeType.Notable => new Size(80, 80),
+            NodeType.JewelSocket => new Size(76, 76),
+            NodeType.AscendancyStart => new Size(24, 24),
+            _ => new Size(54, 54),
+        };
+    }
+
+    private static string? Poe2DefaultFrameKey(NodeType type, bool allocated, bool hover) => type switch
+    {
+        NodeType.Normal => allocated ? "PSSkillFrameActive" : hover ? "PSSkillFrameHighlighted" : "PSSkillFrame",
+        NodeType.Notable => allocated ? "NotableFrameAllocated" : hover ? "NotableFrameCanAllocate" : "NotableFrameUnallocated",
+        NodeType.Keystone => allocated ? "KeystoneFrameAllocated" : hover ? "KeystoneFrameCanAllocate" : "KeystoneFrameUnallocated",
+        NodeType.JewelSocket => allocated ? "JewelFrameAllocated" : hover ? "JewelFrameCanAllocate" : "JewelFrameUnallocated",
+        _ => null,
+    };
 
     private bool DrawSprite(DrawingContext ctx, string atlasKey, string spriteKey, Point centre)
     {
@@ -836,7 +978,8 @@ public sealed class PassiveTreeView : Control
         var p = e.GetPosition(this);
         var (txBefore, tyBefore) = ScreenToTree(p);
         var factor = Math.Pow(1.2, e.Delta.Y);
-        _scale = Math.Clamp(_scale * factor, _fitScale * MinZoomFactor, _fitScale * MaxZoomFactor);
+        var maxZoom = _vm.Tree.GameId == GameId.PathOfExile2 ? Poe2MaxZoomFactor : MaxZoomFactor;
+        _scale = Math.Clamp(_scale * factor, _fitScale * MinZoomFactor, _fitScale * maxZoom);
         // Keep cursor anchored.
         _offsetX = p.X - txBefore * _scale;
         _offsetY = p.Y - tyBefore * _scale;

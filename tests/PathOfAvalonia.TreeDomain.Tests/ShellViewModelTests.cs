@@ -25,7 +25,7 @@ public sealed class ShellViewModelTests
 
         Assert.Equal(ShellPage.Workspace, vm.CurrentPage);
         Assert.Equal(GameId.PathOfExile2, vm.ActiveWorkspace!.Workspace.Game.Id);
-        Assert.False(vm.ActiveWorkspace.TreePanel.IsImportSupported);
+        Assert.True(vm.ActiveWorkspace.TreePanel.IsImportSupported);
     }
 
     [Fact]
@@ -109,4 +109,3 @@ public sealed class ShellViewModelTests
             throw new NotSupportedException();
     }
 }
-

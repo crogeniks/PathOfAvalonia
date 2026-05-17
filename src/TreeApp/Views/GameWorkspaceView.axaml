@@ -33,7 +33,7 @@
                             <TextBlock Text="Import build" Foreground="#EAEAEA" FontWeight="Bold"
                                        Margin="0,6,0,0"
                                        IsVisible="{Binding IsImportSupported}"/>
-                            <TextBlock Text="Paste a PoE tree URL or a PoB build code:"
+                            <TextBlock Text="{Binding ImportPrompt}"
                                        Foreground="#AAAACC" FontSize="11"
                                        IsVisible="{Binding IsImportSupported}"/>
                             <TextBox Name="ImportInput"
@@ -41,7 +41,7 @@
                                      AcceptsReturn="False"
                                      TextWrapping="NoWrap"
                                      ScrollViewer.HorizontalScrollBarVisibility="Hidden"
-                                     PlaceholderText="https://www.pathofexile.com/passive-skill-tree/... or PoB code"
+                                     PlaceholderText="{Binding ImportPlaceholder}"
                                      IsVisible="{Binding IsImportSupported}">
                                 <TextBox.KeyBindings>
                                     <KeyBinding Gesture="Return" Command="{Binding ImportCommand}"/>

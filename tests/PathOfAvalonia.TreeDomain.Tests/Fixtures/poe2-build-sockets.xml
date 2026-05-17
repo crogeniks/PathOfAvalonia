@@ -1,0 +1,15 @@
+<PathOfBuilding2>
+  <Tree>
+    <Spec treeVersion="0_4" classInternalId="Witch" ascendancyInternalId="" nodes="">
+      <Sockets>
+        <Socket nodeId="1" itemId="1" />
+      </Sockets>
+    </Spec>
+  </Tree>
+  <Items activeItemSet="1">
+    <Item id="1">Rarity: Magic
+Ruby
+--------
+Adds fire damage</Item>
+  </Items>
+</PathOfBuilding2>

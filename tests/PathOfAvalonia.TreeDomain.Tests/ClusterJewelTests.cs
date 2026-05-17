@@ -703,7 +703,7 @@ public sealed class ClusterJewelTests
         var vm = new EquipmentViewModel();
         vm.LoadBuild(build);
 
-        Assert.Equal(new[] { "Equipment", "Jewels" }, vm.Groups.Select(group => group.Header).ToArray());
+        Assert.Equal(new[] { "Equipment", "Socketed Tree Jewels" }, vm.Groups.Select(group => group.Header).ToArray());
         Assert.Equal("Helmet", Assert.Single(vm.Groups[0].Items).Slot);
         Assert.Equal("Jewel 55190", Assert.Single(vm.Groups[1].Items).Slot);
     }
