@@ -35,6 +35,7 @@ public sealed class PassiveTreeView : Control
     private bool _panning;
     private Point _panStartScreen;
     private Point _lastPointerPosition;
+    private Point _lastTooltipRedrawPosition;
     private double _panStartOffX, _panStartOffY;
     private bool _panMoved;
 
@@ -56,7 +57,9 @@ public sealed class PassiveTreeView : Control
     private static readonly double HitRsqKeystone = Sq(84 * SpriteDisplayScale);
     private static readonly double HitRsqSocket   = Sq(58 * SpriteDisplayScale);
     private static readonly double HitRsqMastery  = Sq(65 * SpriteDisplayScale);
+    private static readonly double HitMaxRadius = 90 * SpriteDisplayScale;
     private static double Sq(double x) => x * x;
+    private static double DistanceSquared(Point a, Point b) => Sq(a.X - b.X) + Sq(a.Y - b.Y);
 
     // Cached brushes / pens
     private static readonly IBrush BgBrush = new SolidColorBrush(Color.FromRgb(0x10, 0x10, 0x18));
@@ -139,6 +142,19 @@ public sealed class PassiveTreeView : Control
     private (double tx, double ty) ScreenToTree(Point p) =>
         ((p.X - _offsetX) / _scale, (p.Y - _offsetY) / _scale);
 
+    private Rect VisibleTreeRect(double paddingTree = 180)
+    {
+        var (left, top) = ScreenToTree(new Point(0, 0));
+        var (right, bottom) = ScreenToTree(new Point(Bounds.Width, Bounds.Height));
+        var x = Math.Min(left, right) - paddingTree;
+        var y = Math.Min(top, bottom) - paddingTree;
+        return new Rect(
+            x,
+            y,
+            Math.Abs(right - left) + paddingTree * 2,
+            Math.Abs(bottom - top) + paddingTree * 2);
+    }
+
     public override void Render(DrawingContext ctx)
     {
         EnsureViewInitialised();
@@ -146,6 +162,7 @@ public sealed class PassiveTreeView : Control
         DrawBackgroundTile(ctx);
 
         var activeClusters = _vm.ActiveClusters;
+        var visibleTree = VisibleTreeRect();
 
         // Cluster background discs, drawn under connectors and nodes.
         // We don't have the actual medallion art asset, so we approximate it with
@@ -153,6 +170,10 @@ public sealed class PassiveTreeView : Control
         // The disc is centred on the ring centre (offset outward from the socket).
         foreach (var sub in activeClusters.Values)
         {
+            if (!CircleIntersects(visibleTree, sub.ClusterCenterX, sub.ClusterCenterY, sub.CircleRadius))
+            {
+                continue;
+            }
             var centre = TreeToScreen(sub.ClusterCenterX, sub.ClusterCenterY);
             var r = sub.CircleRadius * _scale;
 
@@ -207,7 +228,7 @@ public sealed class PassiveTreeView : Control
             }
         }
 
-        DrawNodesAndHud(ctx);
+        DrawNodesAndHud(ctx, visibleTree);
         return;
 
         bool ShouldDrawBaseConnector(Connector c)
@@ -215,7 +236,8 @@ public sealed class PassiveTreeView : Control
             return _vm.Tree.Nodes.TryGetValue(c.FromId, out var from)
                 && _vm.Tree.Nodes.TryGetValue(c.ToId, out var to)
                 && IsVisibleBaseTreeNode(from)
-                && IsVisibleBaseTreeNode(to);
+                && IsVisibleBaseTreeNode(to)
+                && ConnectorIntersects(c, visibleTree);
         }
 
         static bool IsVisibleBaseTreeNode(Node n)
@@ -226,6 +248,10 @@ public sealed class PassiveTreeView : Control
 
         void DrawConnector(Connector c)
         {
+            if (!ConnectorIntersects(c, visibleTree))
+            {
+                return;
+            }
             var key = (Math.Min(c.FromId, c.ToId), Math.Max(c.FromId, c.ToId));
             IPen pen;
             if (allocated.Contains(c.FromId) && allocated.Contains(c.ToId))
@@ -295,7 +321,31 @@ public sealed class PassiveTreeView : Control
         ctx.DrawGeometry(brush: null, pen: pen, geometry: geo);
     }
 
-    private void DrawNodesAndHud(DrawingContext ctx)
+    private static bool ConnectorIntersects(Connector connector, Rect visibleTree) =>
+        connector switch
+        {
+            LineConnector lc => RectFromPoints(lc.X1, lc.Y1, lc.X2, lc.Y2).Intersects(visibleTree),
+            ArcConnector ac => CircleRect(ac.Cx, ac.Cy, ac.Radius).Intersects(visibleTree),
+            _ => true,
+        };
+
+    private static Rect RectFromPoints(double x1, double y1, double x2, double y2)
+    {
+        var x = Math.Min(x1, x2);
+        var y = Math.Min(y1, y2);
+        return new Rect(x, y, Math.Abs(x2 - x1), Math.Abs(y2 - y1));
+    }
+
+    private static Rect CircleRect(double cx, double cy, double radius) =>
+        new(cx - radius, cy - radius, radius * 2, radius * 2);
+
+    private static bool CircleIntersects(Rect rect, double cx, double cy, double radius) =>
+        CircleRect(cx, cy, radius).Intersects(rect);
+
+    private static bool NodeIntersects(Node node, Rect visibleTree) =>
+        visibleTree.Contains(new Point(node.X, node.Y));
+
+    private void DrawNodesAndHud(DrawingContext ctx, Rect visibleTree)
     {
         var allocated = _vm.AllocatedNodes;
 
@@ -311,6 +361,10 @@ public sealed class PassiveTreeView : Control
             {
                 continue;
             }
+            if (!NodeIntersects(n, visibleTree))
+            {
+                continue;
+            }
             var isHover = _vm.HoverNodeId == n.Id;
             var onPath = _vm.HoverPathNodes.Contains(n.Id);
             DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath, useClusterSocketFrame: true);
@@ -321,6 +375,10 @@ public sealed class PassiveTreeView : Control
         {
             foreach (var n in sub.Nodes)
             {
+                if (!NodeIntersects(n, visibleTree))
+                {
+                    continue;
+                }
                 var isHover = _vm.HoverNodeId == n.Id;
                 var onPath = _vm.HoverPathNodes.Contains(n.Id);
                 DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath, useClusterSocketFrame: true);
@@ -872,6 +930,10 @@ public sealed class PassiveTreeView : Control
         {
             var dx = tx - n.X;
             var dy = ty - n.Y;
+            if (Math.Abs(dx) > HitMaxRadius || Math.Abs(dy) > HitMaxRadius)
+            {
+                return;
+            }
             var d = dx * dx + dy * dy;
             var rsq = n.Type switch
             {
@@ -914,10 +976,12 @@ public sealed class PassiveTreeView : Control
         var hit = HitTest(p);
         if (hit != _vm.HoverNodeId)
         {
+            _lastTooltipRedrawPosition = p;
             _vm.SetHover(hit); // fires RedrawRequested → InvalidateVisual
         }
-        else if (hit is not null)
+        else if (hit is not null && DistanceSquared(p, _lastTooltipRedrawPosition) > 16)
         {
+            _lastTooltipRedrawPosition = p;
             InvalidateVisual();
         }
     }
