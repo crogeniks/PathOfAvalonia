@@ -18,6 +18,11 @@
                         <ComboBox ItemsSource="{Binding ClassNames}"
                                   SelectedIndex="{Binding SelectedClassIndex}"
                                   HorizontalAlignment="Stretch"/>
+                        <TextBlock Text="Ascendancy" Foreground="#EAEAEA" FontWeight="Bold"
+                                   Margin="0,6,0,0"/>
+                        <ComboBox ItemsSource="{Binding AscendancyNames}"
+                                  SelectedItem="{Binding SelectedAscendancyName}"
+                                  HorizontalAlignment="Stretch"/>
                         <TextBlock Text="Import build" Foreground="#EAEAEA" FontWeight="Bold"
                                    Margin="0,6,0,0"/>
                         <TextBlock Text="Paste a PoE tree URL or a PoB build code:"

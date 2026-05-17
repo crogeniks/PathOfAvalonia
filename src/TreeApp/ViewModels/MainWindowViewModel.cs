@@ -14,6 +14,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly PassiveSpec _spec;
     private readonly IImportService _importService;
     private bool _syncingClass;
+    private bool _syncingAscendancy;
 
     // Multi-KB PoB build codes lag Avalonia's TextBox on every click/select.
     // After paste, we stash the full string here and replace the TextBox text
@@ -29,8 +30,11 @@ public partial class MainWindowViewModel : ObservableObject
     public EquipmentViewModel Equipment { get; }
     public PassiveTreeViewModel TreeViewModel { get; }
     public IReadOnlyList<string> ClassNames => CharacterClasses.Names;
+    public IReadOnlyList<string> AscendancyNames => CharacterClasses.AscendancyNames(SelectedClassIndex);
 
     [ObservableProperty] private int _selectedClassIndex;
+    [ObservableProperty] private int _selectedAscendancyIndex;
+    [ObservableProperty] private string _selectedAscendancyName = "None";
     [ObservableProperty] private string _importInput = string.Empty;
     [ObservableProperty] private string _importStatus = string.Empty;
     [ObservableProperty] private bool _importStatusIsError;
@@ -46,21 +50,51 @@ public partial class MainWindowViewModel : ObservableObject
         Equipment = equipment;
         TreeViewModel = new PassiveTreeViewModel(spec);
         _selectedClassIndex = spec.SelectedClassIndex;
+        _selectedAscendancyIndex = spec.SelectedAscendancyIndex;
+        _selectedAscendancyName = AscendancyNameAt(_selectedClassIndex, _selectedAscendancyIndex);
         _spec.SpecChanged += OnSpecChanged;
     }
 
     private void OnSpecChanged()
     {
         _syncingClass = true;
+        _syncingAscendancy = true;
         SelectedClassIndex = _spec.SelectedClassIndex;
+        OnPropertyChanged(nameof(AscendancyNames));
+        SelectedAscendancyIndex = _spec.SelectedAscendancyIndex;
+        SelectedAscendancyName = AscendancyNameAt(SelectedClassIndex, SelectedAscendancyIndex);
         _syncingClass = false;
+        _syncingAscendancy = false;
     }
 
     partial void OnSelectedClassIndexChanged(int value)
     {
+        OnPropertyChanged(nameof(AscendancyNames));
         if (!_syncingClass && value >= 0)
         {
             _spec.SetClass(value);
+        }
+    }
+
+    partial void OnSelectedAscendancyIndexChanged(int value)
+    {
+        if (!_syncingAscendancy && value >= 0)
+        {
+            _spec.SetAscendancy(value);
+        }
+    }
+
+    partial void OnSelectedAscendancyNameChanged(string value)
+    {
+        if (_syncingAscendancy)
+        {
+            return;
+        }
+        var names = AscendancyNames;
+        var index = AscendancyIndexOf(names, value);
+        if (index >= 0)
+        {
+            _spec.SetAscendancy(index);
         }
     }
 
@@ -127,5 +161,23 @@ public partial class MainWindowViewModel : ObservableObject
         ImportInput = string.Empty;
         ImportStatus = "cleared";
         ImportStatusIsError = false;
+    }
+
+    private static string AscendancyNameAt(int classIndex, int ascendancyIndex)
+    {
+        var names = CharacterClasses.AscendancyNames(classIndex);
+        return ascendancyIndex >= 0 && ascendancyIndex < names.Count ? names[ascendancyIndex] : names[0];
+    }
+
+    private static int AscendancyIndexOf(IReadOnlyList<string> names, string value)
+    {
+        for (var i = 0; i < names.Count; i++)
+        {
+            if (names[i] == value)
+            {
+                return i;
+            }
+        }
+        return -1;
     }
 }
