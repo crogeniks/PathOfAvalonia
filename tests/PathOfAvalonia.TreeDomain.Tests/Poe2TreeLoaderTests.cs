@@ -65,6 +65,29 @@ public sealed class Poe2TreeLoaderTests
     }
 
     [Fact]
+    public void DrawableLinkedNodesHaveConnectors()
+    {
+        var tree = LoadTree();
+        var connectorPairs = tree.Connectors
+            .Select(c => (FromId: Math.Min(c.FromId, c.ToId), ToId: Math.Max(c.FromId, c.ToId)))
+            .ToHashSet();
+
+        foreach (var node in tree.Nodes.Values)
+        {
+            foreach (var linked in node.LinkedNodes)
+            {
+                if (!NeedsDrawableConnector(node, linked))
+                {
+                    continue;
+                }
+
+                var pair = (FromId: Math.Min(node.Id, linked.Id), ToId: Math.Max(node.Id, linked.Id));
+                Assert.Contains(pair, connectorPairs);
+            }
+        }
+    }
+
+    [Fact]
     public void PassiveSpecCanSelectSorceressDiscipleOfVarashta()
     {
         var tree = LoadTree();
@@ -86,5 +109,14 @@ public sealed class Poe2TreeLoaderTests
         var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE2", "tree_0_4.json"));
         using var stream = File.OpenRead(path);
         return TreeLoader.LoadPoe2FromJson(stream, "0.4");
+    }
+
+    private static bool NeedsDrawableConnector(Node from, Node to)
+    {
+        return (from.GroupId == to.GroupId || from.AscendancyName is not null)
+            && from.Type != NodeType.Mastery
+            && to.Type != NodeType.Mastery
+            && !((from.Type == NodeType.ClassStart && to.Type == NodeType.AscendancyStart)
+                || (from.Type == NodeType.AscendancyStart && to.Type == NodeType.ClassStart));
     }
 }
