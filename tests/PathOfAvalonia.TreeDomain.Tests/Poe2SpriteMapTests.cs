@@ -17,6 +17,24 @@ public sealed class Poe2SpriteMapTests
         Assert.NotEqual(
             sprites.Atlases["poe2NodeIcons"].Coords["Art/2DArt/SkillIcons/passives/life1.dds"],
             sprites.Atlases["poe2NodeIcons"].Coords["Art/2DArt/SkillIcons/passives/mana.dds"]);
+        Assert.NotEqual(
+            sprites.Atlases["poe2Frames"].Coords["PSSkillFrame"],
+            sprites.Atlases["poe2Frames"].Coords["NotableFrameUnallocated"]);
+        Assert.NotEqual(
+            sprites.Atlases["poe2Frames"].Coords["PSSkillFrame"],
+            sprites.Atlases["poe2Frames"].Coords["PSSkillFrameActive"]);
+        Assert.NotEqual(
+            sprites.Atlases["poe2Frames"].Coords["PSSkillFrame"],
+            sprites.Atlases["poe2Frames"].Coords["PSSkillFrameHighlighted"]);
+        Assert.NotEqual(
+            sprites.Atlases["poe2Frames"].Coords["NotableFrameUnallocated"],
+            sprites.Atlases["poe2Frames"].Coords["NotableFrameCanAllocate"]);
+        Assert.NotEqual(
+            sprites.Atlases["poe2Frames"].Coords["PSSkillFrame"],
+            sprites.Atlases["poe2Frames"].Coords["JewelFrameUnallocated"]);
+        Assert.NotEqual(
+            sprites.Atlases["poe2Frames"].Coords["PSSkillFrame"],
+            sprites.Atlases["poe2Frames"].Coords["OracleFrameSmallNormal"]);
         foreach (var atlas in sprites.Atlases.Values)
         {
             var atlasPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path)!, atlas.File));
