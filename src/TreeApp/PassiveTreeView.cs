@@ -355,6 +355,12 @@ public sealed class PassiveTreeView : Control
             return;
         }
 
+        if (node.Type == NodeType.JewelSocket && _vm.SocketedJewelAt(node.Id) is { } socketedJewel)
+        {
+            DrawItemTooltip(ctx, ItemViewModel.FromImported(socketedJewel));
+            return;
+        }
+
         var contentWidth = 380.0;
         var paddingX = 12.0;
         var paddingY = 9.0;
@@ -404,6 +410,73 @@ public sealed class PassiveTreeView : Control
         }
     }
 
+    private void DrawItemTooltip(DrawingContext ctx, ItemViewModel item)
+    {
+        var contentWidth = 380.0;
+        var paddingX = 12.0;
+        var paddingY = 9.0;
+        var headerHeight = item.HasSeparateName ? 48.0 : 32.0;
+        var title = CreateText(item.Name, 20, item.NameBrush);
+        var subtitle = item.HasSeparateName ? CreateText(item.BaseType, 14, TooltipTitleBrush) : null;
+        var lines = BuildItemTooltipLines(item, contentWidth);
+
+        var headerWidth = title.Width;
+        if (subtitle is not null)
+        {
+            headerWidth = Math.Max(headerWidth, subtitle.Width);
+        }
+        var width = Math.Max(260, Math.Min(430, Math.Max(headerWidth + paddingX * 2, contentWidth + paddingX * 2)));
+        var height = headerHeight + paddingY;
+        foreach (var line in lines)
+        {
+            height += line.IsGap ? 8 : line.Text.Height + 2;
+        }
+        height += paddingY;
+
+        var x = _lastPointerPosition.X + 18;
+        var y = _lastPointerPosition.Y + 18;
+        if (x + width > Bounds.Width - 8)
+        {
+            x = _lastPointerPosition.X - width - 18;
+        }
+        if (y + height > Bounds.Height - 8)
+        {
+            y = Bounds.Height - height - 8;
+        }
+        x = Math.Clamp(x, 8, Math.Max(8, Bounds.Width - width - 8));
+        y = Math.Clamp(y, 8, Math.Max(8, Bounds.Height - height - 8));
+
+        var rect = new Rect(x, y, width, height);
+        ctx.FillRectangle(TooltipFillBrush, rect);
+        ctx.FillRectangle(TooltipHeaderBrush, new Rect(x, y, width, headerHeight));
+        ctx.DrawRectangle(null, new Pen(item.BorderBrush, 1.5), rect);
+        ctx.DrawLine(new Pen(item.BorderBrush, 1), new Point(x, y + headerHeight), new Point(x + width, y + headerHeight));
+
+        if (subtitle is null)
+        {
+            ctx.DrawText(title, new Point(x + (width - title.Width) * 0.5, y + (headerHeight - title.Height) * 0.5 - 1));
+        }
+        else
+        {
+            var textHeight = title.Height + subtitle.Height + 1;
+            var ty = y + (headerHeight - textHeight) * 0.5 - 1;
+            ctx.DrawText(title, new Point(x + (width - title.Width) * 0.5, ty));
+            ctx.DrawText(subtitle, new Point(x + (width - subtitle.Width) * 0.5, ty + title.Height + 1));
+        }
+
+        var cy = y + headerHeight + paddingY;
+        foreach (var line in lines)
+        {
+            if (line.IsGap)
+            {
+                cy += 8;
+                continue;
+            }
+            ctx.DrawText(line.Text, new Point(x + paddingX, cy));
+            cy += line.Text.Height + 2;
+        }
+    }
+
     private List<TooltipLine> BuildTooltipLines(Node node, double contentWidth)
     {
         var lines = new List<TooltipLine>();
@@ -414,6 +487,15 @@ public sealed class PassiveTreeView : Control
             new Typeface(FontFamily.Default, FontStyle.Italic, FontWeight.Normal));
         AddWrappedLines(lines, node.ReminderText, contentWidth, TooltipReminderBrush, 12, Typeface.Default, gapBefore: lines.Count > 0);
 
+        return lines;
+    }
+
+    private List<TooltipLine> BuildItemTooltipLines(ItemViewModel item, double contentWidth)
+    {
+        var lines = new List<TooltipLine>();
+        AddModLines(lines, item.Implicits, contentWidth, gapBefore: false);
+        AddModLines(lines, item.Body, contentWidth, gapBefore: lines.Count > 0);
+        AddModLines(lines, item.StatusFlags, contentWidth, gapBefore: lines.Count > 0);
         return lines;
     }
 
@@ -466,6 +548,27 @@ public sealed class PassiveTreeView : Control
                     lines.Add(TooltipLine.Gap);
                 }
                 lines.Add(new TooltipLine(CreateText(line, size, brush, typeface)));
+                added = true;
+            }
+        }
+    }
+
+    private static void AddModLines(
+        List<TooltipLine> lines,
+        IEnumerable<ModLineViewModel> source,
+        double maxWidth,
+        bool gapBefore)
+    {
+        var added = false;
+        foreach (var raw in source)
+        {
+            foreach (var line in WrapText(raw.Text, maxWidth, 14, Typeface.Default, raw.Brush))
+            {
+                if (!added && gapBefore)
+                {
+                    lines.Add(TooltipLine.Gap);
+                }
+                lines.Add(new TooltipLine(CreateText(line, 14, raw.Brush)));
                 added = true;
             }
         }
@@ -526,6 +629,10 @@ public sealed class PassiveTreeView : Control
         {
             DrawSprite(ctx, "frame", frameKey, screen);
         }
+        if (n.Type == NodeType.JewelSocket && _vm.SocketedJewelOverlayAt(n) is { } jewelOverlay)
+        {
+            DrawSocketedJewelOverlay(ctx, jewelOverlay, screen);
+        }
         // Fallback for node types we haven't wired art for yet (e.g. class start),
         // so they don't disappear.
         if (iconAtlas is null && frameKey is null)
@@ -554,6 +661,19 @@ public sealed class PassiveTreeView : Control
         var dst = new Rect(centre.X - halfW, centre.Y - halfH, halfW * 2, halfH * 2);
         var src = new Rect(rect.X, rect.Y, rect.W, rect.H);
         ctx.DrawImage(bmp, src, dst);
+    }
+
+    private void DrawSocketedJewelOverlay(DrawingContext ctx, string spriteKey, Point centre)
+    {
+        if (_sprites.Lookup("jewel", spriteKey) is not null)
+        {
+            DrawSprite(ctx, "jewel", spriteKey, centre);
+            return;
+        }
+        if (_sprites.Lookup("azmeriBloodline", spriteKey) is not null)
+        {
+            DrawSprite(ctx, "azmeriBloodline", spriteKey, centre);
+        }
     }
 
     private static (string? atlas, string? path) IconSprite(Node n, bool alloc, bool hover) => n.Type switch

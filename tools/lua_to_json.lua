@@ -184,13 +184,15 @@ if sprIn and sprOut then
     local function localName(url)
         return (url:gsub('%?%x+$', '')):gsub('.*/', '')
     end
-    -- Atlases we actually use (icons + frames + masteries). Excludes bloodlines,
-    -- ascendancy WebP, tattoo/active-effect layers — all deferred to later.
+    -- Atlases we actually use (icons + frames + masteries + socketed jewel overlays).
+    -- Excludes most bloodlines, ascendancy WebP, tattoo/active-effect layers — all deferred to later.
     local wanted = {
         'normalActive', 'normalInactive',
         'notableActive', 'notableInactive',
         'keystoneActive', 'keystoneInactive',
         'mastery', 'masteryInactive', 'masteryConnected', 'masteryActiveSelected',
+        'jewel',
+        'azmeriBloodline',
         'frame',
     }
     local atlases = {}
