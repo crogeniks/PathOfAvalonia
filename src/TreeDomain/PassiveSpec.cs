@@ -14,7 +14,9 @@ public sealed class PassiveSpec
     private readonly HashSet<int> _allocated = new();
     private readonly Dictionary<int, int> _masterySelections = new();
     private readonly Dictionary<int, int> _classStartNodeByIndex;
+    private readonly Dictionary<string, int> _ascendancyStartNodeByName;
     private int _selectedClassIndex;
+    private int _selectedAscendancyIndex;
 
     private readonly Dictionary<int, ClusterSubgraph> _activeSubgraphs = new();
     // Flat lookup for all currently-active cluster nodes by ID.
@@ -28,14 +30,20 @@ public sealed class PassiveSpec
     {
         Tree = tree;
         _classStartNodeByIndex = new Dictionary<int, int>();
+        _ascendancyStartNodeByName = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var n in tree.Nodes.Values)
         {
             if (n.Type == NodeType.ClassStart && n.ClassStartIndex is int idx)
             {
                 _classStartNodeByIndex[idx] = n.Id;
             }
+            if (n.Type == NodeType.AscendancyStart && n.AscendancyName is { } ascendancyName)
+            {
+                _ascendancyStartNodeByName[ascendancyName] = n.Id;
+            }
         }
         _selectedClassIndex = 0;
+        _selectedAscendancyIndex = 0;
         if (_classStartNodeByIndex.TryGetValue(0, out var startId))
         {
             _allocated.Add(startId);
@@ -46,6 +54,7 @@ public sealed class PassiveSpec
     public bool IsAllocated(int id) => _allocated.Contains(id);
 
     public int SelectedClassIndex => _selectedClassIndex;
+    public int SelectedAscendancyIndex => _selectedAscendancyIndex;
 
     public IReadOnlyList<ClusterJewelSize> AllowedClusterSizes(int socketId)
     {
@@ -83,7 +92,26 @@ public sealed class PassiveSpec
         _allocated.Clear();
         _masterySelections.Clear();
         _selectedClassIndex = classIndex;
+        _selectedAscendancyIndex = 0;
         _allocated.Add(_classStartNodeByIndex[classIndex]);
+        SpecChanged?.Invoke();
+    }
+
+    public void SetAscendancy(int ascendancyIndex)
+    {
+        var names = CharacterClasses.AscendancyNames(_selectedClassIndex);
+        if (ascendancyIndex < 0 || ascendancyIndex >= names.Count || _selectedAscendancyIndex == ascendancyIndex)
+        {
+            return;
+        }
+
+        RemoveSelectedAscendancyAllocations();
+        _selectedAscendancyIndex = ascendancyIndex;
+        if (SelectedAscendancyName is { } ascendancyName
+            && _ascendancyStartNodeByName.TryGetValue(ascendancyName, out var startId))
+        {
+            _allocated.Add(startId);
+        }
         SpecChanged?.Invoke();
     }
 
@@ -117,13 +145,17 @@ public sealed class PassiveSpec
         {
             return;
         }
+        if (SelectedAscendancyStartNodeId() is { } ascendancyStartId && ascendancyStartId == id)
+        {
+            return;
+        }
         if (_allocated.Contains(id))
         {
             DeallocateWithDependents(id);
             return;
         }
         // Reject IDs that don't belong to either the base tree or an active cluster subgraph.
-        if (!Tree.Nodes.ContainsKey(id) && !_clusterNodes.ContainsKey(id))
+        if (!CanAllocate(id))
         {
             return;
         }
@@ -218,13 +250,20 @@ public sealed class PassiveSpec
 
     private IEnumerable<Node> DependencyRoots(int excludeId)
     {
+        var roots = new List<Node>();
         if (_classStartNodeByIndex.TryGetValue(_selectedClassIndex, out var startId)
             && startId != excludeId
             && _allocated.Contains(startId))
         {
-            return new[] { Tree.Nodes[startId] };
+            roots.Add(Tree.Nodes[startId]);
         }
-        return Array.Empty<Node>();
+        if (SelectedAscendancyStartNodeId() is { } ascendancyStartId
+            && ascendancyStartId != excludeId
+            && Tree.Nodes.TryGetValue(ascendancyStartId, out var ascendancyStart))
+        {
+            roots.Add(ascendancyStart);
+        }
+        return roots;
     }
 
     public void AllocateMany(IEnumerable<int> ids)
@@ -232,7 +271,7 @@ public sealed class PassiveSpec
         var changed = false;
         foreach (var id in ids)
         {
-            if ((Tree.Nodes.ContainsKey(id) || _clusterNodes.ContainsKey(id)) && _allocated.Add(id))
+            if (CanAllocate(id) && _allocated.Add(id))
             {
                 changed = true;
             }
@@ -251,6 +290,7 @@ public sealed class PassiveSpec
     {
         if (!TryGetNode(targetId, out var target)
             || _allocated.Contains(targetId)
+            || !CanAllocate(target!)
             || target!.Type is NodeType.Proxy or NodeType.ClassStart or NodeType.AscendancyStart)
         {
             return HoverPath.Empty;
@@ -287,6 +327,10 @@ public sealed class PassiveSpec
                     continue;
                 }
                 if (other.Type is NodeType.Proxy or NodeType.ClassStart or NodeType.AscendancyStart)
+                {
+                    continue;
+                }
+                if (!CanAllocate(other))
                 {
                     continue;
                 }
@@ -376,6 +420,7 @@ public sealed class PassiveSpec
         _allocated.Clear();
         _masterySelections.Clear();
         _socketedJewels.Clear();
+        _selectedAscendancyIndex = 0;
         if (_classStartNodeByIndex.TryGetValue(_selectedClassIndex, out var nodeId))
         {
             _allocated.Add(nodeId);
@@ -400,6 +445,11 @@ public sealed class PassiveSpec
             _selectedClassIndex = build.ClassId;
         }
         _allocated.Add(_classStartNodeByIndex[_selectedClassIndex]);
+        _selectedAscendancyIndex = ResolveAscendancyIndex(_selectedClassIndex, build.AscendClassId);
+        if (SelectedAscendancyStartNodeId() is { } ascendancyStartId)
+        {
+            _allocated.Add(ascendancyStartId);
+        }
         var applied = 0;
         var skipped = 0;
         var clusterSkipped = 0;
@@ -614,6 +664,24 @@ public sealed class PassiveSpec
         return Tree.Nodes.TryGetValue(id, out node);
     }
 
+    private bool CanAllocate(int id)
+    {
+        if (!TryGetNode(id, out var node) || node is null)
+        {
+            return false;
+        }
+        return CanAllocate(node);
+    }
+
+    private bool CanAllocate(Node node)
+    {
+        if (node.AscendancyName is not { } ascendancyName)
+        {
+            return true;
+        }
+        return SelectedAscendancyName == ascendancyName;
+    }
+
     public event Action? SpecChanged;
 
     private bool RemoveClusterRecursive(int socketId)
@@ -670,6 +738,39 @@ public sealed class PassiveSpec
                 cluster.NotableNames,
                 cluster.KeystoneName));
         return true;
+    }
+
+    private string? SelectedAscendancyName => CharacterClasses.AscendancyName(_selectedClassIndex, _selectedAscendancyIndex);
+
+    private int? SelectedAscendancyStartNodeId()
+    {
+        if (SelectedAscendancyName is not { } ascendancyName)
+        {
+            return null;
+        }
+        return _ascendancyStartNodeByName.TryGetValue(ascendancyName, out var startId) ? startId : null;
+    }
+
+    private void RemoveSelectedAscendancyAllocations()
+    {
+        if (SelectedAscendancyName is not { } ascendancyName)
+        {
+            return;
+        }
+        foreach (var id in _allocated.ToArray())
+        {
+            if (Tree.Nodes.TryGetValue(id, out var node) && node.AscendancyName == ascendancyName)
+            {
+                _allocated.Remove(id);
+                _masterySelections.Remove(id);
+            }
+        }
+    }
+
+    private static int ResolveAscendancyIndex(int classIndex, int importedAscendancyId)
+    {
+        var names = CharacterClasses.AscendancyNames(classIndex);
+        return importedAscendancyId >= 0 && importedAscendancyId < names.Count ? importedAscendancyId : 0;
     }
 
     private int BuildLegacyProxyGroup(int proxyGroupId, int expansionJewelSize, int clusterSizeIndex)
@@ -838,4 +939,34 @@ public static class CharacterClasses
     {
         "Scion", "Marauder", "Ranger", "Witch", "Duelist", "Templar", "Shadow",
     };
+
+    private static readonly IReadOnlyList<IReadOnlyList<string>> Ascendancies = new IReadOnlyList<string>[]
+    {
+        new[] { "None", "Ascendant", "Scavenger" },
+        new[] { "None", "Juggernaut", "Berserker", "Chieftain" },
+        new[] { "None", "Deadeye", "Raider", "Pathfinder", "Warden" },
+        new[] { "None", "Necromancer", "Occultist", "Elementalist" },
+        new[] { "None", "Slayer", "Gladiator", "Champion" },
+        new[] { "None", "Inquisitor", "Hierophant", "Guardian" },
+        new[] { "None", "Assassin", "Trickster", "Saboteur" },
+    };
+
+    public static IReadOnlyList<string> AscendancyNames(int classIndex) =>
+        classIndex >= 0 && classIndex < Ascendancies.Count
+            ? Ascendancies[classIndex]
+            : Ascendancies[0];
+
+    public static string? AscendancyName(int classIndex, int ascendancyIndex)
+    {
+        var names = AscendancyNames(classIndex);
+        if (ascendancyIndex <= 0 || ascendancyIndex >= names.Count)
+        {
+            return null;
+        }
+        return names[ascendancyIndex] switch
+        {
+            "Scavenger" => "Reliquarian",
+            var name => name,
+        };
+    }
 }
