@@ -324,16 +324,16 @@ public sealed class PassiveTreeView : Control
     private static bool ConnectorIntersects(Connector connector, Rect visibleTree) =>
         connector switch
         {
-            LineConnector lc => RectFromPoints(lc.X1, lc.Y1, lc.X2, lc.Y2).Intersects(visibleTree),
+            LineConnector lc => RectFromPoints(lc.X1, lc.Y1, lc.X2, lc.Y2, HitMaxRadius).Intersects(visibleTree),
             ArcConnector ac => CircleRect(ac.Cx, ac.Cy, ac.Radius).Intersects(visibleTree),
             _ => true,
         };
 
-    private static Rect RectFromPoints(double x1, double y1, double x2, double y2)
+    private static Rect RectFromPoints(double x1, double y1, double x2, double y2, double padding = 0)
     {
-        var x = Math.Min(x1, x2);
-        var y = Math.Min(y1, y2);
-        return new Rect(x, y, Math.Abs(x2 - x1), Math.Abs(y2 - y1));
+        var x = Math.Min(x1, x2) - padding;
+        var y = Math.Min(y1, y2) - padding;
+        return new Rect(x, y, Math.Abs(x2 - x1) + padding * 2, Math.Abs(y2 - y1) + padding * 2);
     }
 
     private static Rect CircleRect(double cx, double cy, double radius) =>
@@ -406,14 +406,15 @@ public sealed class PassiveTreeView : Control
             return;
         }
 
-        var contentWidth = 380.0;
         var paddingX = 12.0;
         var paddingY = 9.0;
-        var headerHeight = 32.0;
-        var title = CreateText(node.Name, 20, TooltipTitleBrush);
+        var maxWidth = AvailableTooltipWidth();
+        var contentWidth = TooltipContentWidth(node.Name, 20, Typeface.Default, paddingX, maxWidth);
+        var titleLines = CreateWrappedText(node.Name, contentWidth, 20, TooltipTitleBrush, Typeface.Default);
         var lines = BuildTooltipLines(node, contentWidth);
 
-        var width = Math.Max(260, Math.Min(430, Math.Max(title.Width + paddingX * 2, contentWidth + paddingX * 2)));
+        var width = TooltipWidth(contentWidth, paddingX, maxWidth, titleLines, lines);
+        var headerHeight = TooltipHeaderHeight(titleLines);
         var height = headerHeight + paddingY;
         foreach (var line in lines)
         {
@@ -440,7 +441,7 @@ public sealed class PassiveTreeView : Control
         ctx.DrawRectangle(null, new Pen(TooltipBorderBrush, 1.5), rect);
         ctx.DrawLine(new Pen(TooltipBorderBrush, 1), new Point(x, y + headerHeight), new Point(x + width, y + headerHeight));
 
-        ctx.DrawText(title, new Point(x + (width - title.Width) * 0.5, y + (headerHeight - title.Height) * 0.5 - 1));
+        DrawCenteredTextLines(ctx, titleLines, x, y, width, headerHeight);
 
         var cy = y + headerHeight + paddingY;
         foreach (var line in lines)
@@ -457,20 +458,22 @@ public sealed class PassiveTreeView : Control
 
     private void DrawItemTooltip(DrawingContext ctx, ItemViewModel item)
     {
-        var contentWidth = 380.0;
         var paddingX = 12.0;
         var paddingY = 9.0;
-        var headerHeight = item.HasSeparateName ? 48.0 : 32.0;
-        var title = CreateText(item.Name, 20, item.NameBrush);
-        var subtitle = item.HasSeparateName ? CreateText(item.BaseType, 14, TooltipTitleBrush) : null;
+        var maxWidth = AvailableTooltipWidth();
+        var contentWidth = TooltipContentWidth(item.Name, 20, Typeface.Default, paddingX, maxWidth);
+        if (item.HasSeparateName)
+        {
+            contentWidth = Math.Max(contentWidth, TooltipContentWidth(item.BaseType, 14, Typeface.Default, paddingX, maxWidth));
+        }
+        var titleLines = CreateWrappedText(item.Name, contentWidth, 20, item.NameBrush, Typeface.Default);
+        var subtitleLines = item.HasSeparateName
+            ? CreateWrappedText(item.BaseType, contentWidth, 14, TooltipTitleBrush, Typeface.Default)
+            : [];
         var lines = BuildItemTooltipLines(item, contentWidth);
 
-        var headerWidth = title.Width;
-        if (subtitle is not null)
-        {
-            headerWidth = Math.Max(headerWidth, subtitle.Width);
-        }
-        var width = Math.Max(260, Math.Min(430, Math.Max(headerWidth + paddingX * 2, contentWidth + paddingX * 2)));
+        var width = TooltipWidth(contentWidth, paddingX, maxWidth, titleLines, subtitleLines, lines);
+        var headerHeight = TooltipHeaderHeight(titleLines, subtitleLines);
         var height = headerHeight + paddingY;
         foreach (var line in lines)
         {
@@ -497,17 +500,7 @@ public sealed class PassiveTreeView : Control
         ctx.DrawRectangle(null, new Pen(item.BorderBrush, 1.5), rect);
         ctx.DrawLine(new Pen(item.BorderBrush, 1), new Point(x, y + headerHeight), new Point(x + width, y + headerHeight));
 
-        if (subtitle is null)
-        {
-            ctx.DrawText(title, new Point(x + (width - title.Width) * 0.5, y + (headerHeight - title.Height) * 0.5 - 1));
-        }
-        else
-        {
-            var textHeight = title.Height + subtitle.Height + 1;
-            var ty = y + (headerHeight - textHeight) * 0.5 - 1;
-            ctx.DrawText(title, new Point(x + (width - title.Width) * 0.5, ty));
-            ctx.DrawText(subtitle, new Point(x + (width - subtitle.Width) * 0.5, ty + title.Height + 1));
-        }
+        DrawCenteredTextLines(ctx, titleLines, subtitleLines, x, y, width, headerHeight);
 
         var cy = y + headerHeight + paddingY;
         foreach (var line in lines)
@@ -520,6 +513,145 @@ public sealed class PassiveTreeView : Control
             ctx.DrawText(line.Text, new Point(x + paddingX, cy));
             cy += line.Text.Height + 2;
         }
+    }
+
+    private double AvailableTooltipWidth()
+    {
+        var available = Bounds.Width > 0 ? Bounds.Width - 16 : 560;
+        return Math.Max(260, Math.Min(560, available));
+    }
+
+    private static double TooltipContentWidth(string text, double size, Typeface typeface, double paddingX, double maxWidth)
+    {
+        var preferredContentWidth = Math.Max(380, CreateText(text, size, Brushes.Transparent, typeface).Width);
+        return Math.Clamp(preferredContentWidth, 260 - paddingX * 2, maxWidth - paddingX * 2);
+    }
+
+    private static double TooltipWidth(
+        double contentWidth,
+        double paddingX,
+        double maxWidth,
+        IReadOnlyList<FormattedText> titleLines,
+        List<TooltipLine> bodyLines)
+    {
+        var measuredContentWidth = Math.Max(contentWidth, MaxTextWidth(titleLines));
+        measuredContentWidth = Math.Max(measuredContentWidth, MaxTextWidth(bodyLines));
+        return Math.Clamp(measuredContentWidth + paddingX * 2, 260, maxWidth);
+    }
+
+    private static double TooltipWidth(
+        double contentWidth,
+        double paddingX,
+        double maxWidth,
+        IReadOnlyList<FormattedText> titleLines,
+        IReadOnlyList<FormattedText> subtitleLines,
+        List<TooltipLine> bodyLines)
+    {
+        var measuredContentWidth = Math.Max(contentWidth, MaxTextWidth(titleLines));
+        measuredContentWidth = Math.Max(measuredContentWidth, MaxTextWidth(subtitleLines));
+        measuredContentWidth = Math.Max(measuredContentWidth, MaxTextWidth(bodyLines));
+        return Math.Clamp(measuredContentWidth + paddingX * 2, 260, maxWidth);
+    }
+
+    private static double TooltipHeaderHeight(IReadOnlyList<FormattedText> titleLines)
+    {
+        return Math.Max(32, TextBlockHeight(titleLines) + 10);
+    }
+
+    private static double TooltipHeaderHeight(
+        IReadOnlyList<FormattedText> titleLines,
+        IReadOnlyList<FormattedText> subtitleLines)
+    {
+        var separator = titleLines.Count > 0 && subtitleLines.Count > 0 ? 1 : 0;
+        return Math.Max(subtitleLines.Count > 0 ? 48 : 32, TextBlockHeight(titleLines) + separator + TextBlockHeight(subtitleLines) + 10);
+    }
+
+    private static void DrawCenteredTextLines(
+        DrawingContext ctx,
+        IReadOnlyList<FormattedText> titleLines,
+        double x,
+        double y,
+        double width,
+        double height)
+    {
+        var cy = y + (height - TextBlockHeight(titleLines)) * 0.5 - 1;
+        foreach (var line in titleLines)
+        {
+            ctx.DrawText(line, new Point(x + (width - line.Width) * 0.5, cy));
+            cy += line.Height + 2;
+        }
+    }
+
+    private static void DrawCenteredTextLines(
+        DrawingContext ctx,
+        IReadOnlyList<FormattedText> titleLines,
+        IReadOnlyList<FormattedText> subtitleLines,
+        double x,
+        double y,
+        double width,
+        double height)
+    {
+        var textHeight = TextBlockHeight(titleLines) + TextBlockHeight(subtitleLines);
+        if (titleLines.Count > 0 && subtitleLines.Count > 0)
+        {
+            textHeight += 1;
+        }
+
+        var cy = y + (height - textHeight) * 0.5 - 1;
+        foreach (var line in titleLines)
+        {
+            ctx.DrawText(line, new Point(x + (width - line.Width) * 0.5, cy));
+            cy += line.Height + 2;
+        }
+
+        if (titleLines.Count > 0 && subtitleLines.Count > 0)
+        {
+            cy -= 1;
+        }
+
+        foreach (var line in subtitleLines)
+        {
+            ctx.DrawText(line, new Point(x + (width - line.Width) * 0.5, cy));
+            cy += line.Height + 2;
+        }
+    }
+
+    private static double MaxTextWidth(IReadOnlyList<FormattedText> lines)
+    {
+        var max = 0.0;
+        foreach (var line in lines)
+        {
+            max = Math.Max(max, line.Width);
+        }
+        return max;
+    }
+
+    private static double MaxTextWidth(IEnumerable<TooltipLine> lines)
+    {
+        var max = 0.0;
+        foreach (var line in lines)
+        {
+            if (!line.IsGap)
+            {
+                max = Math.Max(max, line.Text.Width);
+            }
+        }
+        return max;
+    }
+
+    private static double TextBlockHeight(IReadOnlyList<FormattedText> lines)
+    {
+        if (lines.Count == 0)
+        {
+            return 0;
+        }
+
+        var height = 0.0;
+        foreach (var line in lines)
+        {
+            height += line.Height + 2;
+        }
+        return height - 2;
     }
 
     private List<TooltipLine> BuildTooltipLines(Node node, double contentWidth)
@@ -646,6 +778,21 @@ public sealed class PassiveTreeView : Control
         }
     }
 
+    private static List<FormattedText> CreateWrappedText(
+        string text,
+        double maxWidth,
+        double size,
+        IBrush brush,
+        Typeface typeface)
+    {
+        var lines = new List<FormattedText>();
+        foreach (var line in WrapText(text, maxWidth, size, typeface, brush))
+        {
+            lines.Add(CreateText(line, size, brush, typeface));
+        }
+        return lines;
+    }
+
     private static FormattedText CreateText(string text, double size, IBrush brush, Typeface? typeface = null) =>
         new(text, System.Globalization.CultureInfo.CurrentCulture,
             FlowDirection.LeftToRight, typeface ?? Typeface.Default, size, brush);
@@ -707,7 +854,7 @@ public sealed class PassiveTreeView : Control
         var drewAny = false;
         if (!string.IsNullOrWhiteSpace(visual.Icon))
         {
-            drewAny |= DrawPoe2Sprite(ctx, "poe2NodeIcons", visual.Icon, screen, Poe2IconHalfSize(node));
+            drewAny |= DrawPoe2NodeIcon(ctx, visual.Icon, screen, node);
         }
 
         var drewFrame = DrawPoe2FrameSprite(ctx, visual, node, allocated, hover, screen);
@@ -824,6 +971,27 @@ public sealed class PassiveTreeView : Control
         return true;
     }
 
+    private bool DrawPoe2NodeIcon(DrawingContext ctx, string spriteKey, Point centre, Node node)
+    {
+        var halfSizeTree = Poe2IconHalfSize(node);
+        var clipRadiusTree = Poe2IconClipRadius(node);
+        if (clipRadiusTree <= 0)
+        {
+            return DrawPoe2Sprite(ctx, "poe2NodeIcons", spriteKey, centre, halfSizeTree);
+        }
+
+        var clipRadius = clipRadiusTree * _scale;
+        var clip = new EllipseGeometry(new Rect(
+            centre.X - clipRadius,
+            centre.Y - clipRadius,
+            clipRadius * 2,
+            clipRadius * 2));
+        using (ctx.PushGeometryClip(clip))
+        {
+            return DrawPoe2Sprite(ctx, "poe2NodeIcons", spriteKey, centre, halfSizeTree);
+        }
+    }
+
     private static Size Poe2IconHalfSize(Node node) => node.Type switch
     {
         NodeType.Keystone => new Size(82, 82),
@@ -833,6 +1001,16 @@ public sealed class PassiveTreeView : Control
         NodeType.Mastery => new Size(37, 37),
         _ when node.AscendancyName is not null => new Size(54, 54),
         _ => new Size(37, 37),
+    };
+
+    private static double Poe2IconClipRadius(Node node) => node.Type switch
+    {
+        NodeType.Keystone => 75,
+        NodeType.Notable => 50,
+        NodeType.JewelSocket => 58,
+        NodeType.Normal => 34,
+        _ when node.AscendancyName is not null => 50,
+        _ => 0,
     };
 
     private static Size Poe2FrameHalfSize(Node node, string frameKey)

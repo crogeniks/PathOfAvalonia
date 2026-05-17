@@ -132,37 +132,44 @@ public sealed class Poe2TreeLoader : ITreeLoader
                 {
                     continue;
                 }
-                var a = Math.Min(id, conn.Id);
-                var b = Math.Max(id, conn.Id);
-                if (!connectorSet.Add((a, b)))
-                {
-                    continue;
-                }
-                var ia = orbitInfo[a];
-                var ib = orbitInfo[b];
                 if (TryBuildConnectionArc(me, other, conn.Orbit, orbitRadii, out var connectionArc))
                 {
+                    var a = Math.Min(id, conn.Id);
+                    var b = Math.Max(id, conn.Id);
+                    if (!connectorSet.Add((a, b)))
+                    {
+                        continue;
+                    }
                     connectors.Add(connectionArc);
-                }
-                else if (conn.Orbit == int.MaxValue)
-                {
-                    continue;
-                }
-                else if (ia.Group == ib.Group && ia.Orbit == ib.Orbit && ia.Radius > 0)
-                {
-                    var sweep = ib.Angle - ia.Angle;
-                    while (sweep > Math.PI)
-                    {
-                        sweep -= Math.Tau;
-                    }
-                    while (sweep <= -Math.PI)
-                    {
-                        sweep += Math.Tau;
-                    }
-                    connectors.Add(new ArcConnector(a, b, ia.Cx, ia.Cy, ia.Radius, ia.Angle, sweep));
                 }
                 else
                 {
+                    var a = Math.Min(id, conn.Id);
+                    var b = Math.Max(id, conn.Id);
+                    var ia = orbitInfo[a];
+                    var ib = orbitInfo[b];
+                    if (conn.Orbit == int.MaxValue && ia.Group != ib.Group && me.AscendancyName is null)
+                    {
+                        continue;
+                    }
+                    if (!connectorSet.Add((a, b)))
+                    {
+                        continue;
+                    }
+                    if (ia.Group == ib.Group && ia.Orbit == ib.Orbit && ia.Radius > 0)
+                    {
+                        var sweep = ib.Angle - ia.Angle;
+                        while (sweep > Math.PI)
+                        {
+                            sweep -= Math.Tau;
+                        }
+                        while (sweep <= -Math.PI)
+                        {
+                            sweep += Math.Tau;
+                        }
+                        connectors.Add(new ArcConnector(a, b, ia.Cx, ia.Cy, ia.Radius, ia.Angle, sweep));
+                        continue;
+                    }
                     var na = nodes[a];
                     var nb = nodes[b];
                     connectors.Add(new LineConnector(a, b, na.X, na.Y, nb.X, nb.Y));
