@@ -88,6 +88,17 @@ public sealed class Poe2TreeLoaderTests
     }
 
     [Fact]
+    public void WhispersOfDoomHasConnector()
+    {
+        var tree = LoadTree();
+        var whispers = Assert.Single(tree.Nodes.Values.Where(n => n.Name == "Whispers of Doom"));
+
+        var connector = Assert.Single(tree.Connectors.Where(c => c.FromId == whispers.Id || c.ToId == whispers.Id));
+
+        Assert.Contains(whispers.LinkedNodes, n => n.Id == connector.FromId || n.Id == connector.ToId);
+    }
+
+    [Fact]
     public void PassiveSpecCanSelectSorceressDiscipleOfVarashta()
     {
         var tree = LoadTree();

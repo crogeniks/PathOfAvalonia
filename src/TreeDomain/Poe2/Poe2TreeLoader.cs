@@ -5,6 +5,8 @@ namespace PathOfAvalonia.TreeDomain.Poe2;
 
 public sealed class Poe2TreeLoader : ITreeLoader
 {
+    private const double MaxInferredCrossGroupConnectionDistance = 1200;
+
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -148,7 +150,10 @@ public sealed class Poe2TreeLoader : ITreeLoader
                     var b = Math.Max(id, conn.Id);
                     var ia = orbitInfo[a];
                     var ib = orbitInfo[b];
-                    if (conn.Orbit == int.MaxValue && ia.Group != ib.Group && me.AscendancyName is null)
+                    if (conn.Orbit == int.MaxValue
+                        && ia.Group != ib.Group
+                        && me.AscendancyName is null
+                        && Distance(me, other) > MaxInferredCrossGroupConnectionDistance)
                     {
                         continue;
                     }
@@ -310,6 +315,13 @@ public sealed class Poe2TreeLoader : ITreeLoader
             return NodeType.Notable;
         }
         return NodeType.Normal;
+    }
+
+    private static double Distance(Node a, Node b)
+    {
+        var dx = b.X - a.X;
+        var dy = b.Y - a.Y;
+        return Math.Sqrt(dx * dx + dy * dy);
     }
 
     private static IReadOnlyList<string> NormalizeLines(string[]? values)
