@@ -141,5 +141,5 @@ public sealed class SocketedJewelTests
     }
 
     private static string AssetPath(string fileName) =>
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", fileName));
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE1", fileName));
 }

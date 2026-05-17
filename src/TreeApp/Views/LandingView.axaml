@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PathOfAvalonia.TreeApp.ViewModels"
+             x:Class="PathOfAvalonia.TreeApp.Views.LandingView"
+             x:DataType="vm:ShellViewModel">
+    <Grid Background="#101018" RowDefinitions="Auto,*">
+        <StackPanel Margin="32,28,32,18" Spacing="4">
+            <TextBlock Text="PathOfAvalonia" Foreground="#F0F0F4" FontSize="28" FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding StatusMessage}" Foreground="#E0A060"/>
+        </StackPanel>
+        <ItemsControl Grid.Row="1" ItemsSource="{Binding Games}" Margin="32,0,32,32">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="16"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:GameChoiceViewModel">
+                    <Border Width="340"
+                            Padding="18"
+                            Background="#181820"
+                            BorderBrush="#363646"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="{Binding DisplayName}" Foreground="#F4F4F4" FontSize="20" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding Version, StringFormat='Tree {0}'}" Foreground="#B8B8C8"/>
+                            <TextBlock Text="{Binding SupportStatus}" Foreground="#D0D0D8"/>
+                            <TextBlock Text="Last used" Foreground="#8AE090" IsVisible="{Binding IsLastUsed}"/>
+                            <Button Content="Open"
+                                    HorizontalAlignment="Left"
+                                    Tag="{Binding Id}"
+                                    Click="OpenClicked"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Grid>
+</UserControl>

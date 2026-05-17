@@ -6,7 +6,7 @@ using Avalonia.Controls.Primitives.PopupPositioning;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
-using Avalonia.Platform;
+using PathOfAvalonia.TreeApp.Services;
 using PathOfAvalonia.TreeApp.ViewModels;
 using PathOfAvalonia.TreeDomain;
 using PathOfAvalonia.TreeDomain.ClusterJewels;
@@ -17,6 +17,7 @@ public sealed class PassiveTreeView : Control
 {
     private readonly PassiveTreeViewModel _vm;
     private readonly SpriteMap _sprites;
+    private readonly ITreeImageAssetResolver _assetResolver;
     private ContextMenu? _clusterMenu;
     // One Bitmap per unique atlas filename (multiple atlas keys share a file).
     private readonly Dictionary<string, Bitmap> _atlasBitmaps = new();
@@ -78,14 +79,15 @@ public sealed class PassiveTreeView : Control
     private static readonly IBrush ClusterDiscRing2Brush  = new SolidColorBrush(Color.FromRgb(0x42, 0x3C, 0x24));
     private static readonly IBrush ClusterOrbitLineBrush  = new SolidColorBrush(Color.FromArgb(0x60, 0x90, 0x82, 0x56));
 
-    public PassiveTreeView(PassiveTreeViewModel vm, SpriteMap sprites)
+    public PassiveTreeView(PassiveTreeViewModel vm, SpriteMap sprites, ITreeImageAssetResolver assetResolver)
     {
         _vm = vm;
         _sprites = sprites;
+        _assetResolver = assetResolver;
         ClipToBounds = true;
         Focusable = true;
         _vm.RedrawRequested += InvalidateVisual;
-        _bgTile = TryLoadBackground(_vm.Tree.Version);
+        _bgTile = _assetResolver.LoadBackground(_vm.Tree.Version);
         LoadAtlasBitmaps();
     }
 
@@ -97,32 +99,10 @@ public sealed class PassiveTreeView : Control
             {
                 continue;
             }
-            var uri = new Uri($"avares://PathOfAvalonia.TreeApp/Assets/{atlas.File}");
-            try
+            if (_assetResolver.LoadBitmap(atlas.File) is { } bitmap)
             {
-                using var s = AssetLoader.Open(uri);
-                _atlasBitmaps[atlas.File] = new Bitmap(s);
+                _atlasBitmaps[atlas.File] = bitmap;
             }
-            catch
-            {
-                // Missing atlas (e.g. ascendancy WebP on a build without WebP codec)
-                // is non-fatal — affected nodes will simply skip their art.
-            }
-        }
-    }
-
-    private static Bitmap? TryLoadBackground(string version)
-    {
-        var name = $"background_{version.Replace('.', '_')}.png";
-        var uri = new Uri($"avares://PathOfAvalonia.TreeApp/Assets/{name}");
-        try
-        {
-            using var s = AssetLoader.Open(uri);
-            return new Bitmap(s);
-        }
-        catch
-        {
-            return null;
         }
     }
 
@@ -612,22 +592,23 @@ public sealed class PassiveTreeView : Control
         var (iconAtlas, iconPath) = IconSprite(n, alloc, hover: false);
         if (iconAtlas is not null && iconPath is not null)
         {
-            DrawSprite(ctx, iconAtlas, iconPath, screen);
+            _ = DrawSprite(ctx, iconAtlas, iconPath, screen);
         }
         // Hover overlay: for masteries, the masteryConnected sprite glows on top of
         // the base icon rather than replacing it.
         if (hover && !alloc && n.Type == NodeType.Mastery && n.InactiveIcon is { } ii)
         {
-            DrawSprite(ctx, "masteryConnected", ii, screen);
+            _ = DrawSprite(ctx, "masteryConnected", ii, screen);
         }
         // Frame: ornate border. Mastery has no separate frame (baked in).
         // Only active cluster subgraphs alter the socket frame. A socketed jewel by
         // itself must not make the node look allocated.
         var clusterSize = useClusterSocketFrame && n.Type == NodeType.JewelSocket ? _vm.ClusterSizeAt(n.Id) : null;
         var frameKey = FrameKey(n.Type, alloc, hover, clusterSize);
+        var drewFrame = false;
         if (frameKey is not null)
         {
-            DrawSprite(ctx, "frame", frameKey, screen);
+            drewFrame = DrawSprite(ctx, "frame", frameKey, screen);
         }
         if (n.Type == NodeType.JewelSocket && _vm.SocketedJewelOverlayAt(n) is { } jewelOverlay)
         {
@@ -635,44 +616,45 @@ public sealed class PassiveTreeView : Control
         }
         // Fallback for node types we haven't wired art for yet (e.g. class start),
         // so they don't disappear.
-        if (iconAtlas is null && frameKey is null)
+        if (!drewFrame && (frameKey is not null || iconAtlas is null))
         {
             var r = NodeRadius * _scale;
             ctx.DrawEllipse(alloc ? AllocatedBrush : NormalBrush, NodeOutlinePen, screen, r, r);
         }
     }
 
-    private void DrawSprite(DrawingContext ctx, string atlasKey, string spriteKey, Point centre)
+    private bool DrawSprite(DrawingContext ctx, string atlasKey, string spriteKey, Point centre)
     {
         if (!_sprites.Atlases.TryGetValue(atlasKey, out var atlas))
         {
-            return;
+            return false;
         }
         if (!atlas.Coords.TryGetValue(spriteKey, out var rect))
         {
-            return;
+            return false;
         }
         if (!_atlasBitmaps.TryGetValue(atlas.File, out var bmp))
         {
-            return;
+            return false;
         }
         var halfW = rect.W * SpriteDisplayScale * _scale;
         var halfH = rect.H * SpriteDisplayScale * _scale;
         var dst = new Rect(centre.X - halfW, centre.Y - halfH, halfW * 2, halfH * 2);
         var src = new Rect(rect.X, rect.Y, rect.W, rect.H);
         ctx.DrawImage(bmp, src, dst);
+        return true;
     }
 
     private void DrawSocketedJewelOverlay(DrawingContext ctx, string spriteKey, Point centre)
     {
         if (_sprites.Lookup("jewel", spriteKey) is not null)
         {
-            DrawSprite(ctx, "jewel", spriteKey, centre);
+            _ = DrawSprite(ctx, "jewel", spriteKey, centre);
             return;
         }
         if (_sprites.Lookup("azmeriBloodline", spriteKey) is not null)
         {
-            DrawSprite(ctx, "azmeriBloodline", spriteKey, centre);
+            _ = DrawSprite(ctx, "azmeriBloodline", spriteKey, centre);
         }
     }
 

@@ -1,55 +1,35 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:local="clr-namespace:PathOfAvalonia.TreeApp"
         xmlns:vm="clr-namespace:PathOfAvalonia.TreeApp.ViewModels"
         x:Class="PathOfAvalonia.TreeApp.MainWindow"
-        x:DataType="vm:MainWindowViewModel"
+        x:DataType="vm:ShellViewModel"
         Width="1280" Height="800"
-        Title="PathOfAvalonia — passive tree PoC">
-    <TabControl Background="#101018">
-        <TabItem Header="Passive Tree">
-            <Grid Name="Root" Background="#101018">
-                <Border HorizontalAlignment="Right" VerticalAlignment="Top"
-                        Margin="12" Padding="10"
-                        Background="#CC1A1A24" CornerRadius="6"
-                        BorderBrush="#3A3A4A" BorderThickness="1">
-                    <StackPanel Orientation="Vertical" Spacing="6" Width="360">
-                        <TextBlock Text="Class" Foreground="#EAEAEA" FontWeight="Bold"/>
-                        <ComboBox ItemsSource="{Binding ClassNames}"
-                                  SelectedIndex="{Binding SelectedClassIndex}"
-                                  HorizontalAlignment="Stretch"/>
-                        <TextBlock Text="Ascendancy" Foreground="#EAEAEA" FontWeight="Bold"
-                                   Margin="0,6,0,0"/>
-                        <ComboBox ItemsSource="{Binding AscendancyNames}"
-                                  SelectedItem="{Binding SelectedAscendancyName}"
-                                  HorizontalAlignment="Stretch"/>
-                        <TextBlock Text="Import build" Foreground="#EAEAEA" FontWeight="Bold"
-                                   Margin="0,6,0,0"/>
-                        <TextBlock Text="Paste a PoE tree URL or a PoB build code:"
-                                   Foreground="#AAAACC" FontSize="11"/>
-                        <TextBox Name="ImportInput"
-                                 Text="{Binding ImportInput}"
-                                 AcceptsReturn="False"
-                                 TextWrapping="NoWrap"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Hidden"
-                                 PlaceholderText="https://www.pathofexile.com/passive-skill-tree/... or PoB code">
-                            <TextBox.KeyBindings>
-                                <KeyBinding Gesture="Return" Command="{Binding ImportCommand}"/>
-                            </TextBox.KeyBindings>
-                        </TextBox>
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <Button Content="Import" Command="{Binding ImportCommand}"/>
-                            <Button Content="Clear" Command="{Binding ClearCommand}"/>
-                        </StackPanel>
-                        <TextBlock Text="{Binding ImportStatus}"
-                                   Foreground="{Binding ImportStatusForeground}"
-                                   TextWrapping="Wrap"/>
+        Title="PathOfAvalonia">
+    <Grid Background="#101018">
+        <ContentControl Name="ShellHost"/>
+        <Border IsVisible="{Binding IsConfirmingGameChange}"
+                Background="#AA000000">
+            <Border Width="460"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Padding="18"
+                    Background="#1A1A24"
+                    BorderBrush="#4A4A58"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Changing game will clear the current tree and equipment state."
+                               Foreground="#F0F0F0"
+                               TextWrapping="Wrap"
+                               FontSize="15"/>
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                Spacing="8">
+                        <Button Content="Cancel" Command="{Binding CancelGameChangeCommand}"/>
+                        <Button Content="Change Game" Command="{Binding ConfirmGameChangeCommand}"/>
                     </StackPanel>
-                </Border>
-            </Grid>
-        </TabItem>
-        <TabItem Header="Equipment">
-            <local:EquipmentView DataContext="{Binding Equipment}"/>
-        </TabItem>
-    </TabControl>
+                </StackPanel>
+            </Border>
+        </Border>
+    </Grid>
 </Window>

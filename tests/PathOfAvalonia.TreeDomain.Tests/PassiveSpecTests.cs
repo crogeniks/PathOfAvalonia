@@ -42,7 +42,7 @@ public sealed class PassiveSpecTests
             node.Name == "Scavenger" &&
             node.AscendancyName == "Reliquarian"));
 
-        Assert.Equal(new[] { "None", "Ascendant", "Scavenger" }, CharacterClasses.AscendancyNames(0));
+        Assert.Equal(new[] { "None", "Ascendant", "Scavenger" }, spec.Classes.AscendancyNames(0));
         Assert.Contains(scavengerStart.Id, spec.AllocatedNodes);
     }
 
@@ -85,7 +85,7 @@ public sealed class PassiveSpecTests
 
     private static TreeModel LoadTree()
     {
-        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "tree_3_28.json"));
+        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE1", "tree_3_28.json"));
         using var stream = File.OpenRead(path);
         return TreeLoader.LoadFromJson(stream, "3.28");
     }

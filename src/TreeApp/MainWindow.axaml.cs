@@ -1,40 +1,46 @@
+using System.ComponentModel;
 using Avalonia.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using PathOfAvalonia.TreeApp.ViewModels;
-using PathOfAvalonia.TreeDomain;
+using PathOfAvalonia.TreeApp.Views;
 
 namespace PathOfAvalonia.TreeApp;
 
 public partial class MainWindow : Window
 {
-    // Parameterless ctor used by Avalonia's runtime XAML loader (hot reload / design mode).
-    public MainWindow() : this(
-        App.Services.GetRequiredService<MainWindowViewModel>(),
-        App.Services.GetRequiredService<SpriteMap>()) { }
+    public MainWindow() : this(App.Services.GetRequiredService<ShellViewModel>())
+    {
+    }
 
-    public MainWindow(MainWindowViewModel vm, SpriteMap sprites)
+    public MainWindow(ShellViewModel vm)
     {
         InitializeComponent();
         DataContext = vm;
+        vm.PropertyChanged += OnShellPropertyChanged;
+        UpdateShellHost(vm);
+    }
 
-        // PassiveTreeView is a canvas-rendering Control — it can't be declared in AXAML
-        // because it needs the live PassiveSpec instance. Insert it behind the overlay.
-        var root = this.FindControl<Grid>("Root")!;
-        root.Children.Insert(0, new PassiveTreeView(vm.TreeViewModel, sprites));
-
-        // Replace large build codes with a short placeholder directly in the TextBox.
-        // Direct TextBox.Text write bypasses the TwoWay binding's reentrancy guard,
-        // which would otherwise suppress the source→target update from inside the
-        // PropertyChanged cycle triggered by the user's paste.
-        var inputBox = this.FindControl<TextBox>("ImportInput")!;
-        inputBox.TextChanged += (_, _) =>
+    private void OnShellPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (sender is ShellViewModel vm
+            && (e.PropertyName == nameof(ShellViewModel.CurrentPage)
+                || e.PropertyName == nameof(ShellViewModel.ActiveWorkspace)))
         {
-            var placeholder = vm.TryReplaceBuildCode(inputBox.Text ?? string.Empty);
-            if (placeholder != null)
-            {
-                inputBox.Text = placeholder;
-                inputBox.CaretIndex = placeholder.Length;
-            }
-        };
+            UpdateShellHost(vm);
+        }
+    }
+
+    private void UpdateShellHost(ShellViewModel vm)
+    {
+        var host = this.FindControl<ContentControl>("ShellHost")!;
+        if (vm.CurrentPage == ShellPage.Workspace && vm.ActiveWorkspace is { } workspace)
+        {
+            host.Content = new GameWorkspaceView { DataContext = workspace };
+        }
+        else
+        {
+            host.Content = new LandingView { DataContext = vm };
+        }
     }
 }
+
