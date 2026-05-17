@@ -47,6 +47,8 @@ public sealed class Poe2NodeDto
     [JsonPropertyName("skill")] public int? Skill { get; set; }
     [JsonPropertyName("name")] public string? Name { get; set; }
     [JsonPropertyName("icon")] public string? Icon { get; set; }
+    [JsonPropertyName("connectionArt")] public string? ConnectionArt { get; set; }
+    [JsonPropertyName("activeEffectImage")] public string? ActiveEffectImage { get; set; }
     [JsonPropertyName("group")] public int? Group { get; set; }
     [JsonPropertyName("orbit")] public int? Orbit { get; set; }
     [JsonPropertyName("orbitIndex")] public int? OrbitIndex { get; set; }
@@ -56,6 +58,7 @@ public sealed class Poe2NodeDto
     [JsonPropertyName("isOnlyImage")] public bool IsOnlyImage { get; set; }
     [JsonPropertyName("isJewelSocket")] public bool IsJewelSocket { get; set; }
     [JsonPropertyName("isAscendancyStart")] public bool IsAscendancyStart { get; set; }
+    [JsonPropertyName("isAttribute")] public bool IsAttribute { get; set; }
     [JsonPropertyName("ascendancyName")] public string? AscendancyName { get; set; }
     [JsonPropertyName("stats")] public string[]? Stats { get; set; }
     [JsonPropertyName("options")] public JsonElement? Options { get; set; }

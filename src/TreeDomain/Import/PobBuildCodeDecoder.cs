@@ -65,6 +65,9 @@ public static class PobBuildCodeDecoder
     }
 
     internal static ImportedBuild ParseXml(string xml)
+        => ParseXml(xml, "pob-code");
+
+    internal static ImportedBuild ParseXml(string xml, string source)
     {
         var items = ParseItemsSection(xml);
 
@@ -80,11 +83,14 @@ public static class PobBuildCodeDecoder
         var activeIndex = ExtractActiveSpecIndex(xml, specElements.Count);
         var spec = specElements[activeIndex];
 
-        var classId = (int?)spec.Attribute("classId") ?? 0;
-        var ascendClassId = (int?)spec.Attribute("ascendClassId") ?? 0;
+        var classId = ParseIntOrZero((string?)spec.Attribute("classId"));
+        var ascendClassId = ParseIntOrZero((string?)spec.Attribute("ascendClassId"));
         var secondaryAscendClassId = ParseIntOrZero((string?)spec.Attribute("secondaryAscendClassId"));
         var treeVersion = (string?)spec.Attribute("treeVersion");
         var clusterHashFormatVersion = ParseClusterHashFormatVersion(spec);
+        var classInternalId = (string?)spec.Attribute("classInternalId");
+        var ascendancyInternalId = (string?)spec.Attribute("ascendancyInternalId");
+        var attributeOverrides = ParseAttributeOverrides(spec);
 
         var nodesAttr = (string?)spec.Attribute("nodes");
         if (!string.IsNullOrWhiteSpace(nodesAttr))
@@ -99,9 +105,12 @@ public static class PobBuildCodeDecoder
                 ClusterNodeHashes: cluster,
                 MasterySelections: masteries,
                 TreeVersion: treeVersion,
-                Source: "pob-code")
+                Source: source)
             {
                 ClusterHashFormatVersion = clusterHashFormatVersion,
+                ClassInternalId = classInternalId,
+                AscendancyInternalId = ascendancyInternalId,
+                AttributeOverrides = attributeOverrides,
                 Items = items.ActiveItems,
                 ItemsById = items.ItemsById,
                 SocketedJewels = ParseSocketedJewels(spec),
@@ -117,8 +126,11 @@ public static class PobBuildCodeDecoder
         return embedded with
         {
             TreeVersion = treeVersion,
-            Source = "pob-code",
+            Source = source,
             ClusterHashFormatVersion = clusterHashFormatVersion,
+            ClassInternalId = classInternalId,
+            AscendancyInternalId = ascendancyInternalId,
+            AttributeOverrides = attributeOverrides,
             Items = items.ActiveItems,
             ItemsById = items.ItemsById,
             SocketedJewels = ParseSocketedJewels(spec),
@@ -286,6 +298,45 @@ public static class PobBuildCodeDecoder
         return result;
     }
 
+    private static IReadOnlyDictionary<int, AttributeNodeOverride> ParseAttributeOverrides(XElement spec)
+    {
+        var overrides = spec.Element("Overrides");
+        if (overrides is null)
+        {
+            return new Dictionary<int, AttributeNodeOverride>();
+        }
+
+        var result = new Dictionary<int, AttributeNodeOverride>();
+        foreach (var el in overrides.Elements("AttributeOverride"))
+        {
+            var nodeId = (int?)el.Attribute("nodeId") ?? (int?)el.Attribute("id") ?? 0;
+            var raw = ((string?)el.Attribute("attribute") ?? (string?)el.Attribute("value") ?? el.Value).Trim();
+            if (nodeId <= 0 || raw.Length == 0)
+            {
+                continue;
+            }
+
+            if (int.TryParse(raw, out var numeric) && Enum.IsDefined(typeof(AttributeNodeOverride), numeric))
+            {
+                result[nodeId] = (AttributeNodeOverride)numeric;
+                continue;
+            }
+
+            result[nodeId] = raw.ToLowerInvariant() switch
+            {
+                "str" or "strength" => AttributeNodeOverride.Strength,
+                "dex" or "dexterity" => AttributeNodeOverride.Dexterity,
+                "int" or "intelligence" => AttributeNodeOverride.Intelligence,
+                _ => result.TryGetValue(nodeId, out var existing) ? existing : 0,
+            };
+            if (result[nodeId] == 0)
+            {
+                result.Remove(nodeId);
+            }
+        }
+        return result;
+    }
+
     private sealed record ParsedItems(
         IReadOnlyList<ImportedItem> ActiveItems,
         IReadOnlyDictionary<int, ImportedItem> ItemsById);
@@ -323,16 +374,20 @@ public static class PobBuildCodeDecoder
             if ((int?)el.Attribute("id") is int id)
             {
                 texts[id] = el.Value;
-                itemsById[id] = ParseRawItem(string.Empty, rawText: el.Value.Trim()) with { Id = id };
+                itemsById[id] = RawItemParser.Parse(string.Empty, rawText: el.Value.Trim()) with { Id = id };
             }
         }
 
         // Find the active ItemSet
-        var activeId = (int?)itemsEl.Attribute("activeItemSet") ?? 1;
+        var activeId = (int?)itemsEl.Attribute("activeItemSet")
+            ?? (int?)itemsEl.Attribute("active")
+            ?? 1;
         XElement? activeSet = null;
         foreach (var setEl in itemsEl.Elements("ItemSet"))
         {
-            if (((int?)setEl.Attribute("id") ?? 1) == activeId)
+            var isActive = string.Equals((string?)setEl.Attribute("active"), "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals((string?)setEl.Attribute("active"), "1", StringComparison.OrdinalIgnoreCase);
+            if (isActive || ((int?)setEl.Attribute("id") ?? 1) == activeId)
             {
                 activeSet = setEl;
                 break;
@@ -358,7 +413,7 @@ public static class PobBuildCodeDecoder
             var itemId = (int?)slotEl.Attribute("itemId") ?? 0;
             if (itemId > 0 && texts.TryGetValue(itemId, out var raw))
             {
-                result.Add(ParseRawItem(slotName, raw.Trim()) with { Id = itemId });
+                result.Add(RawItemParser.Parse(slotName, raw.Trim()) with { Id = itemId });
             }
         }
 

@@ -15,6 +15,7 @@ public sealed class PassiveSpec
 
     private readonly HashSet<int> _allocated = new();
     private readonly Dictionary<int, int> _masterySelections = new();
+    private readonly Dictionary<int, AttributeNodeOverride> _attributeOverrides = new();
     private readonly Dictionary<int, int> _classStartNodeByIndex;
     private readonly Dictionary<string, int> _ascendancyStartNodeByName;
     private int _selectedClassIndex;
@@ -27,9 +28,10 @@ public sealed class PassiveSpec
 
     public IReadOnlyDictionary<int, ClusterSubgraph> ActiveSubgraphs => _activeSubgraphs;
     public IReadOnlyDictionary<int, ImportedItem> SocketedJewels => _socketedJewels;
+    public IReadOnlyDictionary<int, AttributeNodeOverride> AttributeOverrides => _attributeOverrides;
 
     public PassiveSpec(TreeModel tree)
-        : this(tree, tree.Classes, tree.GameId == GameId.PathOfExile2 ? GameFeatureFlags.Poe2Milestone1 : GameFeatureFlags.Poe1)
+        : this(tree, tree.Classes, tree.GameId == GameId.PathOfExile2 ? GameFeatureFlags.Poe2Milestone2 : GameFeatureFlags.Poe1)
     {
     }
 
@@ -114,6 +116,7 @@ public sealed class PassiveSpec
         }
         _allocated.Clear();
         _masterySelections.Clear();
+        _attributeOverrides.Clear();
         _selectedClassIndex = classIndex;
         _selectedAscendancyIndex = 0;
         _allocated.Add(_classStartNodeByIndex[classIndex]);
@@ -432,7 +435,7 @@ public sealed class PassiveSpec
 
     public void Clear()
     {
-        if (_allocated.Count == 0 && _masterySelections.Count == 0 && _activeSubgraphs.Count == 0 && _socketedJewels.Count == 0)
+        if (_allocated.Count == 0 && _masterySelections.Count == 0 && _attributeOverrides.Count == 0 && _activeSubgraphs.Count == 0 && _socketedJewels.Count == 0)
         {
             return;
         }
@@ -442,6 +445,7 @@ public sealed class PassiveSpec
         }
         _allocated.Clear();
         _masterySelections.Clear();
+        _attributeOverrides.Clear();
         _socketedJewels.Clear();
         _selectedAscendancyIndex = 0;
         if (_classStartNodeByIndex.TryGetValue(_selectedClassIndex, out var nodeId))
@@ -458,18 +462,19 @@ public sealed class PassiveSpec
     {
         _allocated.Clear();
         _masterySelections.Clear();
+        _attributeOverrides.Clear();
         _socketedJewels.Clear();
         foreach (var socketId in _activeSubgraphs.Keys.ToArray())
         {
             RemoveClusterRecursive(socketId);
         }
-        var importedClassIndex = Classes.ResolveClassIndexFromImportedId(build.ClassId);
+        var importedClassIndex = Classes.ResolveClassIndex(build);
         if (_classStartNodeByIndex.ContainsKey(importedClassIndex))
         {
             _selectedClassIndex = importedClassIndex;
         }
         _allocated.Add(_classStartNodeByIndex[_selectedClassIndex]);
-        _selectedAscendancyIndex = Classes.ResolveAscendancyIndex(_selectedClassIndex, build.AscendClassId);
+        _selectedAscendancyIndex = Classes.ResolveAscendancyIndex(_selectedClassIndex, build);
         if (SelectedAscendancyStartNodeId() is { } ascendancyStartId)
         {
             _allocated.Add(ascendancyStartId);
@@ -477,27 +482,37 @@ public sealed class PassiveSpec
         var applied = 0;
         var skipped = 0;
         var clusterSkipped = 0;
+        var unsupportedClusterJewels = 0;
+        var unsupportedAttributeOverrides = 0;
+        var unsupportedSocketedJewels = 0;
         var pendingJewels = build.SocketedJewels.ToList();
-        var restoredAny = true;
-        while (restoredAny && pendingJewels.Count > 0)
+        if (Features.SupportsClusterJewels)
         {
-            restoredAny = false;
-            var socketIdMap = build.ClusterHashFormatVersion < 2
-                ? BuildLegacyClusterIdMap()
-                : null;
-            for (var i = pendingJewels.Count - 1; i >= 0; i--)
+            var restoredAny = true;
+            while (restoredAny && pendingJewels.Count > 0)
             {
-                var socketedJewel = pendingJewels[i];
-                if (socketIdMap is not null && socketIdMap.TryGetValue(socketedJewel.SocketNodeId, out var mappedSocketId))
+                restoredAny = false;
+                var socketIdMap = build.ClusterHashFormatVersion < 2
+                    ? BuildLegacyClusterIdMap()
+                    : null;
+                for (var i = pendingJewels.Count - 1; i >= 0; i--)
                 {
-                    socketedJewel = socketedJewel with { SocketNodeId = mappedSocketId };
-                }
-                if (RestoreImportedCluster(socketedJewel, build))
-                {
-                    pendingJewels.RemoveAt(i);
-                    restoredAny = true;
+                    var socketedJewel = pendingJewels[i];
+                    if (socketIdMap is not null && socketIdMap.TryGetValue(socketedJewel.SocketNodeId, out var mappedSocketId))
+                    {
+                        socketedJewel = socketedJewel with { SocketNodeId = mappedSocketId };
+                    }
+                    if (RestoreImportedCluster(socketedJewel, build))
+                    {
+                        pendingJewels.RemoveAt(i);
+                        restoredAny = true;
+                    }
                 }
             }
+        }
+        else
+        {
+            unsupportedClusterJewels = build.ClusterNodeHashes.Count;
         }
 
         var legacyClusterIdMap = build.ClusterHashFormatVersion < 2
@@ -509,7 +524,11 @@ public sealed class PassiveSpec
             var socketNodeId = legacyClusterIdMap is not null && legacyClusterIdMap.TryGetValue(socketedJewel.SocketNodeId, out var mappedSocketId)
                 ? mappedSocketId
                 : socketedJewel.SocketNodeId;
-            if (build.ItemsById.TryGetValue(socketedJewel.ItemId, out var item))
+            if (!Features.SupportsPassiveTreeJewels)
+            {
+                unsupportedSocketedJewels++;
+            }
+            else if (Tree.Nodes.ContainsKey(socketNodeId) && build.ItemsById.TryGetValue(socketedJewel.ItemId, out var item))
             {
                 _socketedJewels[socketNodeId] = item;
             }
@@ -532,13 +551,19 @@ public sealed class PassiveSpec
         }
         foreach (var (nodeId, effectId) in build.MasterySelections)
         {
-            if (_allocated.Contains(nodeId))
+            if (Features.SupportsMasterySelections && _allocated.Contains(nodeId))
             {
                 _masterySelections[nodeId] = effectId;
             }
         }
         foreach (var id in build.ClusterNodeHashes)
         {
+            if (!Features.SupportsClusterJewels)
+            {
+                skipped++;
+                clusterSkipped++;
+                continue;
+            }
             var mappedId = legacyClusterIdMap is not null && legacyClusterIdMap.TryGetValue(id, out var legacyMappedId)
                 ? legacyMappedId
                 : id;
@@ -557,8 +582,24 @@ public sealed class PassiveSpec
         applied += fallbackApplied;
         skipped = Math.Max(0, skipped - fallbackApplied);
         clusterSkipped = Math.Max(0, clusterSkipped - fallbackApplied);
+        if (Features.SupportsAttributeOverrides)
+        {
+            foreach (var (nodeId, attribute) in build.AttributeOverrides)
+            {
+                _attributeOverrides[nodeId] = attribute;
+            }
+        }
+        else
+        {
+            unsupportedAttributeOverrides = build.AttributeOverrides.Count;
+        }
         SpecChanged?.Invoke();
-        return new ImportResult(applied, skipped, clusterSkipped, build);
+        return new ImportResult(applied, skipped, clusterSkipped, build)
+        {
+            UnsupportedClusterJewels = unsupportedClusterJewels,
+            UnsupportedAttributeOverrides = unsupportedAttributeOverrides,
+            UnsupportedSocketedJewels = unsupportedSocketedJewels,
+        };
     }
 
     private int AllocateUniqueClusterFallbacks()
@@ -941,7 +982,12 @@ public sealed class PassiveSpec
     }
 }
 
-public sealed record ImportResult(int Applied, int Skipped, int ClusterSkipped, ImportedBuild Build);
+public sealed record ImportResult(int Applied, int Skipped, int ClusterSkipped, ImportedBuild Build)
+{
+    public int UnsupportedClusterJewels { get; init; }
+    public int UnsupportedAttributeOverrides { get; init; }
+    public int UnsupportedSocketedJewels { get; init; }
+}
 
 public sealed record HoverPath(IReadOnlyList<int> Nodes, IReadOnlySet<(int Min, int Max)> Edges)
 {

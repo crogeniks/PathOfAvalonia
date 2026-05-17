@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia.Media;
 using PathOfAvalonia.TreeDomain.Import;
 
@@ -16,6 +17,10 @@ public sealed class ItemViewModel
     private static readonly IBrush BrushScourge   = new SolidColorBrush(Color.FromRgb(0xD0, 0x50, 0x30));
     private static readonly IBrush BrushCrucible  = new SolidColorBrush(Color.FromRgb(0xC8, 0x70, 0x40));
     private static readonly IBrush BrushStatus    = new SolidColorBrush(Color.FromRgb(0xD0, 0x40, 0x40));
+    private static readonly IBrush BrushEnchant   = new SolidColorBrush(Color.FromRgb(0xB8, 0xB8, 0xFF));
+    private static readonly IBrush BrushRune      = new SolidColorBrush(Color.FromRgb(0x70, 0xD8, 0xC8));
+    private static readonly IBrush BrushVariant   = new SolidColorBrush(Color.FromRgb(0xC8, 0xA0, 0xFF));
+    private static readonly IBrush BrushCustom    = new SolidColorBrush(Color.FromRgb(0xE0, 0xD0, 0x90));
 
     public string Slot { get; }
     public string Name { get; }
@@ -87,6 +92,15 @@ public sealed class ItemViewModel
         var implicitCount = -1;
         var implicitsSeen = 0;
 
+        if (item.Sockets.Count > 0)
+        {
+            body.Add(new BodyLine("Sockets: " + string.Join(" ", item.Sockets.Select(socket => socket.Kind)), BrushDefault));
+        }
+        foreach (var rune in item.Runes)
+        {
+            body.Add(new BodyLine("Rune: " + rune, BrushRune));
+        }
+
         for (; i < rawLines.Length; i++)
         {
             var line = rawLines[i].Trim();
@@ -101,7 +115,20 @@ public sealed class ItemViewModel
                 continue;
             }
 
-            if (line.Contains("BasePercentile: ", StringComparison.OrdinalIgnoreCase))
+            if (line.Contains("BasePercentile: ", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("LevelReq:", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("Str:", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("Dex:", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("Int:", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("Requires Class ", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("Source:", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("Note:", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (line.StartsWith("Sockets:", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("Rune:", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -183,7 +210,7 @@ public sealed class ItemViewModel
     }
 
     private static bool IsStatusFlag(string line) =>
-        line is "Corrupted" or "Split" or "Mirrored" or "Fractured Item";
+        line is "Corrupted" or "Split" or "Mirrored" or "Fractured Item" or "Desecrated" or "Unreleased";
 
     private static BodyLine ParseModLine(string line)
     {
@@ -196,7 +223,8 @@ public sealed class ItemViewModel
         return new BodyLine(text, brush);
     }
 
-    // Strips all leading {tag} tokens. {range:X} is silent metadata; other tags set color.
+    // Strips all leading {tag} tokens. {range:X}, {tags:X}, and {variant:X} are metadata;
+    // other recognized tags set color.
     private static (string Text, IBrush Brush) StripPrefixes(string line)
     {
         var brush = BrushDefault;
@@ -213,8 +241,14 @@ public sealed class ItemViewModel
             var tag = span[1..close].ToString();
             span = span[(close + 1)..];
 
-            if (tag.StartsWith("range:", StringComparison.Ordinal))
+            if (tag.StartsWith("range:", StringComparison.Ordinal)
+                || tag.StartsWith("tags:", StringComparison.Ordinal))
             {
+                continue;
+            }
+            if (tag.StartsWith("variant:", StringComparison.Ordinal))
+            {
+                brush = BrushVariant;
                 continue;
             }
 
@@ -224,6 +258,9 @@ public sealed class ItemViewModel
                 "fractured" => BrushFractured,
                 "scourge"   => BrushScourge,
                 "crucible"  => BrushCrucible,
+                "enchant"   => BrushEnchant,
+                "rune"      => BrushRune,
+                "custom"    => BrushCustom,
                 _           => brush,
             };
         }

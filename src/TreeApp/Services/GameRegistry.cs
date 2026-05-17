@@ -18,8 +18,8 @@ public sealed class GameRegistry
             "0.4",
             "Assets/PoE2",
             new Poe2TreeLoader(),
-            new UnsupportedImportStrategy(),
-            GameFeatureFlags.Poe2Milestone1),
+            new Poe2ImportStrategy(),
+            GameFeatureFlags.Poe2Milestone2),
     ];
 
     public IReadOnlyList<GameDefinition> Games => _games;

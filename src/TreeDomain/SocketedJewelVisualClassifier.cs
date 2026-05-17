@@ -17,6 +17,14 @@ public enum SocketedJewelVisualKind
     UrsineCharm,
     CorvineCharm,
     LupineCharm,
+    RubyJewel,
+    EmeraldJewel,
+    SapphireJewel,
+    Diamond,
+    TimeLost,
+    SoulCore,
+    Charm,
+    UnknownPoe2,
 }
 
 public static class SocketedJewelVisualClassifier
@@ -54,6 +62,13 @@ public static class SocketedJewelVisualClassifier
                 "Ursine Charm" => SocketedJewelVisualKind.UrsineCharm,
                 "Corvine Charm" => SocketedJewelVisualKind.CorvineCharm,
                 "Lupine Charm" => SocketedJewelVisualKind.LupineCharm,
+                "Ruby" or "Ruby Jewel" => SocketedJewelVisualKind.RubyJewel,
+                "Emerald" or "Emerald Jewel" => SocketedJewelVisualKind.EmeraldJewel,
+                "Sapphire" or "Sapphire Jewel" => SocketedJewelVisualKind.SapphireJewel,
+                "Diamond" or "Diamond Jewel" => SocketedJewelVisualKind.Diamond,
+                "Time-Lost Diamond" or "Time-Lost Diamond Jewel" => SocketedJewelVisualKind.TimeLost,
+                "Soul Core" => SocketedJewelVisualKind.SoulCore,
+                "Charm" => SocketedJewelVisualKind.Charm,
                 _ => SocketedJewelVisualKind.Unknown,
             };
             if (kind != SocketedJewelVisualKind.Unknown)
@@ -62,7 +77,20 @@ public static class SocketedJewelVisualClassifier
             }
         }
 
-        return SocketedJewelVisualKind.Unknown;
+        if (baseType.Contains("Soul Core", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Soul Core", StringComparison.OrdinalIgnoreCase))
+        {
+            return SocketedJewelVisualKind.SoulCore;
+        }
+        if (baseType.Contains("Charm", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Charm", StringComparison.OrdinalIgnoreCase))
+        {
+            return SocketedJewelVisualKind.Charm;
+        }
+
+        return rawText.Contains("Path of Exile 2", StringComparison.OrdinalIgnoreCase)
+            ? SocketedJewelVisualKind.UnknownPoe2
+            : SocketedJewelVisualKind.Unknown;
     }
 
     public static string? OverlayKey(ImportedItem item, bool isExpansionSocket) =>

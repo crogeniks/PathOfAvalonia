@@ -11,5 +11,5 @@ public sealed partial class GameChoiceViewModel(GameDefinition game, bool isLast
     [ObservableProperty] private bool _isLastUsed = isLastUsed;
     public string SupportStatus => game.Id == GameId.PathOfExile1
         ? "Passive tree, imports, equipment"
-        : "Passive tree preview";
+        : "Passive tree, icons, build import, equipment";
 }

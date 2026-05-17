@@ -36,3 +36,8 @@ public sealed class UnsupportedImportStrategy : IImportStrategy
         throw new NotSupportedException("Build import is not available for Path of Exile 2 yet.");
 }
 
+public sealed class Poe2ImportStrategy : IImportStrategy
+{
+    public bool IsSupported => true;
+    public ImportedBuild Import(string text) => Poe2BuildImporter.Import(text);
+}

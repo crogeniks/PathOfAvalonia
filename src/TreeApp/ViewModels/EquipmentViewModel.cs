@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -20,22 +21,42 @@ public partial class EquipmentViewModel : ObservableObject
     public void LoadBuild(ImportedBuild build)
     {
         var groups = new List<ItemGroupViewModel>();
-        if (build.Items.Count > 0)
+        var activeItems = build.Items.ToArray();
+
+        var equipment = activeItems.Where(item => GroupName(item) == "Equipment").ToArray();
+        if (equipment.Length > 0)
         {
             groups.Add(new ItemGroupViewModel(
                 "Equipment",
-                build.Items.Select(item => ItemViewModel.FromImported(item))));
+                equipment.Select(item => ItemViewModel.FromImported(item))));
         }
 
-        var jewelItems = SocketedJewels(build).ToArray();
+        var flaskCharmItems = activeItems.Where(item => GroupName(item) == "Flasks & Charms").ToArray();
+        if (flaskCharmItems.Length > 0)
+        {
+            groups.Add(new ItemGroupViewModel(
+                "Flasks & Charms",
+                flaskCharmItems.Select(item => ItemViewModel.FromImported(item))));
+        }
+
+        var jewelItems = activeItems
+            .Where(item => GroupName(item) == "Jewels")
+            .Select(item => ItemViewModel.FromImported(item))
+            .ToArray();
         if (jewelItems.Length > 0)
         {
             groups.Add(new ItemGroupViewModel("Jewels", jewelItems));
         }
 
+        var socketedJewels = SocketedJewels(build, activeItems.Select(item => item.Id).ToHashSet()).ToArray();
+        if (socketedJewels.Length > 0)
+        {
+            groups.Add(new ItemGroupViewModel("Socketed Tree Jewels", socketedJewels));
+        }
+
         if (groups.Count == 0)
         {
-            EmptyMessage = "No items in this build.";
+            EmptyMessage = "Import a build to view equipment.";
             Groups = new ObservableCollection<ItemGroupViewModel>();
             return;
         }
@@ -46,21 +67,47 @@ public partial class EquipmentViewModel : ObservableObject
     public void Clear()
     {
         Groups = new ObservableCollection<ItemGroupViewModel>();
-        EmptyMessage = "Import a build to see equipment.";
+        EmptyMessage = "Import a build to view equipment.";
     }
 
-    private static IEnumerable<ItemViewModel> SocketedJewels(ImportedBuild build)
+    public void MarkUnsupported()
+    {
+        Groups = new ObservableCollection<ItemGroupViewModel>();
+        EmptyMessage = "Equipment is not available for this game yet.";
+    }
+
+    private static IEnumerable<ItemViewModel> SocketedJewels(ImportedBuild build, HashSet<int> activeItemIds)
     {
         var seen = new HashSet<int>();
         foreach (var socketed in build.SocketedJewels.OrderBy(jewel => jewel.SocketNodeId))
         {
-            if (!seen.Add(socketed.ItemId) || !build.ItemsById.TryGetValue(socketed.ItemId, out var item))
+            if (activeItemIds.Contains(socketed.ItemId)
+                || !seen.Add(socketed.ItemId)
+                || !build.ItemsById.TryGetValue(socketed.ItemId, out var item))
             {
                 continue;
             }
 
             yield return ItemViewModel.FromImported(item, $"Jewel {socketed.SocketNodeId}");
         }
+    }
+
+    private static string GroupName(ImportedItem item)
+    {
+        if (item.Slot.Contains("Flask", StringComparison.OrdinalIgnoreCase)
+            || item.Slot.Contains("Charm", StringComparison.OrdinalIgnoreCase)
+            || item.BaseType.Contains("Charm", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Flasks & Charms";
+        }
+
+        if (item.Slot.Contains("Jewel", StringComparison.OrdinalIgnoreCase)
+            || item.BaseType.Contains("Jewel", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Jewels";
+        }
+
+        return "Equipment";
     }
 }
 

@@ -33,7 +33,13 @@ public partial class MainWindowViewModel : ObservableObject
     public IReadOnlyList<string> AscendancyNames => _spec.Classes.AscendancyNames(SelectedClassIndex);
     public bool IsImportSupported => _importStrategy.IsSupported;
     public bool IsImportUnsupported => !_importStrategy.IsSupported;
-    public string UnsupportedImportStatus => "Build import is not available for Path of Exile 2 yet.";
+    public string UnsupportedImportStatus => "Build import is not available for this game yet.";
+    public string ImportPrompt => _spec.Tree.GameId == GameId.PathOfExile2
+        ? "Paste a Path of Building 2 build code"
+        : "Paste a PoE tree URL or a PoB build code:";
+    public string ImportPlaceholder => _spec.Tree.GameId == GameId.PathOfExile2
+        ? "Paste a Path of Building 2 build code"
+        : "https://www.pathofexile.com/passive-skill-tree/... or PoB code";
 
     [ObservableProperty] private int _selectedClassIndex;
     [ObservableProperty] private int _selectedAscendancyIndex;
@@ -150,7 +156,7 @@ public partial class MainWindowViewModel : ObservableObject
             var build = _importStrategy.Import(text);
             var result = _spec.ApplyImport(build);
             Equipment.LoadBuild(build);
-            ImportStatus = $"{build.Source}: {result.Applied} nodes (+{result.ClusterSkipped} cluster skipped)";
+            ImportStatus = BuildImportStatus(result);
             ImportStatusIsError = false;
         }
         catch (Exception ex)
@@ -158,6 +164,35 @@ public partial class MainWindowViewModel : ObservableObject
             ImportStatus = $"Import failed: {ex.Message}";
             ImportStatusIsError = true;
         }
+    }
+
+    private static string BuildImportStatus(ImportResult result)
+    {
+        var build = result.Build;
+        var status = $"{build.Source}: {result.Applied} nodes applied, {result.Skipped} skipped";
+        if (build.Items.Count > 0)
+        {
+            status += $", {build.Items.Count} items imported";
+        }
+
+        var unsupported = new List<string>();
+        if (result.UnsupportedClusterJewels > 0)
+        {
+            unsupported.Add($"{result.UnsupportedClusterJewels} cluster nodes");
+        }
+        if (result.UnsupportedAttributeOverrides > 0)
+        {
+            unsupported.Add($"{result.UnsupportedAttributeOverrides} attribute override{(result.UnsupportedAttributeOverrides == 1 ? string.Empty : "s")}");
+        }
+        if (result.UnsupportedSocketedJewels > 0)
+        {
+            unsupported.Add($"{result.UnsupportedSocketedJewels} socketed jewel{(result.UnsupportedSocketedJewels == 1 ? string.Empty : "s")}");
+        }
+        if (unsupported.Count > 0)
+        {
+            status += "; unsupported: " + string.Join(", ", unsupported);
+        }
+        return status;
     }
 
     [RelayCommand]

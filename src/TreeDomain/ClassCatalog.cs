@@ -1,5 +1,7 @@
 namespace PathOfAvalonia.TreeDomain;
 
+using PathOfAvalonia.TreeDomain.Import;
+
 public sealed class ClassCatalog
 {
     public required IReadOnlyList<CharacterClassInfo> Classes { get; init; }
@@ -31,6 +33,48 @@ public sealed class ClassCatalog
         return importedAscendancyId >= 0 && importedAscendancyId < cls.Ascendancies.Count
             ? importedAscendancyId
             : 0;
+    }
+
+    public int ResolveClassIndex(ImportedBuild build)
+    {
+        if (!string.IsNullOrWhiteSpace(build.ClassInternalId))
+        {
+            foreach (var cls in Classes)
+            {
+                if (cls.ExternalIntegerId?.ToString(System.Globalization.CultureInfo.InvariantCulture) == build.ClassInternalId
+                    || string.Equals(cls.Name, build.ClassInternalId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return cls.ClassIndex;
+                }
+            }
+        }
+
+        return ResolveClassIndexFromImportedId(build.ClassId);
+    }
+
+    public int ResolveAscendancyIndex(int classIndex, ImportedBuild build)
+    {
+        if (build.AscendancyInternalId is { } internalId)
+        {
+            if (internalId.Length == 0)
+            {
+                return 0;
+            }
+            if (!TryGetClass(classIndex, out var cls))
+            {
+                return 0;
+            }
+            foreach (var asc in cls.Ascendancies)
+            {
+                if (string.Equals(asc.InternalId, internalId, StringComparison.Ordinal))
+                {
+                    return asc.AscendancyIndex;
+                }
+            }
+            return 0;
+        }
+
+        return ResolveAscendancyIndex(classIndex, build.AscendClassId);
     }
 
     public int ResolveClassIndexFromImportedId(int importedClassId)
@@ -99,4 +143,3 @@ public sealed record AscendancyInfo(
     string DisplayName,
     string TreeName,
     string? InternalId);
-

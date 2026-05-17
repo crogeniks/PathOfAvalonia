@@ -1,0 +1,16 @@
+<PathOfBuilding2>
+  <Tree>
+    <Spec treeVersion="0_4" classInternalId="Witch" ascendancyInternalId="" nodes="" />
+  </Tree>
+  <Items activeItemSet="1">
+    <Item id="1">Rarity: Rare
+Dire Shell
+Expert Hexer's Robe
+--------
+Sockets: S S S
+Rune: Soul Core of Cholotl</Item>
+    <ItemSet id="1">
+      <Slot name="Body Armour" itemId="1" />
+    </ItemSet>
+  </Items>
+</PathOfBuilding2>

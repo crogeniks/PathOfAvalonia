@@ -48,6 +48,6 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
         || Workspace.Spec.SelectedAscendancyIndex != 0
         || Workspace.Spec.AllocatedNodes.Count != _initialAllocatedCount
         || Workspace.Spec.ActiveSubgraphs.Count > 0
-        || Workspace.Spec.SocketedJewels.Count > 0;
+        || Workspace.Spec.SocketedJewels.Count > 0
+        || Workspace.Spec.AttributeOverrides.Count > 0;
 }
-
