@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using PathOfAvalonia.TreeDomain;
 using PathOfAvalonia.TreeDomain.ClusterJewels;
+using PathOfAvalonia.TreeDomain.Import;
 
 namespace PathOfAvalonia.TreeApp.ViewModels;
 
@@ -62,6 +63,30 @@ public sealed class PassiveTreeViewModel
     public bool IsAllocated(int id) => _spec.IsAllocated(id);
 
     public MasteryEffect? SelectedMasteryEffect(int nodeId) => _spec.SelectedMasteryEffect(nodeId);
+
+    public ImportedItem? SocketedJewelAt(int socketNodeId) =>
+        _spec.TryGetSocketedJewel(socketNodeId, out var item) ? item : null;
+
+    public string? SocketedJewelOverlayAt(Node socketNode)
+    {
+        if (socketNode.Type != NodeType.JewelSocket)
+        {
+            return null;
+        }
+
+        if (_spec.TryGetSocketedJewel(socketNode.Id, out var item))
+        {
+            return SocketedJewelVisualClassifier.OverlayKey(item, socketNode.ExpansionSocket is not null);
+        }
+
+        return ClusterSizeAt(socketNode.Id) switch
+        {
+            ClusterJewelSize.Large => SocketedJewelVisualClassifier.OverlayKey(SocketedJewelVisualKind.LargeCluster, socketNode.ExpansionSocket is not null),
+            ClusterJewelSize.Medium => SocketedJewelVisualClassifier.OverlayKey(SocketedJewelVisualKind.MediumCluster, socketNode.ExpansionSocket is not null),
+            ClusterJewelSize.Small => SocketedJewelVisualClassifier.OverlayKey(SocketedJewelVisualKind.SmallCluster, socketNode.ExpansionSocket is not null),
+            _ => null,
+        };
+    }
 
     // Returns the cluster size for the given socket node, or null if no cluster is active there.
     public ClusterJewelSize? ClusterSizeAt(int socketNodeId) =>

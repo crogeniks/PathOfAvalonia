@@ -53,6 +53,9 @@ public sealed class PassiveSpec
     public IReadOnlySet<int> AllocatedNodes => _allocated;
     public bool IsAllocated(int id) => _allocated.Contains(id);
 
+    public bool TryGetSocketedJewel(int socketNodeId, out ImportedItem item) =>
+        _socketedJewels.TryGetValue(socketNodeId, out item!);
+
     public int SelectedClassIndex => _selectedClassIndex;
     public int SelectedAscendancyIndex => _selectedAscendancyIndex;
 
