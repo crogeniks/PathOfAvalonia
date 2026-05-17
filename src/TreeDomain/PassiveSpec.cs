@@ -1,5 +1,6 @@
 using PathOfAvalonia.TreeDomain.ClusterJewels;
 using PathOfAvalonia.TreeDomain.Import;
+using PathOfAvalonia.TreeDomain.Jewels;
 
 namespace PathOfAvalonia.TreeDomain;
 
@@ -25,10 +26,17 @@ public sealed class PassiveSpec
     // Flat lookup for all currently-active cluster nodes by ID.
     private readonly Dictionary<int, Node> _clusterNodes = new();
     private readonly Dictionary<int, ImportedItem> _socketedJewels = new();
+    private readonly JewelRadiusTable _jewelRadiusTable;
+    private readonly IReadOnlyDictionary<int, RadiusMembership> _socketRadiusMembership;
+    private readonly IReadOnlyDictionary<int, RadiusMembership> _keystoneRadiusMembership;
+    private readonly Dictionary<string, int> _keystoneNodeIdsByName;
+    private readonly List<RadiusJewelEffect> _activeRadiusEffects = new();
+    private readonly List<JewelRadiusVisual> _activeJewelRadii = new();
 
     public IReadOnlyDictionary<int, ClusterSubgraph> ActiveSubgraphs => _activeSubgraphs;
     public IReadOnlyDictionary<int, ImportedItem> SocketedJewels => _socketedJewels;
     public IReadOnlyDictionary<int, AttributeNodeOverride> AttributeOverrides => _attributeOverrides;
+    public IReadOnlyList<JewelRadiusVisual> ActiveJewelRadii => _activeJewelRadii;
 
     public PassiveSpec(TreeModel tree)
         : this(tree, tree.Classes, tree.GameId == GameId.PathOfExile2 ? GameFeatureFlags.Poe2Milestone2 : GameFeatureFlags.Poe1)
@@ -40,6 +48,10 @@ public sealed class PassiveSpec
         Tree = tree;
         Classes = classes;
         Features = features;
+        _jewelRadiusTable = JewelRadiusTable.For(tree.GameId, tree.Version);
+        _socketRadiusMembership = RadiusMembership.BuildForSockets(tree, _jewelRadiusTable);
+        _keystoneRadiusMembership = RadiusMembership.BuildForKeystones(tree, _jewelRadiusTable);
+        _keystoneNodeIdsByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         _classStartNodeByIndex = new Dictionary<int, int>();
         _ascendancyStartNodeByName = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var n in tree.Nodes.Values)
@@ -59,6 +71,10 @@ public sealed class PassiveSpec
             {
                 _ascendancyStartNodeByName[ascendancyName] = n.Id;
             }
+            if (n.Type == NodeType.Keystone)
+            {
+                _keystoneNodeIdsByName[n.Name] = n.Id;
+            }
         }
         _selectedClassIndex = 0;
         _selectedAscendancyIndex = 0;
@@ -66,6 +82,7 @@ public sealed class PassiveSpec
         {
             _allocated.Add(startId);
         }
+        RebuildActiveRadiusEffects();
     }
 
     public IReadOnlySet<int> AllocatedNodes => _allocated;
@@ -73,6 +90,42 @@ public sealed class PassiveSpec
 
     public bool TryGetSocketedJewel(int socketNodeId, out ImportedItem item) =>
         _socketedJewels.TryGetValue(socketNodeId, out item!);
+
+    public EffectiveNodeView EffectiveNode(int nodeId)
+    {
+        if (!TryGetNode(nodeId, out var node) || node is null)
+        {
+            throw new KeyNotFoundException($"Node {nodeId} is not present in the passive tree.");
+        }
+
+        var stats = (IReadOnlyList<string>)node.Stats;
+        var affectedBy = new List<int>();
+        TimelessConqueror? conqueror = null;
+        foreach (var effect in _activeRadiusEffects)
+        {
+            if (!EffectAffectsNode(effect, nodeId))
+            {
+                continue;
+            }
+
+            affectedBy.Add(effect.SocketNodeId);
+            if (effect.Conqueror is { } c)
+            {
+                conqueror = c;
+            }
+            foreach (var transform in effect.NodeTransforms)
+            {
+                stats = transform.Apply(node, stats);
+            }
+        }
+
+        return new EffectiveNodeView(node, stats, conqueror is not null, conqueror, affectedBy);
+    }
+
+    public bool IsAllocatedByRadiusJewel(int nodeId) =>
+        _activeRadiusEffects.Any(effect =>
+            effect.AllowsUnconnectedAllocation
+            && EffectAffectsNode(effect, nodeId));
 
     public int SelectedClassIndex => _selectedClassIndex;
     public int SelectedAscendancyIndex => _selectedAscendancyIndex;
@@ -120,6 +173,7 @@ public sealed class PassiveSpec
         _selectedClassIndex = classIndex;
         _selectedAscendancyIndex = 0;
         _allocated.Add(_classStartNodeByIndex[classIndex]);
+        RebuildActiveRadiusEffects();
         SpecChanged?.Invoke();
     }
 
@@ -138,6 +192,7 @@ public sealed class PassiveSpec
         {
             _allocated.Add(startId);
         }
+        RebuildActiveRadiusEffects();
         SpecChanged?.Invoke();
     }
 
@@ -186,6 +241,7 @@ public sealed class PassiveSpec
             return;
         }
         _allocated.Add(id);
+        RebuildActiveRadiusEffects();
         SpecChanged?.Invoke();
     }
 
@@ -194,12 +250,18 @@ public sealed class PassiveSpec
     // is gone — anything unvisited is a dependent.
     private void DeallocateWithDependents(int id)
     {
+        var wasActiveRadiusSocket = _activeRadiusEffects.Any(effect => effect.SocketNodeId == id);
         var affected = AllocatedComponentFrom(id);
         var roots = DependencyRoots(id).ToList();
         if (roots.Count == 0)
         {
             _allocated.Remove(id);
             _masterySelections.Remove(id);
+            RebuildActiveRadiusEffects();
+            if (wasActiveRadiusSocket)
+            {
+                PruneInvalidRadiusOnlyAllocations();
+            }
             SpecChanged?.Invoke();
             return;
         }
@@ -240,6 +302,11 @@ public sealed class PassiveSpec
         {
             _allocated.Remove(o);
             _masterySelections.Remove(o);
+        }
+        RebuildActiveRadiusEffects();
+        if (wasActiveRadiusSocket)
+        {
+            PruneInvalidRadiusOnlyAllocations();
         }
         SpecChanged?.Invoke();
     }
@@ -297,13 +364,14 @@ public sealed class PassiveSpec
         var changed = false;
         foreach (var id in ids)
         {
-            if (CanAllocate(id) && _allocated.Add(id))
+            if (TryGetNode(id, out var node) && node is not null && CanAllocateNodeRules(node) && _allocated.Add(id))
             {
                 changed = true;
             }
         }
         if (changed)
         {
+            RebuildActiveRadiusEffects();
             SpecChanged?.Invoke();
         }
     }
@@ -316,10 +384,14 @@ public sealed class PassiveSpec
     {
         if (!TryGetNode(targetId, out var target)
             || _allocated.Contains(targetId)
-            || !CanAllocate(target!)
+            || !CanAllocateNodeRules(target!)
             || target!.Type is NodeType.Proxy or NodeType.ClassStart or NodeType.AscendancyStart)
         {
             return HoverPath.Empty;
+        }
+        if (IsAllocatedByRadiusJewel(targetId))
+        {
+            return new HoverPath([targetId], new HashSet<(int, int)>());
         }
 
         // Seed the BFS from all currently-allocated nodes (including cluster nodes).
@@ -356,7 +428,7 @@ public sealed class PassiveSpec
                 {
                     continue;
                 }
-                if (!CanAllocate(other))
+                if (!CanAllocateNodeRules(other))
                 {
                     continue;
                 }
@@ -420,6 +492,7 @@ public sealed class PassiveSpec
         socket.LinkedNodes.Add(entranceNode);
         entranceNode.LinkedNodes.Add(socket);
 
+        RebuildActiveRadiusEffects();
         SpecChanged?.Invoke();
     }
 
@@ -429,6 +502,8 @@ public sealed class PassiveSpec
         changed |= _socketedJewels.Remove(socketId);
         if (changed)
         {
+            RebuildActiveRadiusEffects();
+            PruneInvalidRadiusOnlyAllocations();
             SpecChanged?.Invoke();
         }
     }
@@ -452,6 +527,7 @@ public sealed class PassiveSpec
         {
             _allocated.Add(nodeId);
         }
+        RebuildActiveRadiusEffects();
         SpecChanged?.Invoke();
     }
 
@@ -593,6 +669,7 @@ public sealed class PassiveSpec
         {
             unsupportedAttributeOverrides = build.AttributeOverrides.Count;
         }
+        RebuildActiveRadiusEffects();
         SpecChanged?.Invoke();
         return new ImportResult(applied, skipped, clusterSkipped, build)
         {
@@ -735,16 +812,37 @@ public sealed class PassiveSpec
         {
             return false;
         }
-        return CanAllocate(node);
+        return CanAllocateNodeRules(node)
+            && (IsNormallyReachableForAllocation(node) || IsAllocatedByRadiusJewel(node.Id));
     }
 
-    private bool CanAllocate(Node node)
+    private bool CanAllocateNodeRules(Node node)
     {
         if (node.AscendancyName is not { } ascendancyName)
         {
             return true;
         }
         return SelectedAscendancyName == ascendancyName;
+    }
+
+    private bool IsNormallyReachableForAllocation(Node node)
+    {
+        if (_allocated.Contains(node.Id))
+        {
+            return true;
+        }
+        if (node.Type is NodeType.ClassStart or NodeType.AscendancyStart)
+        {
+            return false;
+        }
+        foreach (var linked in node.LinkedNodes)
+        {
+            if (_allocated.Contains(linked.Id))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     public event Action? SpecChanged;
@@ -777,7 +875,126 @@ public sealed class PassiveSpec
 
         _activeSubgraphs.Remove(socketId);
         _socketedJewels.Remove(socketId);
+        RebuildActiveRadiusEffects();
         return true;
+    }
+
+    private void RebuildActiveRadiusEffects()
+    {
+        _activeRadiusEffects.Clear();
+        _activeJewelRadii.Clear();
+        if (!Features.SupportsPassiveTreeJewels)
+        {
+            return;
+        }
+
+        foreach (var (socketNodeId, item) in _socketedJewels)
+        {
+            if (!_allocated.Contains(socketNodeId))
+            {
+                continue;
+            }
+            if (!Tree.Nodes.TryGetValue(socketNodeId, out var socket))
+            {
+                continue;
+            }
+            var effect = RadiusJewelParser.Parse(item, socketNodeId, Tree, _jewelRadiusTable, _keystoneNodeIdsByName);
+            if (effect is null || !_jewelRadiusTable.TryGet(effect.RadiusIndex, out var band))
+            {
+                continue;
+            }
+
+            _activeRadiusEffects.Add(effect);
+            var center = effect.AlternateCenterNodeId is { } centerNodeId && Tree.Nodes.TryGetValue(centerNodeId, out var alternate)
+                ? alternate
+                : socket;
+            _activeJewelRadii.Add(new JewelRadiusVisual(
+                socketNodeId,
+                center.X,
+                center.Y,
+                band.Inner,
+                band.Outer,
+                VisualStyle(effect, band),
+                effect.Conqueror));
+        }
+    }
+
+    private static JewelRadiusVisualStyle VisualStyle(RadiusJewelEffect effect, JewelRadiusBand band)
+    {
+        if (effect.Conqueror is not null)
+        {
+            return JewelRadiusVisualStyle.Timeless;
+        }
+        if (effect.AlternateCenterNodeId is not null)
+        {
+            return JewelRadiusVisualStyle.KeystoneCentered;
+        }
+        return band.IsAnnulus ? JewelRadiusVisualStyle.Annulus : JewelRadiusVisualStyle.Normal;
+    }
+
+    private bool EffectAffectsNode(RadiusJewelEffect effect, int nodeId)
+    {
+        var sourceId = effect.AlternateCenterNodeId ?? effect.SocketNodeId;
+        var memberships = effect.AlternateCenterNodeId is not null ? _keystoneRadiusMembership : _socketRadiusMembership;
+        return memberships.TryGetValue(sourceId, out var membership)
+            && membership.Contains(effect.RadiusIndex, nodeId);
+    }
+
+    private void PruneInvalidRadiusOnlyAllocations()
+    {
+        var roots = DependencyRoots(excludeId: -1).Select(r => r.Id).ToArray();
+        if (roots.Length == 0)
+        {
+            return;
+        }
+
+        var reachable = NormallyReachableAllocatedNodes(roots);
+        var changed = false;
+        foreach (var id in _allocated.ToArray())
+        {
+            if (reachable.Contains(id) || IsAllocatedByRadiusJewel(id))
+            {
+                continue;
+            }
+            _allocated.Remove(id);
+            _masterySelections.Remove(id);
+            changed = true;
+        }
+        if (changed)
+        {
+            RebuildActiveRadiusEffects();
+        }
+    }
+
+    private HashSet<int> NormallyReachableAllocatedNodes(IEnumerable<int> rootIds)
+    {
+        var reachable = new HashSet<int>();
+        var queue = new Queue<Node>();
+        foreach (var rootId in rootIds)
+        {
+            if (TryGetNode(rootId, out var root) && root is not null && _allocated.Contains(rootId) && reachable.Add(rootId))
+            {
+                queue.Enqueue(root);
+            }
+        }
+
+        while (queue.Count > 0)
+        {
+            var node = queue.Dequeue();
+            if (node.Type == NodeType.Mastery)
+            {
+                continue;
+            }
+            foreach (var other in node.LinkedNodes)
+            {
+                if (!_allocated.Contains(other.Id) || !reachable.Add(other.Id))
+                {
+                    continue;
+                }
+                queue.Enqueue(other);
+            }
+        }
+        return reachable;
     }
 
     private bool RestoreImportedCluster(ImportedSocketedJewel socketedJewel, ImportedBuild build)
