@@ -42,12 +42,30 @@ public sealed class Poe2SocketedJewelTests
     [InlineData("Ruby", SocketedJewelVisualKind.RubyJewel)]
     [InlineData("Emerald", SocketedJewelVisualKind.EmeraldJewel)]
     [InlineData("Sapphire", SocketedJewelVisualKind.SapphireJewel)]
+    [InlineData("Time-Lost Ruby", SocketedJewelVisualKind.RubyJewel)]
+    [InlineData("Time-Lost Emerald", SocketedJewelVisualKind.EmeraldJewel)]
+    [InlineData("Time-Lost Sapphire", SocketedJewelVisualKind.SapphireJewel)]
+    [InlineData("Diamond", SocketedJewelVisualKind.Diamond)]
     [InlineData("Time-Lost Diamond", SocketedJewelVisualKind.TimeLost)]
     [InlineData("Soul Core", SocketedJewelVisualKind.SoulCore)]
     [InlineData("Charm", SocketedJewelVisualKind.Charm)]
     public void ClassifiesPoe2JewelKinds(string baseType, SocketedJewelVisualKind expected)
     {
         Assert.Equal(expected, SocketedJewelVisualClassifier.Classify(baseType, "", ""));
+    }
+
+    [Theory]
+    [InlineData("Ruby", "Ruby")]
+    [InlineData("Emerald", "Emerald")]
+    [InlineData("Sapphire", "Sapphire")]
+    [InlineData("Time-Lost Ruby", "Ruby")]
+    [InlineData("Time-Lost Emerald", "Emerald")]
+    [InlineData("Time-Lost Sapphire", "Sapphire")]
+    [InlineData("Diamond", "Diamond")]
+    [InlineData("Time-Lost Diamond", "Time-Lost Diamond")]
+    public void MapsPoe2JewelKindsToSpriteKeys(string baseType, string expected)
+    {
+        Assert.Equal(expected, SocketedJewelVisualClassifier.OverlayKey(baseType, "", "", isExpansionSocket: false));
     }
 
     private static TreeModel LoadTree()

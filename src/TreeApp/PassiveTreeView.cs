@@ -1066,6 +1066,16 @@ public sealed class PassiveTreeView : Control
 
     private void DrawSocketedJewelOverlay(DrawingContext ctx, string spriteKey, Point centre)
     {
+        if (_sprites.Lookup("poe2Jewels", spriteKey) is not null)
+        {
+            _ = DrawPoe2Sprite(ctx, "poe2Jewels", spriteKey, centre, new Size(76, 76));
+            return;
+        }
+        if (spriteKey == "JewelSocketActiveLegion" && _sprites.Lookup("poe2Jewels", "Timeless Jewel") is not null)
+        {
+            _ = DrawPoe2Sprite(ctx, "poe2Jewels", "Timeless Jewel", centre, new Size(76, 76));
+            return;
+        }
         if (_sprites.Lookup("jewel", spriteKey) is not null)
         {
             _ = DrawSprite(ctx, "jewel", spriteKey, centre);
