@@ -25,6 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AvaloniaResource Include="..\..\assets\Shared\**\*" Link="Assets/Shared/%(RecursiveDir)%(Filename)%(Extension)" />
     <AvaloniaResource Include="..\..\assets\PoE1\**\*" Link="Assets/PoE1/%(RecursiveDir)%(Filename)%(Extension)" />
     <AvaloniaResource Include="..\..\assets\PoE2\**\*" Link="Assets/PoE2/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>

@@ -16,6 +16,7 @@ public interface IGameAssetService
 public interface ITreeImageAssetResolver
 {
     Bitmap? LoadBitmap(string relativePath);
+    Bitmap? LoadJewelRadiusBitmap(string relativePath) => LoadBitmap($"JewelRadius/{relativePath}");
     Bitmap? LoadBackground(string treeVersion);
 }
 
@@ -57,6 +58,22 @@ public sealed class TreeImageAssetResolver(GameDefinition game) : ITreeImageAsse
 
     public Bitmap? LoadBackground(string treeVersion) =>
         LoadBitmap($"background_{treeVersion.Replace('.', '_')}.png");
+
+    public Bitmap? LoadJewelRadiusBitmap(string relativePath) =>
+        LoadBitmap($"JewelRadius/{relativePath}") ?? LoadSharedBitmap($"JewelRadius/{relativePath}");
+
+    private static Bitmap? LoadSharedBitmap(string relativePath)
+    {
+        try
+        {
+            using var s = AssetLoader.Open(new Uri($"avares://PathOfAvalonia.TreeApp/Assets/Shared/{relativePath}"));
+            return new Bitmap(s);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }
 
 public interface ITreeAssetService

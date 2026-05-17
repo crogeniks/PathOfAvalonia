@@ -10,6 +10,7 @@ using PathOfAvalonia.TreeApp.Services;
 using PathOfAvalonia.TreeApp.ViewModels;
 using PathOfAvalonia.TreeDomain;
 using PathOfAvalonia.TreeDomain.ClusterJewels;
+using PathOfAvalonia.TreeDomain.Jewels;
 
 namespace PathOfAvalonia.TreeApp;
 
@@ -21,6 +22,7 @@ public sealed class PassiveTreeView : Control
     private ContextMenu? _clusterMenu;
     // One Bitmap per unique atlas filename (multiple atlas keys share a file).
     private readonly Dictionary<string, Bitmap> _atlasBitmaps = new();
+    private readonly Dictionary<string, Bitmap?> _jewelRadiusBitmaps = new();
 
     // View transform (tree-space → screen-space): screen = tree * scale + offset
     private double _scale = 0.05;
@@ -164,6 +166,8 @@ public sealed class PassiveTreeView : Control
         var activeClusters = _vm.ActiveClusters;
         var visibleTree = VisibleTreeRect();
 
+        DrawActiveJewelRadii(ctx, visibleTree);
+
         // Cluster background discs, drawn under connectors and nodes.
         // We don't have the actual medallion art asset, so we approximate it with
         // concentric golden rings on a dark fill.
@@ -298,6 +302,108 @@ public sealed class PassiveTreeView : Control
         };
         ctx.FillRectangle(brush, new Rect(Bounds.Size));
     }
+
+    private void DrawActiveJewelRadii(DrawingContext ctx, Rect visibleTree)
+    {
+        foreach (var visual in _vm.ActiveJewelRadii)
+        {
+            if (!CircleIntersects(visibleTree, visual.X, visual.Y, visual.OuterRadius))
+            {
+                continue;
+            }
+
+            if (visual.Style == JewelRadiusVisualStyle.Timeless && TryDrawTimelessRadius(ctx, visual))
+            {
+                continue;
+            }
+
+            var centre = TreeToScreen(visual.X, visual.Y);
+            var outer = visual.OuterRadius * _scale;
+            var inner = visual.InnerRadius * _scale;
+            var tint = RadiusBrush(visual);
+            var pen = new Pen(tint, Math.Max(1.25, 8 * _scale));
+
+            if (TryGetJewelRadiusBitmap("ShadedOuterRing.png") is { } outerRing)
+            {
+                DrawBitmapCentered(ctx, outerRing, centre, outer);
+            }
+            else
+            {
+                ctx.DrawEllipse(null, pen, centre, outer, outer);
+            }
+
+            if (inner > 0)
+            {
+                if (TryGetJewelRadiusBitmap("ShadedInnerRing.png") is { } innerRing)
+                {
+                    DrawBitmapCentered(ctx, innerRing, centre, inner);
+                }
+                else
+                {
+                    ctx.DrawEllipse(null, pen, centre, inner, inner);
+                }
+            }
+            else
+            {
+                ctx.DrawEllipse(new SolidColorBrush(Color.FromArgb(0x18, 0x66, 0xFF, 0xCC)), null, centre, outer, outer);
+            }
+        }
+    }
+
+    private bool TryDrawTimelessRadius(DrawingContext ctx, JewelRadiusVisual visual)
+    {
+        if (visual.Conqueror is not { } conqueror)
+        {
+            return false;
+        }
+        var prefix = conqueror switch
+        {
+            TimelessConqueror.EternalEmpire => "PassiveSkillScreenEternalEmpireJewelCircle",
+            TimelessConqueror.Karui => "PassiveSkillScreenKaruiJewelCircle",
+            TimelessConqueror.Maraketh => "PassiveSkillScreenMarakethJewelCircle",
+            TimelessConqueror.Templar => "PassiveSkillScreenTemplarJewelCircle",
+            TimelessConqueror.Vaal => "PassiveSkillScreenVaalJewelCircle",
+            TimelessConqueror.Kalguuran => "PassiveSkillScreenKalguuranJewelCircle",
+            _ => string.Empty,
+        };
+        if (prefix.Length == 0
+            || TryGetJewelRadiusBitmap($"{prefix}1.png") is not { } circle1
+            || TryGetJewelRadiusBitmap($"{prefix}2.png") is not { } circle2)
+        {
+            return false;
+        }
+
+        var centre = TreeToScreen(visual.X, visual.Y);
+        var radius = visual.OuterRadius * _scale;
+        DrawBitmapCentered(ctx, circle1, centre, radius);
+        DrawBitmapCentered(ctx, circle2, centre, radius);
+        return true;
+    }
+
+    private Bitmap? TryGetJewelRadiusBitmap(string relativePath)
+    {
+        if (_jewelRadiusBitmaps.TryGetValue(relativePath, out var cached))
+        {
+            return cached;
+        }
+        var bitmap = _assetResolver.LoadJewelRadiusBitmap(relativePath);
+        _jewelRadiusBitmaps[relativePath] = bitmap;
+        return bitmap;
+    }
+
+    private static void DrawBitmapCentered(DrawingContext ctx, Bitmap bitmap, Point centre, double radius)
+    {
+        var dst = new Rect(centre.X - radius, centre.Y - radius, radius * 2, radius * 2);
+        ctx.DrawImage(bitmap, dst);
+    }
+
+    private static IBrush RadiusBrush(JewelRadiusVisual visual) =>
+        visual.Style switch
+        {
+            JewelRadiusVisualStyle.Annulus => new SolidColorBrush(Color.FromArgb(0xB0, 0xD3, 0x54, 0x00)),
+            JewelRadiusVisualStyle.KeystoneCentered => new SolidColorBrush(Color.FromArgb(0xB0, 0xC1, 0x00, 0xFF)),
+            _ => new SolidColorBrush(Color.FromArgb(0xB0, 0x66, 0xFF, 0xCC)),
+        };
 
     private void DrawArc(DrawingContext ctx, IPen pen, ArcConnector ac)
     {
@@ -695,7 +801,7 @@ public sealed class PassiveTreeView : Control
             }
         }
 
-        return node.Stats;
+        return _vm.PassiveEffectLines(node);
     }
 
     private void AddAllocationPreviewLines(List<TooltipLine> lines, Node node, double contentWidth)

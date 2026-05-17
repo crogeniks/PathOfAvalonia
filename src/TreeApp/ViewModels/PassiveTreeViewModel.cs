@@ -4,6 +4,7 @@ using System.Linq;
 using PathOfAvalonia.TreeDomain;
 using PathOfAvalonia.TreeDomain.ClusterJewels;
 using PathOfAvalonia.TreeDomain.Import;
+using PathOfAvalonia.TreeDomain.Jewels;
 
 namespace PathOfAvalonia.TreeApp.ViewModels;
 
@@ -59,10 +60,15 @@ public sealed class PassiveTreeViewModel
     }
 
     public IReadOnlyDictionary<int, ClusterSubgraph> ActiveClusters => _spec.ActiveSubgraphs;
+    public IReadOnlyList<JewelRadiusVisual> ActiveJewelRadii => _spec.ActiveJewelRadii;
 
     public bool IsAllocated(int id) => _spec.IsAllocated(id);
 
     public MasteryEffect? SelectedMasteryEffect(int nodeId) => _spec.SelectedMasteryEffect(nodeId);
+
+    public EffectiveNodeView EffectiveNode(int nodeId) => _spec.EffectiveNode(nodeId);
+
+    public IEnumerable<string> PassiveEffectLines(Node node) => _spec.EffectiveNode(node.Id).EffectiveStats;
 
     public ImportedItem? SocketedJewelAt(int socketNodeId) =>
         _spec.TryGetSocketedJewel(socketNodeId, out var item) ? item : null;
