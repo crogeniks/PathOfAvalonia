@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using BCnEncoder.Decoder;
+using BCnEncoder.Shared;
 
 var argsMap = ParseArgs(args);
 var treePath = Required(argsMap, "tree");
@@ -20,6 +22,11 @@ var tree = JsonDocument.Parse(File.ReadAllText(treePath));
 var iconKeys = new SortedSet<string>(StringComparer.Ordinal);
 var frameKeys = new SortedSet<string>(StringComparer.Ordinal);
 var connectionKeys = new SortedSet<string>(StringComparer.Ordinal);
+
+foreach (var frame in Poe2DefaultFrameKeys())
+{
+    frameKeys.Add(frame);
+}
 
 if (tree.RootElement.TryGetProperty("nodes", out var nodes))
 {
@@ -198,6 +205,22 @@ static string Poe2DefaultFrameKey(JsonElement node)
     return "PSSkillFrame";
 }
 
+static IEnumerable<string> Poe2DefaultFrameKeys()
+{
+    yield return "PSSkillFrame";
+    yield return "PSSkillFrameActive";
+    yield return "PSSkillFrameHighlighted";
+    yield return "NotableFrameAllocated";
+    yield return "NotableFrameCanAllocate";
+    yield return "NotableFrameUnallocated";
+    yield return "JewelFrameAllocated";
+    yield return "JewelFrameCanAllocate";
+    yield return "JewelFrameUnallocated";
+    yield return "KeystoneFrameAllocated";
+    yield return "KeystoneFrameCanAllocate";
+    yield return "KeystoneFrameUnallocated";
+}
+
 static IReadOnlyList<SpriteSource> ParseSpriteSources(string lua)
 {
     var result = new List<SpriteSource>();
@@ -268,9 +291,9 @@ static Dictionary<string, RectDto> BuildCombinedAtlas(
         return coords;
     }
 
-    if (matchingSources.All(source => source.Texture.Contains("_BC1.", StringComparison.OrdinalIgnoreCase)))
+    if (matchingSources.All(source => IsSupportedBlockCompressedTexture(source.Texture)))
     {
-        return BuildBc1CombinedAtlas(matchingSources, wantedKeys, treeAssets, outDir, outputRelativePath);
+        return BuildBlockCompressedCombinedAtlas(matchingSources, wantedKeys, treeAssets, outDir, outputRelativePath);
     }
 
     var tempFiles = new List<string>();
@@ -301,7 +324,11 @@ static Dictionary<string, RectDto> BuildCombinedAtlas(
     return coords;
 }
 
-static Dictionary<string, RectDto> BuildBc1CombinedAtlas(
+static bool IsSupportedBlockCompressedTexture(string texture) =>
+    texture.Contains("_BC1.", StringComparison.OrdinalIgnoreCase)
+    || texture.Contains("_BC7.", StringComparison.OrdinalIgnoreCase);
+
+static Dictionary<string, RectDto> BuildBlockCompressedCombinedAtlas(
     IReadOnlyList<SpriteSource> sources,
     ISet<string> wantedKeys,
     string treeAssets,
@@ -319,7 +346,7 @@ static Dictionary<string, RectDto> BuildBc1CombinedAtlas(
             {
                 continue;
             }
-            entries.Add((key, DecodeBc1DdsArraySlice(dds, index - 1), source.TileWidth, source.TileHeight));
+            entries.Add((key, DecodeDdsArraySlice(dds, index - 1), source.TileWidth, source.TileHeight));
         }
     }
 
@@ -360,6 +387,17 @@ static Dictionary<string, RectDto> BuildBc1CombinedAtlas(
     return coords;
 }
 
+static byte[] DecodeDdsArraySlice(byte[] dds, int sliceIndex)
+{
+    var dxgiFormat = ReadDdsDxgiFormat(dds);
+    return dxgiFormat switch
+    {
+        71 => DecodeBc1DdsArraySlice(dds, sliceIndex),
+        98 => DecodeBc7DdsArraySlice(dds, sliceIndex),
+        _ => throw new InvalidDataException($"Unsupported DDS DXGI format {dxgiFormat}."),
+    };
+}
+
 static byte[] ReadZstd(string source)
 {
     var psi = new ProcessStartInfo("zstd")
@@ -384,25 +422,20 @@ static byte[] ReadZstd(string source)
 
 static byte[] DecodeBc1DdsArraySlice(byte[] dds, int sliceIndex)
 {
-    if (dds.Length < 148 || dds[0] != 'D' || dds[1] != 'D' || dds[2] != 'S' || dds[3] != ' ')
-    {
-        throw new InvalidDataException("Invalid DDS data.");
-    }
-    var height = ReadInt32LE(dds, 12);
-    var width = ReadInt32LE(dds, 16);
-    var mipCount = Math.Max(1, ReadInt32LE(dds, 28));
-    var format = ReadInt32LE(dds, 128);
+    var header = ReadDdsHeader(dds);
+    var height = header.Height;
+    var width = header.Width;
+    var mipCount = header.MipCount;
+    var format = header.DxgiFormat;
     if (format != 71)
     {
         throw new InvalidDataException($"Expected BC1 DDS, got DXGI format {format}.");
     }
-    var arraySize = ReadInt32LE(dds, 140);
-    if (sliceIndex < 0 || sliceIndex >= arraySize)
+    if (sliceIndex < 0 || sliceIndex >= header.ArraySize)
     {
-        throw new InvalidDataException($"DDS slice {sliceIndex} is outside array size {arraySize}.");
+        throw new InvalidDataException($"DDS slice {sliceIndex} is outside array size {header.ArraySize}.");
     }
 
-    var dataOffset = 148;
     var bytesPerSlice = 0;
     var mw = width;
     var mh = height;
@@ -412,7 +445,7 @@ static byte[] DecodeBc1DdsArraySlice(byte[] dds, int sliceIndex)
         mw = Math.Max(1, mw / 2);
         mh = Math.Max(1, mh / 2);
     }
-    var sliceOffset = dataOffset + sliceIndex * bytesPerSlice;
+    var sliceOffset = header.DataOffset + sliceIndex * bytesPerSlice;
     var rgba = new byte[width * height * 4];
     var blockOffset = sliceOffset;
     var blocksWide = Math.Max(1, (width + 3) / 4);
@@ -428,8 +461,77 @@ static byte[] DecodeBc1DdsArraySlice(byte[] dds, int sliceIndex)
     return rgba;
 }
 
+static byte[] DecodeBc7DdsArraySlice(byte[] dds, int sliceIndex)
+{
+    var header = ReadDdsHeader(dds);
+    if (header.DxgiFormat != 98)
+    {
+        throw new InvalidDataException($"Expected BC7 DDS, got DXGI format {header.DxgiFormat}.");
+    }
+    if (sliceIndex < 0 || sliceIndex >= header.ArraySize)
+    {
+        throw new InvalidDataException($"DDS slice {sliceIndex} is outside array size {header.ArraySize}.");
+    }
+
+    var bytesPerSlice = BcMipChainSize(header.Width, header.Height, header.MipCount, bytesPerBlock: 16);
+    var mainMipSize = BcMipSize(header.Width, header.Height, bytesPerBlock: 16);
+    var sliceOffset = header.DataOffset + sliceIndex * bytesPerSlice;
+    if (sliceOffset < 0 || sliceOffset + mainMipSize > dds.Length)
+    {
+        throw new InvalidDataException("DDS slice data is outside the file.");
+    }
+
+    var mainMip = new byte[mainMipSize];
+    Buffer.BlockCopy(dds, sliceOffset, mainMip, 0, mainMipSize);
+    var colors = new BcDecoder().DecodeRaw(mainMip, header.Width, header.Height, CompressionFormat.Bc7);
+    var rgba = new byte[header.Width * header.Height * 4];
+    for (var i = 0; i < colors.Length; i++)
+    {
+        var dst = i * 4;
+        rgba[dst] = colors[i].r;
+        rgba[dst + 1] = colors[i].g;
+        rgba[dst + 2] = colors[i].b;
+        rgba[dst + 3] = colors[i].a;
+    }
+    return rgba;
+}
+
+static DdsHeader ReadDdsHeader(byte[] dds)
+{
+    if (dds.Length < 148 || dds[0] != 'D' || dds[1] != 'D' || dds[2] != 'S' || dds[3] != ' ')
+    {
+        throw new InvalidDataException("Invalid DDS data.");
+    }
+    return new DdsHeader(
+        ReadInt32LE(dds, 16),
+        ReadInt32LE(dds, 12),
+        Math.Max(1, ReadInt32LE(dds, 28)),
+        ReadInt32LE(dds, 128),
+        Math.Max(1, ReadInt32LE(dds, 140)),
+        148);
+}
+
+static int ReadDdsDxgiFormat(byte[] dds) => ReadDdsHeader(dds).DxgiFormat;
+
 static int Bc1MipSize(int width, int height) =>
-    Math.Max(1, (width + 3) / 4) * Math.Max(1, (height + 3) / 4) * 8;
+    BcMipSize(width, height, bytesPerBlock: 8);
+
+static int BcMipChainSize(int width, int height, int mipCount, int bytesPerBlock)
+{
+    var size = 0;
+    var mw = width;
+    var mh = height;
+    for (var mip = 0; mip < mipCount; mip++)
+    {
+        size += BcMipSize(mw, mh, bytesPerBlock);
+        mw = Math.Max(1, mw / 2);
+        mh = Math.Max(1, mh / 2);
+    }
+    return size;
+}
+
+static int BcMipSize(int width, int height, int bytesPerBlock) =>
+    Math.Max(1, (width + 3) / 4) * Math.Max(1, (height + 3) / 4) * bytesPerBlock;
 
 static void DecodeBc1Block(byte[] data, int offset, byte[] rgba, int width, int height, int px, int py)
 {
@@ -688,3 +790,11 @@ public sealed record SpriteSource(
     int TileWidth,
     int TileHeight,
     IReadOnlyDictionary<string, int> Entries);
+
+public sealed record DdsHeader(
+    int Width,
+    int Height,
+    int MipCount,
+    int DxgiFormat,
+    int ArraySize,
+    int DataOffset);

@@ -573,804 +573,852 @@
     },
     "poe2Frames": {
       "file": "frames/poe2Frames.png",
-      "w": 220,
-      "h": 856,
+      "w": 2048,
+      "h": 2672,
       "coords": {
-        "art/textures/interface/2d/2dart/uiimages/ingame/oraclepassiveskillscreenpassiveframeactive.dds": {
-          "x": 0,
-          "y": 0,
-          "w": 104,
-          "h": 104
-        },
-        "art/textures/interface/2d/2dart/uiimages/ingame/oraclepassiveskillscreenpassiveframecanallocate.dds": {
-          "x": 0,
-          "y": 0,
-          "w": 104,
-          "h": 104
-        },
-        "art/textures/interface/2d/2dart/uiimages/ingame/oraclepassiveskillscreenpassiveframenormal.dds": {
-          "x": 0,
-          "y": 0,
-          "w": 104,
-          "h": 104
-        },
         "PSSkillFrame": {
           "x": 0,
           "y": 0,
           "w": 104,
           "h": 104
         },
+        "PSSkillFrameActive": {
+          "x": 104,
+          "y": 0,
+          "w": 104,
+          "h": 104
+        },
+        "PSSkillFrameHighlighted": {
+          "x": 208,
+          "y": 0,
+          "w": 104,
+          "h": 104
+        },
+        "art/textures/interface/2d/2dart/uiimages/ingame/oraclepassiveskillscreenpassiveframeactive.dds": {
+          "x": 312,
+          "y": 0,
+          "w": 104,
+          "h": 104
+        },
+        "art/textures/interface/2d/2dart/uiimages/ingame/oraclepassiveskillscreenpassiveframecanallocate.dds": {
+          "x": 416,
+          "y": 0,
+          "w": 104,
+          "h": 104
+        },
+        "art/textures/interface/2d/2dart/uiimages/ingame/oraclepassiveskillscreenpassiveframenormal.dds": {
+          "x": 520,
+          "y": 0,
+          "w": 104,
+          "h": 104
+        },
+        "JewelFrameAllocated": {
+          "x": 624,
+          "y": 0,
+          "w": 152,
+          "h": 156
+        },
+        "JewelFrameCanAllocate": {
+          "x": 776,
+          "y": 0,
+          "w": 152,
+          "h": 156
+        },
+        "JewelFrameUnallocated": {
+          "x": 928,
+          "y": 0,
+          "w": 152,
+          "h": 156
+        },
+        "NotableFrameAllocated": {
+          "x": 1080,
+          "y": 0,
+          "w": 152,
+          "h": 156
+        },
+        "NotableFrameCanAllocate": {
+          "x": 1232,
+          "y": 0,
+          "w": 152,
+          "h": 156
+        },
+        "NotableFrameUnallocated": {
+          "x": 1384,
+          "y": 0,
+          "w": 152,
+          "h": 156
+        },
         "art/textures/interface/2d/2dart/uiimages/ingame/lichpassiveskillscreenjewelsocketactive.dds": {
-          "x": 0,
-          "y": 104,
+          "x": 1536,
+          "y": 0,
           "w": 152,
           "h": 156
         },
         "art/textures/interface/2d/2dart/uiimages/ingame/lichpassiveskillscreenjewelsocketcanallocate.dds": {
-          "x": 0,
-          "y": 104,
+          "x": 1688,
+          "y": 0,
           "w": 152,
           "h": 156
         },
         "art/textures/interface/2d/2dart/uiimages/ingame/lichpassiveskillscreenjewelsocketnormal.dds": {
-          "x": 0,
-          "y": 104,
+          "x": 1840,
+          "y": 0,
           "w": 152,
           "h": 156
         },
         "art/textures/interface/2d/2dart/uiimages/ingame/oraclepassiveskillscreennotableframeactive.dds": {
           "x": 0,
-          "y": 104,
+          "y": 156,
           "w": 152,
           "h": 156
         },
         "art/textures/interface/2d/2dart/uiimages/ingame/oraclepassiveskillscreennotableframecanallocate.dds": {
-          "x": 0,
-          "y": 104,
+          "x": 152,
+          "y": 156,
           "w": 152,
           "h": 156
         },
         "art/textures/interface/2d/2dart/uiimages/ingame/oraclepassiveskillscreennotableframenormal.dds": {
-          "x": 0,
-          "y": 104,
-          "w": 152,
-          "h": 156
-        },
-        "JewelFrameUnallocated": {
-          "x": 0,
-          "y": 104,
-          "w": 152,
-          "h": 156
-        },
-        "NotableFrameUnallocated": {
-          "x": 0,
-          "y": 104,
+          "x": 304,
+          "y": 156,
           "w": 152,
           "h": 156
         },
         "Acolyte of ChayulaFrameSmallAllocated": {
-          "x": 0,
-          "y": 260,
+          "x": 456,
+          "y": 156,
           "w": 160,
           "h": 164
         },
         "Acolyte of ChayulaFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
+          "x": 616,
+          "y": 156,
           "w": 160,
           "h": 164
         },
         "Acolyte of ChayulaFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
-          "w": 160,
-          "h": 164
-        },
-        "Blood MageFrameSmallAllocated": {
-          "x": 0,
-          "y": 260,
-          "w": 160,
-          "h": 164
-        },
-        "Blood MageFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
-          "w": 160,
-          "h": 164
-        },
-        "Blood MageFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
-          "w": 160,
-          "h": 164
-        },
-        "Disciple of VarashtaFrameSmallAllocated": {
-          "x": 0,
-          "y": 260,
-          "w": 160,
-          "h": 164
-        },
-        "Disciple of VarashtaFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
-          "w": 160,
-          "h": 164
-        },
-        "Disciple of VarashtaFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
-          "w": 160,
-          "h": 164
-        },
-        "Gemling LegionnaireFrameSmallAllocated": {
-          "x": 0,
-          "y": 260,
-          "w": 160,
-          "h": 164
-        },
-        "Gemling LegionnaireFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
-          "w": 160,
-          "h": 164
-        },
-        "Gemling LegionnaireFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
-          "w": 160,
-          "h": 164
-        },
-        "Smith of KitavaFrameSmallAllocated": {
-          "x": 0,
-          "y": 260,
-          "w": 160,
-          "h": 164
-        },
-        "Smith of KitavaFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
-          "w": 160,
-          "h": 164
-        },
-        "Smith of KitavaFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
+          "x": 776,
+          "y": 156,
           "w": 160,
           "h": 164
         },
         "AmazonFrameSmallAllocated": {
-          "x": 0,
-          "y": 260,
+          "x": 936,
+          "y": 156,
           "w": 160,
           "h": 164
         },
         "AmazonFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
+          "x": 1096,
+          "y": 156,
           "w": 160,
           "h": 164
         },
         "AmazonFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
+          "x": 1256,
+          "y": 156,
+          "w": 160,
+          "h": 164
+        },
+        "Blood MageFrameSmallAllocated": {
+          "x": 1416,
+          "y": 156,
+          "w": 160,
+          "h": 164
+        },
+        "Blood MageFrameSmallCanAllocate": {
+          "x": 1576,
+          "y": 156,
+          "w": 160,
+          "h": 164
+        },
+        "Blood MageFrameSmallNormal": {
+          "x": 1736,
+          "y": 156,
           "w": 160,
           "h": 164
         },
         "ChronomancerFrameSmallAllocated": {
           "x": 0,
-          "y": 260,
+          "y": 320,
           "w": 160,
           "h": 164
         },
         "ChronomancerFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
+          "x": 160,
+          "y": 320,
           "w": 160,
           "h": 164
         },
         "ChronomancerFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
+          "x": 320,
+          "y": 320,
           "w": 160,
           "h": 164
         },
         "DeadeyeFrameSmallAllocated": {
-          "x": 0,
-          "y": 260,
+          "x": 480,
+          "y": 320,
           "w": 160,
           "h": 164
         },
         "DeadeyeFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
+          "x": 640,
+          "y": 320,
           "w": 160,
           "h": 164
         },
         "DeadeyeFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
+          "x": 800,
+          "y": 320,
+          "w": 160,
+          "h": 164
+        },
+        "Disciple of VarashtaFrameSmallAllocated": {
+          "x": 960,
+          "y": 320,
+          "w": 160,
+          "h": 164
+        },
+        "Disciple of VarashtaFrameSmallCanAllocate": {
+          "x": 1120,
+          "y": 320,
+          "w": 160,
+          "h": 164
+        },
+        "Disciple of VarashtaFrameSmallNormal": {
+          "x": 1280,
+          "y": 320,
+          "w": 160,
+          "h": 164
+        },
+        "Gemling LegionnaireFrameSmallAllocated": {
+          "x": 1440,
+          "y": 320,
+          "w": 160,
+          "h": 164
+        },
+        "Gemling LegionnaireFrameSmallCanAllocate": {
+          "x": 1600,
+          "y": 320,
+          "w": 160,
+          "h": 164
+        },
+        "Gemling LegionnaireFrameSmallNormal": {
+          "x": 1760,
+          "y": 320,
           "w": 160,
           "h": 164
         },
         "InfernalistFrameSmallAllocated": {
           "x": 0,
-          "y": 260,
+          "y": 484,
           "w": 160,
           "h": 164
         },
         "InfernalistFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
+          "x": 160,
+          "y": 484,
           "w": 160,
           "h": 164
         },
         "InfernalistFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
+          "x": 320,
+          "y": 484,
           "w": 160,
           "h": 164
         },
         "InvokerFrameSmallAllocated": {
-          "x": 0,
-          "y": 260,
+          "x": 480,
+          "y": 484,
           "w": 160,
           "h": 164
         },
         "InvokerFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
+          "x": 640,
+          "y": 484,
           "w": 160,
           "h": 164
         },
         "InvokerFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
+          "x": 800,
+          "y": 484,
           "w": 160,
           "h": 164
         },
         "LichFrameSmallAllocated": {
-          "x": 0,
-          "y": 260,
+          "x": 960,
+          "y": 484,
           "w": 160,
           "h": 164
         },
         "LichFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
+          "x": 1120,
+          "y": 484,
           "w": 160,
           "h": 164
         },
         "LichFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
+          "x": 1280,
+          "y": 484,
           "w": 160,
           "h": 164
         },
         "OracleFrameSmallAllocated": {
-          "x": 0,
-          "y": 260,
+          "x": 1440,
+          "y": 484,
           "w": 160,
           "h": 164
         },
         "OracleFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
+          "x": 1600,
+          "y": 484,
           "w": 160,
           "h": 164
         },
         "OracleFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
+          "x": 1760,
+          "y": 484,
           "w": 160,
           "h": 164
         },
         "PathfinderFrameSmallAllocated": {
           "x": 0,
-          "y": 260,
+          "y": 648,
           "w": 160,
           "h": 164
         },
         "PathfinderFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
+          "x": 160,
+          "y": 648,
           "w": 160,
           "h": 164
         },
         "PathfinderFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
+          "x": 320,
+          "y": 648,
           "w": 160,
           "h": 164
         },
         "RitualistFrameSmallAllocated": {
-          "x": 0,
-          "y": 260,
+          "x": 480,
+          "y": 648,
           "w": 160,
           "h": 164
         },
         "RitualistFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
+          "x": 640,
+          "y": 648,
           "w": 160,
           "h": 164
         },
         "RitualistFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
+          "x": 800,
+          "y": 648,
           "w": 160,
           "h": 164
         },
         "ShamanFrameSmallAllocated": {
-          "x": 0,
-          "y": 260,
+          "x": 960,
+          "y": 648,
           "w": 160,
           "h": 164
         },
         "ShamanFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
+          "x": 1120,
+          "y": 648,
           "w": 160,
           "h": 164
         },
         "ShamanFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
+          "x": 1280,
+          "y": 648,
+          "w": 160,
+          "h": 164
+        },
+        "Smith of KitavaFrameSmallAllocated": {
+          "x": 1440,
+          "y": 648,
+          "w": 160,
+          "h": 164
+        },
+        "Smith of KitavaFrameSmallCanAllocate": {
+          "x": 1600,
+          "y": 648,
+          "w": 160,
+          "h": 164
+        },
+        "Smith of KitavaFrameSmallNormal": {
+          "x": 1760,
+          "y": 648,
           "w": 160,
           "h": 164
         },
         "StormweaverFrameSmallAllocated": {
           "x": 0,
-          "y": 260,
+          "y": 812,
           "w": 160,
           "h": 164
         },
         "StormweaverFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
+          "x": 160,
+          "y": 812,
           "w": 160,
           "h": 164
         },
         "StormweaverFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
+          "x": 320,
+          "y": 812,
           "w": 160,
           "h": 164
         },
         "TacticianFrameSmallAllocated": {
-          "x": 0,
-          "y": 260,
+          "x": 480,
+          "y": 812,
           "w": 160,
           "h": 164
         },
         "TacticianFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
+          "x": 640,
+          "y": 812,
           "w": 160,
           "h": 164
         },
         "TacticianFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
+          "x": 800,
+          "y": 812,
           "w": 160,
           "h": 164
         },
         "TitanFrameSmallAllocated": {
-          "x": 0,
-          "y": 260,
+          "x": 960,
+          "y": 812,
           "w": 160,
           "h": 164
         },
         "TitanFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
+          "x": 1120,
+          "y": 812,
           "w": 160,
           "h": 164
         },
         "TitanFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
+          "x": 1280,
+          "y": 812,
           "w": 160,
           "h": 164
         },
         "WarbringerFrameSmallAllocated": {
-          "x": 0,
-          "y": 260,
+          "x": 1440,
+          "y": 812,
           "w": 160,
           "h": 164
         },
         "WarbringerFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
+          "x": 1600,
+          "y": 812,
           "w": 160,
           "h": 164
         },
         "WarbringerFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
+          "x": 1760,
+          "y": 812,
           "w": 160,
           "h": 164
         },
         "WitchhunterFrameSmallAllocated": {
           "x": 0,
-          "y": 260,
+          "y": 976,
           "w": 160,
           "h": 164
         },
         "WitchhunterFrameSmallCanAllocate": {
-          "x": 0,
-          "y": 260,
+          "x": 160,
+          "y": 976,
           "w": 160,
           "h": 164
         },
         "WitchhunterFrameSmallNormal": {
-          "x": 0,
-          "y": 260,
+          "x": 320,
+          "y": 976,
           "w": 160,
           "h": 164
         },
         "Acolyte of ChayulaFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
+          "x": 480,
+          "y": 976,
           "w": 208,
           "h": 208
         },
         "Acolyte of ChayulaFrameLargeCanAllocate": {
-          "x": 0,
-          "y": 424,
+          "x": 688,
+          "y": 976,
           "w": 208,
           "h": 208
         },
         "Acolyte of ChayulaFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
+          "x": 896,
+          "y": 976,
+          "w": 208,
+          "h": 208
+        },
+        "AmazonFrameLargeAllocated": {
+          "x": 1104,
+          "y": 976,
+          "w": 208,
+          "h": 208
+        },
+        "AmazonFrameLargeCanAllocate": {
+          "x": 1312,
+          "y": 976,
+          "w": 208,
+          "h": 208
+        },
+        "AmazonFrameLargeNormal": {
+          "x": 1520,
+          "y": 976,
           "w": 208,
           "h": 208
         },
         "Blood MageFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
+          "x": 1728,
+          "y": 976,
           "w": 208,
           "h": 208
         },
         "Blood MageFrameLargeCanAllocate": {
           "x": 0,
-          "y": 424,
+          "y": 1184,
           "w": 208,
           "h": 208
         },
         "Blood MageFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
+          "x": 208,
+          "y": 1184,
+          "w": 208,
+          "h": 208
+        },
+        "ChronomancerFrameLargeAllocated": {
+          "x": 416,
+          "y": 1184,
+          "w": 208,
+          "h": 208
+        },
+        "ChronomancerFrameLargeCanAllocate": {
+          "x": 624,
+          "y": 1184,
+          "w": 208,
+          "h": 208
+        },
+        "ChronomancerFrameLargeNormal": {
+          "x": 832,
+          "y": 1184,
+          "w": 208,
+          "h": 208
+        },
+        "DeadeyeFrameLargeAllocated": {
+          "x": 1040,
+          "y": 1184,
+          "w": 208,
+          "h": 208
+        },
+        "DeadeyeFrameLargeCanAllocate": {
+          "x": 1248,
+          "y": 1184,
+          "w": 208,
+          "h": 208
+        },
+        "DeadeyeFrameLargeNormal": {
+          "x": 1456,
+          "y": 1184,
           "w": 208,
           "h": 208
         },
         "Disciple of VarashtaFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
+          "x": 1664,
+          "y": 1184,
           "w": 208,
           "h": 208
         },
         "Disciple of VarashtaFrameLargeCanAllocate": {
           "x": 0,
-          "y": 424,
+          "y": 1392,
           "w": 208,
           "h": 208
         },
         "Disciple of VarashtaFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
+          "x": 208,
+          "y": 1392,
           "w": 208,
           "h": 208
         },
         "Gemling LegionnaireFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
+          "x": 416,
+          "y": 1392,
           "w": 208,
           "h": 208
         },
         "Gemling LegionnaireFrameLargeCanAllocate": {
-          "x": 0,
-          "y": 424,
+          "x": 624,
+          "y": 1392,
           "w": 208,
           "h": 208
         },
         "Gemling LegionnaireFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
-          "w": 208,
-          "h": 208
-        },
-        "Smith of KitavaFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
-          "w": 208,
-          "h": 208
-        },
-        "Smith of KitavaFrameLargeCanAllocate": {
-          "x": 0,
-          "y": 424,
-          "w": 208,
-          "h": 208
-        },
-        "Smith of KitavaFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
-          "w": 208,
-          "h": 208
-        },
-        "AmazonFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
-          "w": 208,
-          "h": 208
-        },
-        "AmazonFrameLargeCanAllocate": {
-          "x": 0,
-          "y": 424,
-          "w": 208,
-          "h": 208
-        },
-        "AmazonFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
-          "w": 208,
-          "h": 208
-        },
-        "ChronomancerFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
-          "w": 208,
-          "h": 208
-        },
-        "ChronomancerFrameLargeCanAllocate": {
-          "x": 0,
-          "y": 424,
-          "w": 208,
-          "h": 208
-        },
-        "ChronomancerFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
-          "w": 208,
-          "h": 208
-        },
-        "DeadeyeFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
-          "w": 208,
-          "h": 208
-        },
-        "DeadeyeFrameLargeCanAllocate": {
-          "x": 0,
-          "y": 424,
-          "w": 208,
-          "h": 208
-        },
-        "DeadeyeFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
+          "x": 832,
+          "y": 1392,
           "w": 208,
           "h": 208
         },
         "InfernalistFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
+          "x": 1040,
+          "y": 1392,
           "w": 208,
           "h": 208
         },
         "InfernalistFrameLargeCanAllocate": {
-          "x": 0,
-          "y": 424,
+          "x": 1248,
+          "y": 1392,
           "w": 208,
           "h": 208
         },
         "InfernalistFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
+          "x": 1456,
+          "y": 1392,
           "w": 208,
           "h": 208
         },
         "InvokerFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
+          "x": 1664,
+          "y": 1392,
           "w": 208,
           "h": 208
         },
         "InvokerFrameLargeCanAllocate": {
           "x": 0,
-          "y": 424,
+          "y": 1600,
           "w": 208,
           "h": 208
         },
         "InvokerFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
+          "x": 208,
+          "y": 1600,
           "w": 208,
           "h": 208
         },
         "LichFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
+          "x": 416,
+          "y": 1600,
           "w": 208,
           "h": 208
         },
         "LichFrameLargeCanAllocate": {
-          "x": 0,
-          "y": 424,
+          "x": 624,
+          "y": 1600,
           "w": 208,
           "h": 208
         },
         "LichFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
+          "x": 832,
+          "y": 1600,
           "w": 208,
           "h": 208
         },
         "OracleFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
+          "x": 1040,
+          "y": 1600,
           "w": 208,
           "h": 208
         },
         "OracleFrameLargeCanAllocate": {
-          "x": 0,
-          "y": 424,
+          "x": 1248,
+          "y": 1600,
           "w": 208,
           "h": 208
         },
         "OracleFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
+          "x": 1456,
+          "y": 1600,
           "w": 208,
           "h": 208
         },
         "PathfinderFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
+          "x": 1664,
+          "y": 1600,
           "w": 208,
           "h": 208
         },
         "PathfinderFrameLargeCanAllocate": {
           "x": 0,
-          "y": 424,
+          "y": 1808,
           "w": 208,
           "h": 208
         },
         "PathfinderFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
+          "x": 208,
+          "y": 1808,
           "w": 208,
           "h": 208
         },
         "RitualistFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
+          "x": 416,
+          "y": 1808,
           "w": 208,
           "h": 208
         },
         "RitualistFrameLargeCanAllocate": {
-          "x": 0,
-          "y": 424,
+          "x": 624,
+          "y": 1808,
           "w": 208,
           "h": 208
         },
         "RitualistFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
+          "x": 832,
+          "y": 1808,
           "w": 208,
           "h": 208
         },
         "ShamanFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
+          "x": 1040,
+          "y": 1808,
           "w": 208,
           "h": 208
         },
         "ShamanFrameLargeCanAllocate": {
-          "x": 0,
-          "y": 424,
+          "x": 1248,
+          "y": 1808,
           "w": 208,
           "h": 208
         },
         "ShamanFrameLargeNormal": {
+          "x": 1456,
+          "y": 1808,
+          "w": 208,
+          "h": 208
+        },
+        "Smith of KitavaFrameLargeAllocated": {
+          "x": 1664,
+          "y": 1808,
+          "w": 208,
+          "h": 208
+        },
+        "Smith of KitavaFrameLargeCanAllocate": {
           "x": 0,
-          "y": 424,
+          "y": 2016,
+          "w": 208,
+          "h": 208
+        },
+        "Smith of KitavaFrameLargeNormal": {
+          "x": 208,
+          "y": 2016,
           "w": 208,
           "h": 208
         },
         "StormweaverFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
+          "x": 416,
+          "y": 2016,
           "w": 208,
           "h": 208
         },
         "StormweaverFrameLargeCanAllocate": {
-          "x": 0,
-          "y": 424,
+          "x": 624,
+          "y": 2016,
           "w": 208,
           "h": 208
         },
         "StormweaverFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
+          "x": 832,
+          "y": 2016,
           "w": 208,
           "h": 208
         },
         "TacticianFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
+          "x": 1040,
+          "y": 2016,
           "w": 208,
           "h": 208
         },
         "TacticianFrameLargeCanAllocate": {
-          "x": 0,
-          "y": 424,
+          "x": 1248,
+          "y": 2016,
           "w": 208,
           "h": 208
         },
         "TacticianFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
+          "x": 1456,
+          "y": 2016,
           "w": 208,
           "h": 208
         },
         "TitanFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
+          "x": 1664,
+          "y": 2016,
           "w": 208,
           "h": 208
         },
         "TitanFrameLargeCanAllocate": {
           "x": 0,
-          "y": 424,
+          "y": 2224,
           "w": 208,
           "h": 208
         },
         "TitanFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
+          "x": 208,
+          "y": 2224,
           "w": 208,
           "h": 208
         },
         "WarbringerFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
+          "x": 416,
+          "y": 2224,
           "w": 208,
           "h": 208
         },
         "WarbringerFrameLargeCanAllocate": {
-          "x": 0,
-          "y": 424,
+          "x": 624,
+          "y": 2224,
           "w": 208,
           "h": 208
         },
         "WarbringerFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
+          "x": 832,
+          "y": 2224,
           "w": 208,
           "h": 208
         },
         "WitchhunterFrameLargeAllocated": {
-          "x": 0,
-          "y": 424,
+          "x": 1040,
+          "y": 2224,
           "w": 208,
           "h": 208
         },
         "WitchhunterFrameLargeCanAllocate": {
-          "x": 0,
-          "y": 424,
+          "x": 1248,
+          "y": 2224,
           "w": 208,
           "h": 208
         },
         "WitchhunterFrameLargeNormal": {
-          "x": 0,
-          "y": 424,
+          "x": 1456,
+          "y": 2224,
           "w": 208,
           "h": 208
         },
-        "KeystoneFrameUnallocated": {
+        "KeystoneFrameAllocated": {
+          "x": 1664,
+          "y": 2224,
+          "w": 220,
+          "h": 224
+        },
+        "KeystoneFrameCanAllocate": {
           "x": 0,
-          "y": 632,
+          "y": 2448,
+          "w": 220,
+          "h": 224
+        },
+        "KeystoneFrameUnallocated": {
+          "x": 220,
+          "y": 2448,
           "w": 220,
           "h": 224
         }
@@ -1378,21 +1426,9 @@
     },
     "poe2Jewels": {
       "file": "frames/poe2Jewels.png",
-      "w": 152,
+      "w": 2048,
       "h": 156,
       "coords": {
-        "Time-Lost Diamond": {
-          "x": 0,
-          "y": 0,
-          "w": 152,
-          "h": 156
-        },
-        "Timeless Jewel": {
-          "x": 0,
-          "y": 0,
-          "w": 152,
-          "h": 156
-        },
         "Diamond": {
           "x": 0,
           "y": 0,
@@ -1400,19 +1436,31 @@
           "h": 156
         },
         "Emerald": {
-          "x": 0,
+          "x": 152,
           "y": 0,
           "w": 152,
           "h": 156
         },
         "Ruby": {
-          "x": 0,
+          "x": 304,
           "y": 0,
           "w": 152,
           "h": 156
         },
         "Sapphire": {
-          "x": 0,
+          "x": 456,
+          "y": 0,
+          "w": 152,
+          "h": 156
+        },
+        "Time-Lost Diamond": {
+          "x": 608,
+          "y": 0,
+          "w": 152,
+          "h": 156
+        },
+        "Timeless Jewel": {
+          "x": 760,
           "y": 0,
           "w": 152,
           "h": 156

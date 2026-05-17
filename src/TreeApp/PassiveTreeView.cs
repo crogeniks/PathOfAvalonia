@@ -710,9 +710,50 @@ public sealed class PassiveTreeView : Control
             drewAny |= DrawPoe2Sprite(ctx, "poe2NodeIcons", visual.Icon, screen, Poe2IconHalfSize(node));
         }
 
-        drewAny |= DrawPoe2VectorFrame(ctx, node, allocated, hover, screen);
+        var drewFrame = DrawPoe2FrameSprite(ctx, visual, node, allocated, hover, screen);
+        if (!drewFrame)
+        {
+            drewFrame = DrawPoe2VectorFrame(ctx, node, allocated, hover, screen);
+        }
+        drewAny |= drewFrame;
 
         return drewAny;
+    }
+
+    private bool DrawPoe2FrameSprite(DrawingContext ctx, NodeVisual visual, Node node, bool allocated, bool hover, Point screen)
+    {
+        foreach (var frame in SelectPoe2FrameCandidates(visual, node.Type, allocated, hover))
+        {
+            if (DrawPoe2Sprite(ctx, "poe2Frames", frame, screen, Poe2FrameHalfSize(node, frame)))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static IEnumerable<string> SelectPoe2FrameCandidates(NodeVisual visual, NodeType type, bool allocated, bool hover)
+    {
+        if (allocated && !string.IsNullOrWhiteSpace(visual.AllocatedFrame))
+        {
+            yield return visual.AllocatedFrame;
+        }
+        if (hover && !string.IsNullOrWhiteSpace(visual.HoverFrame))
+        {
+            yield return visual.HoverFrame;
+        }
+        if (!string.IsNullOrWhiteSpace(visual.UnallocatedFrame))
+        {
+            yield return visual.UnallocatedFrame;
+        }
+        if (Poe2DefaultFrameKey(type, allocated, hover) is { } stateFrame)
+        {
+            yield return stateFrame;
+        }
+        if (Poe2DefaultFrameKey(type, allocated: false, hover: false) is { } baseFrame)
+        {
+            yield return baseFrame;
+        }
     }
 
     private bool DrawPoe2VectorFrame(DrawingContext ctx, Node node, bool allocated, bool hover, Point centre)
