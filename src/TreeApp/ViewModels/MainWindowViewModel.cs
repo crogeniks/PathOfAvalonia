@@ -238,6 +238,14 @@ public partial class MainWindowViewModel : ObservableObject
     {
         var build = result.Build;
         var status = $"{build.Source}: {result.Applied} nodes applied, {result.Skipped} skipped";
+        if (result.WeaponSet1Allocations > 0)
+        {
+            status += $", weapon set 1: {result.WeaponSet1Allocations}";
+        }
+        if (result.WeaponSet2Allocations > 0)
+        {
+            status += $", weapon set 2: {result.WeaponSet2Allocations}";
+        }
         if (build.PassiveTreeVariants.Count > 1
             && build.PassiveTreeVariants.FirstOrDefault(v => v.Index == build.ActivePassiveTreeVariantIndex) is { } selectedPassive)
         {

@@ -1,10 +1,78 @@
 using PathOfAvalonia.TreeDomain;
+using PathOfAvalonia.TreeDomain.Import;
 using Xunit;
 
 namespace PathOfAvalonia.TreeDomain.Tests;
 
 public sealed class PassiveSpecTests
 {
+    [Fact]
+    public void ApplyImportStoresWeaponSetAllocationForAppliedNodes()
+    {
+        var spec = LoadPoe2Spec();
+        var nodes = spec.Tree.Nodes.Values
+            .Where(node => node.Type == NodeType.Normal)
+            .Take(2)
+            .Select(node => node.Id)
+            .ToArray();
+        Assert.Equal(2, nodes.Length);
+        var build = Build(nodes)
+            with
+            {
+                AllocationSets = new Dictionary<int, PassiveAllocationSet>
+                {
+                    [nodes[0]] = PassiveAllocationSet.WeaponSet1,
+                    [nodes[1]] = PassiveAllocationSet.WeaponSet2,
+                },
+            };
+
+        spec.ApplyImport(build);
+
+        Assert.Contains(nodes[0], spec.AllocatedNodes);
+        Assert.Contains(nodes[1], spec.AllocatedNodes);
+        Assert.Equal(PassiveAllocationSet.WeaponSet1, spec.AllocationSetOf(nodes[0]));
+        Assert.Equal(PassiveAllocationSet.WeaponSet2, spec.AllocationSetOf(nodes[1]));
+    }
+
+    [Fact]
+    public void ApplyImportSkipsWeaponSetMetadataForSkippedNodes()
+    {
+        var spec = LoadPoe2Spec();
+        var invalidNode = -123456;
+        var build = Build([invalidNode])
+            with
+            {
+                AllocationSets = new Dictionary<int, PassiveAllocationSet>
+                {
+                    [invalidNode] = PassiveAllocationSet.WeaponSet1,
+                },
+            };
+
+        spec.ApplyImport(build);
+
+        Assert.Empty(spec.AllocationSets);
+    }
+
+    [Fact]
+    public void ClearRemovesWeaponSetAllocationMetadata()
+    {
+        var spec = LoadPoe2Spec();
+        var node = spec.Tree.Nodes.Values.First(n => n.Type == NodeType.Normal).Id;
+        var build = Build([node])
+            with
+            {
+                AllocationSets = new Dictionary<int, PassiveAllocationSet>
+                {
+                    [node] = PassiveAllocationSet.WeaponSet1,
+                },
+            };
+        spec.ApplyImport(build);
+
+        spec.Clear();
+
+        Assert.Empty(spec.AllocationSets);
+    }
+
     [Fact]
     public void SelectedAscendancyStartIsAnAllocationRoot()
     {
@@ -83,10 +151,30 @@ public sealed class PassiveSpecTests
 
     private static PassiveSpec LoadSpec() => new(LoadTree());
 
+    private static PassiveSpec LoadPoe2Spec() => new(LoadPoe2Tree());
+
+    private static ImportedBuild Build(IReadOnlyList<int> nodeIds) =>
+        new(
+            ClassId: 0,
+            AscendClassId: 0,
+            SecondaryAscendClassId: 0,
+            NodeHashes: nodeIds,
+            ClusterNodeHashes: [],
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: "0_4",
+            Source: "test");
+
     private static TreeModel LoadTree()
     {
         var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE1", "tree_3_28.json"));
         using var stream = File.OpenRead(path);
         return TreeLoader.LoadFromJson(stream, "3.28");
+    }
+
+    private static TreeModel LoadPoe2Tree()
+    {
+        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE2", "tree_0_4.json"));
+        using var stream = File.OpenRead(path);
+        return TreeLoader.LoadPoe2FromJson(stream, "0.4");
     }
 }

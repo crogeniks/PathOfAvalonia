@@ -64,6 +64,8 @@ public sealed class PassiveTreeViewModel
 
     public bool IsAllocated(int id) => _spec.IsAllocated(id);
 
+    public PassiveAllocationSet AllocationSetOf(int nodeId) => _spec.AllocationSetOf(nodeId);
+
     public MasteryEffect? SelectedMasteryEffect(int nodeId) => _spec.SelectedMasteryEffect(nodeId);
 
     public EffectiveNodeView EffectiveNode(int nodeId) => _spec.EffectiveNode(nodeId);

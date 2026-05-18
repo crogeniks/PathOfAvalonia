@@ -131,6 +131,71 @@ public sealed class Poe2BuildImporterTests
     }
 
     [Fact]
+    public void ParseXmlPreservesWeaponSetAllocations()
+    {
+        var xml = """
+            <PathOfBuilding2>
+              <Tree>
+                <Spec nodes="10,11,12">
+                  <WeaponSet1 nodes="11" />
+                  <WeaponSet2 nodes="12" />
+                </Spec>
+              </Tree>
+            </PathOfBuilding2>
+            """;
+
+        var build = Poe2BuildXmlParser.Parse(xml);
+
+        Assert.Equal(PassiveAllocationSet.WeaponSet1, build.AllocationSets[11]);
+        Assert.Equal(PassiveAllocationSet.WeaponSet2, build.AllocationSets[12]);
+    }
+
+    [Fact]
+    public void ParseXmlPreservesWeaponSetsPerPassiveTreeVariant()
+    {
+        var xml = """
+            <PathOfBuilding2>
+              <Tree activeSpec="2">
+                <Spec nodes="10,11">
+                  <WeaponSet1 nodes="11" />
+                </Spec>
+                <Spec nodes="20,21">
+                  <WeaponSet2 nodes="21" />
+                </Spec>
+              </Tree>
+            </PathOfBuilding2>
+            """;
+
+        var build = Poe2BuildXmlParser.Parse(xml);
+
+        Assert.Equal(PassiveAllocationSet.WeaponSet2, build.AllocationSets[21]);
+        Assert.DoesNotContain(11, build.AllocationSets.Keys);
+
+        var switched = build.WithPassiveTreeVariant(0);
+
+        Assert.Equal(PassiveAllocationSet.WeaponSet1, switched.AllocationSets[11]);
+        Assert.DoesNotContain(21, switched.AllocationSets.Keys);
+    }
+
+    [Fact]
+    public void ParseXmlIgnoresMalformedWeaponSetNodes()
+    {
+        var xml = """
+            <PathOfBuilding2>
+              <Tree>
+                <Spec nodes="10,11">
+                  <WeaponSet1 nodes="10,abc,11" />
+                </Spec>
+              </Tree>
+            </PathOfBuilding2>
+            """;
+
+        var build = Poe2BuildXmlParser.Parse(xml);
+
+        Assert.Equal(new[] { 10, 11 }, build.AllocationSets.Keys.OrderBy(id => id));
+    }
+
+    [Fact]
     public void WithPassiveTreeVariantRebuildsActiveBuild()
     {
         var xml = """

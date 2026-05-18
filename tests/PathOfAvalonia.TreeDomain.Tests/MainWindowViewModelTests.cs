@@ -135,6 +135,37 @@ public sealed class MainWindowViewModelTests
         Assert.Empty(vm.ItemSetVariantOptions);
     }
 
+    [Fact]
+    public void ImportStatusIncludesWeaponSetCountsWhenPresent()
+    {
+        var nodes = ImportableNodeIds();
+        var build = new ImportedBuild(
+            ClassId: 0,
+            AscendClassId: 0,
+            SecondaryAscendClassId: 0,
+            NodeHashes: nodes,
+            ClusterNodeHashes: [],
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: null,
+            Source: "test")
+        {
+            AllocationSets = new Dictionary<int, PassiveAllocationSet>
+            {
+                [nodes[0]] = PassiveAllocationSet.WeaponSet1,
+                [nodes[1]] = PassiveAllocationSet.WeaponSet2,
+            },
+        };
+        var vm = new MainWindowViewModel(LoadSpec(), new StubImportService(build), new EquipmentViewModel())
+        {
+            ImportInput = "test",
+        };
+
+        vm.ImportCommand.Execute(null);
+
+        Assert.Contains("weapon set 1: 1", vm.ImportStatus);
+        Assert.Contains("weapon set 2: 1", vm.ImportStatus);
+    }
+
     private static PassiveSpec LoadSpec() => new(LoadTree());
 
     private static int[] ImportableNodeIds()
