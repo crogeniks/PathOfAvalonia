@@ -44,6 +44,10 @@ public sealed class ShellViewModelTests
     private sealed class StubSettings : IUserSettingsService
     {
         public GameId? LastGameId { get; set; }
+        public string? Poe1PobPath { get; set; }
+        public string? Poe2PobPath { get; set; }
+        public string? LuaExecutablePath { get; set; }
+        public bool EnablePobBackend { get; set; } = true;
         public void Save() { }
     }
 

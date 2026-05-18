@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -70,6 +71,8 @@ public static class PobBuildCodeDecoder
     internal static ImportedBuild ParseXml(string xml, string source)
     {
         var items = ParseItemsSection(xml);
+        var skills = ParseSkillsSection(xml);
+        var metrics = ParseSavedMetrics(xml);
 
         // PoB builds in the wild can have corrupt or unescaped content in later sections
         // (Notes, Skills names), so XDocument on the whole document may fail. We only need
@@ -108,6 +111,9 @@ public static class PobBuildCodeDecoder
             ItemSetVariants = items.ItemSetVariants,
             ActivePassiveTreeVariantIndex = activeIndex,
             ActiveItemSetVariantIndex = items.ActiveItemSetVariantIndex,
+            RawXml = xml,
+            Skills = skills,
+            Metrics = metrics,
         };
     }
 
@@ -465,6 +471,176 @@ public static class PobBuildCodeDecoder
         return new ParsedItems(variants[activeIndex].Items, itemsById, variants, activeIndex);
     }
 
+    private static ImportedSkills ParseSkillsSection(string xml)
+    {
+        var start = FindTagBoundary(xml, "Skills", 0);
+        if (start < 0)
+        {
+            return ImportedSkills.Empty;
+        }
+
+        var end = xml.IndexOf("</Skills>", start, StringComparison.Ordinal);
+        if (end < 0)
+        {
+            return ImportedSkills.Empty;
+        }
+
+        var block = xml[start..(end + "</Skills>".Length)];
+        XElement skillsEl;
+        try
+        {
+            skillsEl = XElement.Parse(block);
+        }
+        catch
+        {
+            return ImportedSkills.Empty;
+        }
+
+        var activeSetIndex = OneBasedToZero((int?)skillsEl.Attribute("activeSkillSet") ?? 1);
+        var mainSocketGroup = OneBasedToZero(AttrInt(skillsEl, "mainSocketGroup") ?? ExtractBuildMainSocketGroup(xml) ?? 1);
+        var skillSets = skillsEl.Elements("SkillSet").ToArray();
+        if (skillSets.Length == 0)
+        {
+            var groups = ParseSkillGroups(skillsEl.Elements("Skill")).ToArray();
+            return groups.Length == 0
+                ? ImportedSkills.Empty
+                : new ImportedSkills([new ImportedSkillSet(0, 0, "Skills", groups)], 0, mainSocketGroup);
+        }
+
+        var parsedSets = skillSets
+            .Select((setEl, index) => new ImportedSkillSet(
+                index,
+                AttrInt(setEl, "id") ?? index + 1,
+                SkillSetDisplayName(setEl, index),
+                ParseSkillGroups(setEl.Elements("Skill")).ToArray()))
+            .Where(set => set.Groups.Count > 0)
+            .ToArray();
+
+        if (parsedSets.Length == 0)
+        {
+            return ImportedSkills.Empty;
+        }
+
+        if (activeSetIndex < 0 || activeSetIndex >= parsedSets.Length)
+        {
+            activeSetIndex = 0;
+        }
+        return new ImportedSkills(parsedSets, activeSetIndex, mainSocketGroup);
+    }
+
+    private static IEnumerable<ImportedSkillGroup> ParseSkillGroups(IEnumerable<XElement> skillElements)
+    {
+        var index = 0;
+        foreach (var skillEl in skillElements)
+        {
+            var gems = skillEl.Elements("Gem").Select(ParseGem).Where(gem => !string.IsNullOrWhiteSpace(gem.NameSpec)).ToArray();
+            var label = SkillLabel(skillEl, gems, index);
+            yield return new ImportedSkillGroup(
+                index,
+                label,
+                AttrString(skillEl, "slot"),
+                AttrString(skillEl, "source"),
+                AttrBool(skillEl, "enabled", true),
+                AttrBool(skillEl, "includeInFullDPS", false) || AttrBool(skillEl, "includeInFullDps", false),
+                AttrInt(skillEl, "count") ?? AttrInt(skillEl, "groupCount") ?? 1,
+                OneBasedToZero(AttrInt(skillEl, "mainActiveSkill") ?? AttrInt(skillEl, "mainActiveSkillIndex") ?? 1),
+                OneBasedToZero(AttrInt(skillEl, "mainActiveSkillCalcs") ?? AttrInt(skillEl, "mainActiveSkillCalcsIndex") ?? 1),
+                gems);
+            index++;
+        }
+    }
+
+    private static ImportedGem ParseGem(XElement gemEl) =>
+        new(
+            AttrString(gemEl, "nameSpec") ?? AttrString(gemEl, "name") ?? string.Empty,
+            AttrString(gemEl, "gemId"),
+            AttrString(gemEl, "skillId"),
+            AttrString(gemEl, "variantId"),
+            AttrInt(gemEl, "level"),
+            AttrInt(gemEl, "quality"),
+            AttrBool(gemEl, "enabled", true),
+            AttrBool(gemEl, "enableGlobal1", false),
+            AttrBool(gemEl, "enableGlobal2", false),
+            AttrInt(gemEl, "count") ?? 1,
+            AttrInt(gemEl, "skillPart"),
+            AttrInt(gemEl, "skillPartCalcs"),
+            AttrInt(gemEl, "skillStageCount"),
+            AttrInt(gemEl, "skillStageCountCalcs"),
+            AttrInt(gemEl, "skillMineCount"),
+            AttrInt(gemEl, "skillMineCountCalcs"),
+            AttrString(gemEl, "skillMinion"),
+            AttrString(gemEl, "skillMinionCalcs"),
+            AttrInt(gemEl, "skillMinionItemSet"),
+            AttrInt(gemEl, "skillMinionItemSetCalcs"),
+            AttrInt(gemEl, "skillMinionSkill"),
+            AttrInt(gemEl, "skillMinionSkillCalcs"));
+
+    private static ImportedBuildMetrics ParseSavedMetrics(string xml)
+    {
+        var start = FindTagBoundary(xml, "Build", 0);
+        if (start < 0)
+        {
+            return ImportedBuildMetrics.Empty;
+        }
+
+        var end = xml.IndexOf("</Build>", start, StringComparison.Ordinal);
+        if (end < 0)
+        {
+            return ImportedBuildMetrics.Empty;
+        }
+
+        XElement buildEl;
+        try
+        {
+            buildEl = XElement.Parse(xml[start..(end + "</Build>".Length)]);
+        }
+        catch
+        {
+            return ImportedBuildMetrics.Empty;
+        }
+
+        var playerStats = buildEl.Elements("PlayerStat")
+            .Select(ParsePlayerStat)
+            .Where(stat => !string.IsNullOrWhiteSpace(stat.Stat))
+            .ToArray();
+        var dpsRows = buildEl.Elements("FullDPSSkill")
+            .Select(ParseFullDpsSkill)
+            .Where(row => !string.IsNullOrWhiteSpace(row.Name))
+            .ToArray();
+
+        if (playerStats.Length == 0 && dpsRows.Length == 0)
+        {
+            return ImportedBuildMetrics.Empty;
+        }
+
+        return ImportedBuildMetrics.Empty with
+        {
+            Source = ImportedMetricSource.SavedXmlSnapshot,
+            PlayerStats = playerStats,
+            SkillDps = dpsRows,
+        };
+    }
+
+    private static ImportedStatMetric ParsePlayerStat(XElement el)
+    {
+        var stat = AttrString(el, "stat") ?? string.Empty;
+        var value = AttrString(el, "value") ?? el.Value.Trim();
+        return new ImportedStatMetric(stat, StatLabel(stat), ParseDouble(value), value);
+    }
+
+    private static ImportedSkillDpsMetric ParseFullDpsSkill(XElement el)
+    {
+        var stat = AttrString(el, "stat") ?? AttrString(el, "name") ?? string.Empty;
+        var value = AttrString(el, "value") ?? el.Value.Trim();
+        return new ImportedSkillDpsMetric(
+            StatLabel(stat),
+            ParseDouble(value),
+            value,
+            AttrInt(el, "count") ?? 1,
+            AttrString(el, "skillPart"),
+            AttrString(el, "source"));
+    }
+
     private static ImportedItemSetVariant ParseItemSetVariant(XElement setEl, int index, IReadOnlyDictionary<int, string> texts)
     {
         var id = (int?)setEl.Attribute("id") ?? 0;
@@ -589,6 +765,69 @@ public static class PobBuildCodeDecoder
 
         var name = ((string?)element.Attribute("name"))?.Trim();
         return !string.IsNullOrEmpty(name) ? name : $"{prefix} {index + 1}";
+    }
+
+    private static string SkillSetDisplayName(XElement element, int index)
+        => DisplayName(element, "Skill Set", index);
+
+    private static string SkillLabel(XElement skillEl, IReadOnlyList<ImportedGem> gems, int index)
+    {
+        var label = AttrString(skillEl, "label") ?? AttrString(skillEl, "title") ?? AttrString(skillEl, "name");
+        if (!string.IsNullOrWhiteSpace(label))
+        {
+            return label;
+        }
+
+        var activeGem = gems.FirstOrDefault(gem => gem.Enabled && !string.IsNullOrWhiteSpace(gem.NameSpec))
+            ?? gems.FirstOrDefault(gem => !string.IsNullOrWhiteSpace(gem.NameSpec));
+        return activeGem is not null ? activeGem.NameSpec : $"Skill Group {index + 1}";
+    }
+
+    private static int? ExtractBuildMainSocketGroup(string xml)
+    {
+        var m = Regex.Match(xml, "<Build\\b[^>]*\\bmainSocketGroup=\"(\\d+)\"", RegexOptions.IgnoreCase);
+        return m.Success && int.TryParse(m.Groups[1].Value, out var value) ? value : null;
+    }
+
+    private static int OneBasedToZero(int value) => value > 0 ? value - 1 : 0;
+
+    private static string? AttrString(XElement element, string name)
+    {
+        var value = ((string?)element.Attribute(name))?.Trim();
+        return string.IsNullOrEmpty(value) ? null : value;
+    }
+
+    private static int? AttrInt(XElement element, string name) =>
+        int.TryParse((string?)element.Attribute(name), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : null;
+
+    private static bool AttrBool(XElement element, string name, bool defaultValue)
+    {
+        var raw = ((string?)element.Attribute(name))?.Trim();
+        if (string.IsNullOrEmpty(raw))
+        {
+            return defaultValue;
+        }
+        return raw.Equals("true", StringComparison.OrdinalIgnoreCase)
+            || raw.Equals("1", StringComparison.OrdinalIgnoreCase)
+            || raw.Equals("yes", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static double? ParseDouble(string? value) =>
+        double.TryParse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : null;
+
+    private static string StatLabel(string stat)
+    {
+        if (string.IsNullOrWhiteSpace(stat))
+        {
+            return string.Empty;
+        }
+
+        var spaced = Regex.Replace(stat, "([a-z])([A-Z])", "$1 $2");
+        return spaced.Replace('_', ' ');
     }
 
     private static string ItemSetDisplayName(XElement element, int id, int index)

@@ -93,6 +93,27 @@
                     <local:EquipmentView Grid.Row="1" DataContext="{Binding Workspace.Equipment}"/>
                 </Grid>
             </TabItem>
+            <TabItem Header="Gems &amp; DPS" IsEnabled="{Binding SupportsEquipment}">
+                <Grid RowDefinitions="Auto,*" Background="#101018">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="8"
+                                Margin="14,12,14,4"
+                                HorizontalAlignment="Left"
+                                DataContext="{Binding Workspace.Equipment}"
+                                x:DataType="vm:EquipmentViewModel"
+                                IsVisible="{Binding HasSkillSetVariants}">
+                        <TextBlock Text="Skill set"
+                                   Foreground="#EAEAEA"
+                                   FontWeight="Bold"
+                                   VerticalAlignment="Center"/>
+                        <ComboBox Width="260"
+                                  ItemsSource="{Binding SkillSetOptions}"
+                                  SelectedIndex="{Binding SelectedSkillSetIndex}"
+                                  DisplayMemberBinding="{Binding DisplayName}"/>
+                    </StackPanel>
+                    <local:BuildOutputView Grid.Row="1" DataContext="{Binding Workspace.Equipment}"/>
+                </Grid>
+            </TabItem>
         </TabControl>
     </Grid>
 </UserControl>

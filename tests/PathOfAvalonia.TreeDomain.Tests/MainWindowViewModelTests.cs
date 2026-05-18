@@ -166,6 +166,141 @@ public sealed class MainWindowViewModelTests
         Assert.Contains("weapon set 2: 1", vm.ImportStatus);
     }
 
+    [Fact]
+    public void ImportStatusIncludesSkillGroupsAndDpsSource()
+    {
+        var build = new ImportedBuild(
+            ClassId: 0,
+            AscendClassId: 0,
+            SecondaryAscendClassId: 0,
+            NodeHashes: [],
+            ClusterNodeHashes: [],
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: null,
+            Source: "test")
+        {
+            Skills = new ImportedSkills(
+                [new ImportedSkillSet(0, 1, "Set", [new ImportedSkillGroup(0, "Spark", null, null, true, false, 1, 0, 0, [])])],
+                0,
+                0),
+            Metrics = ImportedBuildMetrics.Empty with { Source = ImportedMetricSource.SavedXmlSnapshot },
+        };
+        var vm = new MainWindowViewModel(LoadSpec(), new StubImportService(build), new EquipmentViewModel())
+        {
+            ImportInput = "test",
+        };
+
+        vm.ImportCommand.Execute(null);
+
+        Assert.Contains("1 skill groups imported", vm.ImportStatus);
+        Assert.Contains("DPS: saved snapshot", vm.ImportStatus);
+    }
+
+    [Fact]
+    public void EquipmentViewModelExposesMetricsAndSkillGroupsAfterImport()
+    {
+        var equipment = new EquipmentViewModel();
+        var build = new ImportedBuild(
+            ClassId: 0,
+            AscendClassId: 0,
+            SecondaryAscendClassId: 0,
+            NodeHashes: [],
+            ClusterNodeHashes: [],
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: null,
+            Source: "test")
+        {
+            Skills = new ImportedSkills(
+                [new ImportedSkillSet(0, 1, "Set", [new ImportedSkillGroup(0, "Spark", "Body Armour", null, true, true, 1, 0, 0, [new ImportedGem("Spark", null, null, null, 20, 20, true, false, false, 1, null, null, null, null, null, null, null, null, null, null, null, null)])])],
+                0,
+                0),
+            Metrics = ImportedBuildMetrics.Empty with
+            {
+                Source = ImportedMetricSource.SavedXmlSnapshot,
+                PlayerStats = [new ImportedStatMetric("FullDPS", "Full DPS", 10, "10")],
+                SkillDps = [new ImportedSkillDpsMetric("Spark", 10, "10", 1, null, null)],
+                ErrorMessage = "PoB backend not configured; showing saved DPS snapshot.",
+            },
+        };
+        var vm = new MainWindowViewModel(LoadSpec(), new StubImportService(build), equipment)
+        {
+            ImportInput = "test",
+        };
+
+        vm.ImportCommand.Execute(null);
+
+        Assert.True(equipment.HasMetrics);
+        Assert.True(equipment.HasSkillGroups);
+        Assert.Equal("DPS source: Saved snapshot", equipment.Metrics!.SourceText);
+        Assert.Contains("not configured", equipment.Metrics.ErrorMessage);
+        Assert.Equal("Spark", Assert.Single(equipment.SkillGroups).Header);
+
+        vm.ClearCommand.Execute(null);
+
+        Assert.False(equipment.HasMetrics);
+        Assert.False(equipment.HasSkillGroups);
+    }
+
+    [Fact]
+    public void EquipmentViewModelFiltersSkillGroupsBySelectedSkillSet()
+    {
+        var equipment = new EquipmentViewModel();
+        var build = new ImportedBuild(
+            ClassId: 0,
+            AscendClassId: 0,
+            SecondaryAscendClassId: 0,
+            NodeHashes: [],
+            ClusterNodeHashes: [],
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: null,
+            Source: "test")
+        {
+            Skills = new ImportedSkills(
+                [
+                    new ImportedSkillSet(0, 1, "Mapping", [new ImportedSkillGroup(0, "Spark", null, null, true, false, 1, 0, 0, [])]),
+                    new ImportedSkillSet(1, 2, "Bossing", [new ImportedSkillGroup(0, "Orb of Storms", null, null, true, false, 1, 0, 0, [])]),
+                ],
+                1,
+                0),
+        };
+
+        equipment.LoadBuild(build);
+
+        Assert.True(equipment.HasSkillSetVariants);
+        Assert.Equal(1, equipment.SelectedSkillSetIndex);
+        Assert.Equal("Orb of Storms", Assert.Single(equipment.SkillGroups).Header);
+
+        equipment.SelectedSkillSetIndex = 0;
+
+        Assert.Equal("Spark", Assert.Single(equipment.SkillGroups).Header);
+    }
+
+    [Fact]
+    public async Task StaleBackendResultIsNotAppliedAfterVariantSwitch()
+    {
+        var nodes = ImportableNodeIds();
+        var build = BuildWithPassiveVariants(
+            PassiveVariant(0, "Leveling", nodes[0]),
+            PassiveVariant(1, "Endgame", nodes[1])) with
+        {
+            RawXml = "<PathOfBuilding><Tree><Spec nodes=\"1\" /><Spec nodes=\"2\" /></Tree></PathOfBuilding>",
+            Metrics = ImportedBuildMetrics.Empty with { Source = ImportedMetricSource.SavedXmlSnapshot },
+        };
+        var backend = new DeferredPobCalculationService();
+        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel(), backend)
+        {
+            ImportInput = "test",
+        };
+        vm.ImportCommand.Execute(null);
+
+        vm.SelectedPassiveTreeVariantIndex = 1;
+        backend.Complete(0, ImportedBuildMetrics.Empty with { Source = ImportedMetricSource.PobBackend });
+        await Task.Delay(50);
+
+        Assert.Contains("DPS: saved snapshot", vm.ImportStatus);
+        Assert.DoesNotContain("DPS: PoB backend", vm.ImportStatus);
+    }
+
     private static PassiveSpec LoadSpec() => new(LoadTree());
 
     private static int[] ImportableNodeIds()
@@ -259,5 +394,26 @@ public sealed class MainWindowViewModelTests
     private sealed class StubImportService(ImportedBuild build) : IImportService
     {
         public ImportedBuild Import(string text) => build;
+    }
+
+    private sealed class StubImportStrategy(ImportedBuild build) : IImportStrategy
+    {
+        public bool IsSupported => true;
+        public ImportedBuild Import(string text) => build;
+    }
+
+    private sealed class DeferredPobCalculationService : IPobCalculationService
+    {
+        private readonly Dictionary<int, TaskCompletionSource<ImportedBuildMetrics>> _requests = new();
+
+        public Task<ImportedBuildMetrics> CalculateAsync(GameId gameId, ImportedBuild build, CancellationToken cancellationToken)
+        {
+            var tcs = new TaskCompletionSource<ImportedBuildMetrics>();
+            _requests[build.ActivePassiveTreeVariantIndex] = tcs;
+            return tcs.Task;
+        }
+
+        public void Complete(int passiveVariantIndex, ImportedBuildMetrics metrics) =>
+            _requests[passiveVariantIndex].TrySetResult(metrics);
     }
 }

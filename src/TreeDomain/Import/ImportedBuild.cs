@@ -25,6 +25,9 @@ public sealed record ImportedBuild(
     public IReadOnlyList<ImportedItemSetVariant> ItemSetVariants { get; init; } = [];
     public int ActivePassiveTreeVariantIndex { get; init; }
     public int ActiveItemSetVariantIndex { get; init; }
+    public string? RawXml { get; init; }
+    public ImportedSkills Skills { get; init; } = ImportedSkills.Empty;
+    public ImportedBuildMetrics Metrics { get; init; } = ImportedBuildMetrics.Empty;
 
     public ImportedBuild WithPassiveTreeVariant(int index)
     {
@@ -112,3 +115,95 @@ public enum AttributeNodeOverride
     Dexterity = 2,
     Intelligence = 3,
 }
+
+public sealed record ImportedSkills(
+    IReadOnlyList<ImportedSkillSet> SkillSets,
+    int ActiveSkillSetIndex,
+    int MainSocketGroupIndex)
+{
+    public static ImportedSkills Empty { get; } = new([], 0, 0);
+}
+
+public sealed record ImportedSkillSet(
+    int Index,
+    int Id,
+    string DisplayName,
+    IReadOnlyList<ImportedSkillGroup> Groups);
+
+public sealed record ImportedSkillGroup(
+    int Index,
+    string Label,
+    string? Slot,
+    string? Source,
+    bool Enabled,
+    bool IncludeInFullDps,
+    int GroupCount,
+    int MainActiveSkillIndex,
+    int MainActiveSkillCalcsIndex,
+    IReadOnlyList<ImportedGem> Gems);
+
+public sealed record ImportedGem(
+    string NameSpec,
+    string? GemId,
+    string? SkillId,
+    string? VariantId,
+    int? Level,
+    int? Quality,
+    bool Enabled,
+    bool EnableGlobal1,
+    bool EnableGlobal2,
+    int Count,
+    int? SkillPart,
+    int? SkillPartCalcs,
+    int? SkillStageCount,
+    int? SkillStageCountCalcs,
+    int? SkillMineCount,
+    int? SkillMineCountCalcs,
+    string? SkillMinion,
+    string? SkillMinionCalcs,
+    int? SkillMinionItemSet,
+    int? SkillMinionItemSetCalcs,
+    int? SkillMinionSkill,
+    int? SkillMinionSkillCalcs);
+
+public enum ImportedMetricSource
+{
+    None,
+    SavedXmlSnapshot,
+    PobBackend,
+}
+
+public sealed record ImportedBuildMetrics(
+    ImportedMetricSource Source,
+    string? BackendName,
+    string? BackendVersion,
+    string? BackendPath,
+    IReadOnlyList<ImportedStatMetric> PlayerStats,
+    IReadOnlyList<ImportedSkillDpsMetric> SkillDps,
+    IReadOnlyList<string> Warnings,
+    string? ErrorMessage)
+{
+    public static ImportedBuildMetrics Empty { get; } = new(
+        ImportedMetricSource.None,
+        null,
+        null,
+        null,
+        [],
+        [],
+        [],
+        null);
+}
+
+public sealed record ImportedStatMetric(
+    string Stat,
+    string Label,
+    double? NumericValue,
+    string DisplayValue);
+
+public sealed record ImportedSkillDpsMetric(
+    string Name,
+    double? Dps,
+    string DisplayDps,
+    int Count,
+    string? SkillPart,
+    string? Source);

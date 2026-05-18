@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PathOfAvalonia.TreeApp.Services;
@@ -18,12 +19,23 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly GameRegistry _games;
     private readonly IGameAssetService _assets;
     private readonly IUserSettingsService _settings;
+    private readonly IPobCalculationService _pobCalculationService;
 
     public ShellViewModel(GameRegistry games, IGameAssetService assets, IUserSettingsService settings)
+        : this(games, assets, settings, NullPobCalculationService.Instance)
+    {
+    }
+
+    public ShellViewModel(
+        GameRegistry games,
+        IGameAssetService assets,
+        IUserSettingsService settings,
+        IPobCalculationService pobCalculationService)
     {
         _games = games;
         _assets = assets;
         _settings = settings;
+        _pobCalculationService = pobCalculationService;
         Games = _games.Games.Select(g => new GameChoiceViewModel(g, settings.LastGameId == g.Id)).ToArray();
 
         if (settings.LastGameId is { } lastGame && _games.TryGet(lastGame, out var game))
@@ -85,7 +97,7 @@ public sealed partial class ShellViewModel : ObservableObject
         var sprites = _assets.LoadSprites(game);
         var spec = new PassiveSpec(tree, tree.Classes, game.FeatureFlags);
         var equipment = new EquipmentViewModel();
-        var treePanel = new MainWindowViewModel(spec, game.ImportStrategy, equipment);
+        var treePanel = new MainWindowViewModel(spec, game.ImportStrategy, equipment, _pobCalculationService);
         var workspace = new GameWorkspace
         {
             Game = game,
@@ -110,5 +122,16 @@ public sealed partial class ShellViewModel : ObservableObject
     {
         ActiveWorkspace = null;
         CurrentPage = ShellPage.Landing;
+    }
+
+    private sealed class NullPobCalculationService : IPobCalculationService
+    {
+        public static NullPobCalculationService Instance { get; } = new();
+
+        public Task<PathOfAvalonia.TreeDomain.Import.ImportedBuildMetrics> CalculateAsync(
+            GameId gameId,
+            PathOfAvalonia.TreeDomain.Import.ImportedBuild build,
+            System.Threading.CancellationToken cancellationToken) =>
+            Task.FromResult(build.Metrics);
     }
 }

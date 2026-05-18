@@ -28,6 +28,9 @@ public partial class App : Application
         sc.AddSingleton<ITreeAssetService, TreeAssetService>();
         sc.AddSingleton<ISpritesAssetService, SpritesAssetService>();
         sc.AddSingleton<IImportService, ImportService>();
+        sc.AddSingleton<IPobBackendLocator, PobBackendLocator>();
+        sc.AddSingleton<IProcessRunner, ProcessRunner>();
+        sc.AddSingleton<IPobCalculationService, PobCalculationService>();
 
         // Singletons resolved from asset services at first request.
         sc.AddSingleton(sp => sp.GetRequiredService<ITreeAssetService>().Load("3.28"));

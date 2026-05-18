@@ -303,6 +303,154 @@ public sealed class Poe2BuildImporterTests
         Assert.Equal(imported.SocketedJewels, switched.SocketedJewels);
     }
 
+    [Fact]
+    public void ParseXmlPreservesRawXmlSkillsAndSnapshotMetrics()
+    {
+        var xml = """
+            <PathOfBuilding2>
+              <Build mainSocketGroup="2">
+                <PlayerStat stat="FullDPS" value="12345.5" />
+                <FullDPSSkill stat="Lightning Arrow" value="12000" count="2" skillPart="Beam" source="Attack" />
+              </Build>
+              <Tree><Spec nodes="10" /></Tree>
+              <Skills activeSkillSet="1">
+                <SkillSet id="3" title="Boss">
+                  <Skill label="Main Link" slot="Bow" enabled="true" includeInFullDPS="true" count="2" mainActiveSkill="1" mainActiveSkillCalcs="2">
+                    <Gem nameSpec="Lightning Arrow" gemId="Metadata/Items/Gems/SkillGemLightningArrow" skillId="LightningArrow" variantId="1" level="20" quality="20" enabled="true" count="2" skillPart="3" skillPartCalcs="4" skillStageCount="5" skillStageCountCalcs="6" skillMineCount="7" skillMineCountCalcs="8" skillMinion="A" skillMinionCalcs="B" skillMinionItemSet="9" skillMinionItemSetCalcs="10" skillMinionSkill="11" skillMinionSkillCalcs="12" />
+                  </Skill>
+                </SkillSet>
+              </Skills>
+            </PathOfBuilding2>
+            """;
+
+        var build = Poe2BuildXmlParser.Parse(xml);
+
+        Assert.Equal(xml, build.RawXml);
+        Assert.Equal(0, build.Skills.ActiveSkillSetIndex);
+        Assert.Equal(1, build.Skills.MainSocketGroupIndex);
+        var set = Assert.Single(build.Skills.SkillSets);
+        Assert.Equal(3, set.Id);
+        Assert.Equal("Boss", set.DisplayName);
+        var group = Assert.Single(set.Groups);
+        Assert.Equal("Main Link", group.Label);
+        Assert.Equal("Bow", group.Slot);
+        Assert.True(group.IncludeInFullDps);
+        Assert.Equal(2, group.GroupCount);
+        Assert.Equal(0, group.MainActiveSkillIndex);
+        Assert.Equal(1, group.MainActiveSkillCalcsIndex);
+        var gem = Assert.Single(group.Gems);
+        Assert.Equal("Lightning Arrow", gem.NameSpec);
+        Assert.Equal("Metadata/Items/Gems/SkillGemLightningArrow", gem.GemId);
+        Assert.Equal("LightningArrow", gem.SkillId);
+        Assert.Equal("1", gem.VariantId);
+        Assert.Equal(20, gem.Level);
+        Assert.Equal(20, gem.Quality);
+        Assert.Equal(2, gem.Count);
+        Assert.Equal(3, gem.SkillPart);
+        Assert.Equal(4, gem.SkillPartCalcs);
+        Assert.Equal(5, gem.SkillStageCount);
+        Assert.Equal(6, gem.SkillStageCountCalcs);
+        Assert.Equal(7, gem.SkillMineCount);
+        Assert.Equal(8, gem.SkillMineCountCalcs);
+        Assert.Equal("A", gem.SkillMinion);
+        Assert.Equal("B", gem.SkillMinionCalcs);
+        Assert.Equal(9, gem.SkillMinionItemSet);
+        Assert.Equal(10, gem.SkillMinionItemSetCalcs);
+        Assert.Equal(11, gem.SkillMinionSkill);
+        Assert.Equal(12, gem.SkillMinionSkillCalcs);
+        Assert.Equal(ImportedMetricSource.SavedXmlSnapshot, build.Metrics.Source);
+        Assert.Equal(12345.5, Assert.Single(build.Metrics.PlayerStats).NumericValue);
+        Assert.Equal(12000, Assert.Single(build.Metrics.SkillDps).Dps);
+    }
+
+    [Fact]
+    public void ParseXmlPreservesLegacyDirectSkillChildren()
+    {
+        var xml = """
+            <PathOfBuilding2>
+              <Tree><Spec nodes="10" /></Tree>
+              <Skills>
+                <Skill slot="Body Armour">
+                  <Gem nameSpec="Spark" level="1" />
+                </Skill>
+              </Skills>
+            </PathOfBuilding2>
+            """;
+
+        var build = Poe2BuildXmlParser.Parse(xml);
+
+        var set = Assert.Single(build.Skills.SkillSets);
+        Assert.Equal("Skills", set.DisplayName);
+        var group = Assert.Single(set.Groups);
+        Assert.Equal("Spark", group.Label);
+        Assert.Equal("Body Armour", group.Slot);
+    }
+
+    [Fact]
+    public void MalformedSkillsDoesNotFailTreeImport()
+    {
+        var xml = """
+            <PathOfBuilding2>
+              <Tree><Spec nodes="10" /></Tree>
+              <Skills><Skill><Gem nameSpec="Spark"></Skill></Skills>
+            </PathOfBuilding2>
+            """;
+
+        var build = Poe2BuildXmlParser.Parse(xml);
+
+        Assert.Equal(new[] { 10 }, build.NodeHashes);
+        Assert.Empty(build.Skills.SkillSets);
+    }
+
+    [Fact]
+    public void VariantSwitchingPreservesRawXmlSkillsAndMetrics()
+    {
+        var xml = """
+            <PathOfBuilding2>
+              <Build><PlayerStat stat="FullDPS" value="99" /></Build>
+              <Tree activeSpec="2">
+                <Spec nodes="10" />
+                <Spec nodes="20" />
+              </Tree>
+              <Skills><Skill><Gem nameSpec="Spark" /></Skill></Skills>
+              <Items activeItemSet="2">
+                <Item id="1">Rarity: Rare
+            One
+            Ring</Item>
+                <Item id="2">Rarity: Rare
+            Two
+            Ring</Item>
+                <ItemSet id="1"><Slot name="Ring 1" itemId="1" /></ItemSet>
+                <ItemSet id="2"><Slot name="Ring 1" itemId="2" /></ItemSet>
+              </Items>
+            </PathOfBuilding2>
+            """;
+
+        var build = Poe2BuildXmlParser.Parse(xml);
+        var switched = build.WithPassiveTreeVariant(0).WithItemSetVariant(0);
+
+        Assert.Equal(xml, switched.RawXml);
+        Assert.NotEmpty(switched.Skills.SkillSets);
+        Assert.Equal(ImportedMetricSource.SavedXmlSnapshot, switched.Metrics.Source);
+    }
+
+    [Fact]
+    public void GenericPoe1ParserPreservesSkillsAndMetrics()
+    {
+        var xml = """
+            <PathOfBuilding>
+              <Build><PlayerStat stat="Life" value="4000" /></Build>
+              <Tree><Spec nodes="10" /></Tree>
+              <Skills><Skill><Gem nameSpec="Fireball" /></Skill></Skills>
+            </PathOfBuilding>
+            """;
+
+        var build = PobXmlBuildParser.Parse(xml, "pob-code");
+
+        Assert.Equal("Fireball", Assert.Single(Assert.Single(build.Skills.SkillSets).Groups).Label);
+        Assert.Equal("Life", Assert.Single(build.Metrics.PlayerStats).Stat);
+    }
+
     private static TreeModel LoadTree()
     {
         var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE2", "tree_0_4.json"));
