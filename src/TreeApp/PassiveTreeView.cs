@@ -67,6 +67,8 @@ public sealed class PassiveTreeView : Control
     private static readonly IBrush BgBrush = new SolidColorBrush(Color.FromRgb(0x10, 0x10, 0x18));
     private static readonly IBrush NormalBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x60));
     private static readonly IBrush AllocatedBrush = new SolidColorBrush(Color.FromRgb(0xff, 0xc8, 0x4a));
+    private static readonly IBrush WeaponSet1Brush = new SolidColorBrush(Color.FromRgb(0x35, 0xD4, 0xFF));
+    private static readonly IBrush WeaponSet2Brush = new SolidColorBrush(Color.FromRgb(0x66, 0xE3, 0x78));
     private static readonly IBrush TooltipFillBrush = new SolidColorBrush(Color.FromArgb(0xEE, 0x06, 0x08, 0x0B));
     private static readonly IBrush TooltipHeaderBrush = new SolidColorBrush(Color.FromArgb(0xEE, 0x39, 0x2B, 0x16));
     private static readonly IBrush TooltipBorderBrush = new SolidColorBrush(Color.FromRgb(0xA8, 0x76, 0x22));
@@ -213,6 +215,8 @@ public sealed class PassiveTreeView : Control
         var connThick = Math.Max(0.5, ConnectorThicknessTree * _scale);
         var connPen = new Pen(ConnectorBrush, connThick);
         var connActivePen = new Pen(AllocatedBrush, connThick);
+        var connWeaponSet1Pen = new Pen(WeaponSet1Brush, connThick);
+        var connWeaponSet2Pen = new Pen(WeaponSet2Brush, connThick);
         var connHoverPen = new Pen(HoverPathBrush, connThick);
         var pathEdges = _vm.HoverPath.Edges;
 
@@ -260,7 +264,7 @@ public sealed class PassiveTreeView : Control
             IPen pen;
             if (allocated.Contains(c.FromId) && allocated.Contains(c.ToId))
             {
-                pen = connActivePen;
+                pen = ConnectorAllocationPen(c.FromId, c.ToId);
             }
             else if (pathEdges.Contains(key))
             {
@@ -280,6 +284,30 @@ public sealed class PassiveTreeView : Control
                     DrawArc(ctx, pen, ac);
                     break;
             }
+        }
+
+        IPen ConnectorAllocationPen(int fromId, int toId)
+        {
+            var fromSet = _vm.AllocationSetOf(fromId);
+            var toSet = _vm.AllocationSetOf(toId);
+            if (fromSet == toSet)
+            {
+                return fromSet switch
+                {
+                    PassiveAllocationSet.WeaponSet1 => connWeaponSet1Pen,
+                    PassiveAllocationSet.WeaponSet2 => connWeaponSet2Pen,
+                    _ => connActivePen,
+                };
+            }
+            if (fromSet == PassiveAllocationSet.Normal)
+            {
+                return toSet == PassiveAllocationSet.WeaponSet1 ? connWeaponSet1Pen : connWeaponSet2Pen;
+            }
+            if (toSet == PassiveAllocationSet.Normal)
+            {
+                return fromSet == PassiveAllocationSet.WeaponSet1 ? connWeaponSet1Pen : connWeaponSet2Pen;
+            }
+            return connActivePen;
         }
     }
 
@@ -765,12 +793,28 @@ public sealed class PassiveTreeView : Control
         var lines = new List<TooltipLine>();
 
         AddWrappedLines(lines, PassiveEffectLines(node), contentWidth, TooltipStatBrush, 14, Typeface.Default);
+        AddWeaponSetTooltipLine(lines, node, contentWidth);
         AddAllocationPreviewLines(lines, node, contentWidth);
         AddWrappedLines(lines, node.FlavourText, contentWidth, TooltipFlavourBrush, 14,
             new Typeface(FontFamily.Default, FontStyle.Italic, FontWeight.Normal));
         AddWrappedLines(lines, node.ReminderText, contentWidth, TooltipReminderBrush, 12, Typeface.Default, gapBefore: lines.Count > 0);
 
         return lines;
+    }
+
+    private void AddWeaponSetTooltipLine(List<TooltipLine> lines, Node node, double contentWidth)
+    {
+        var (text, brush) = _vm.AllocationSetOf(node.Id) switch
+        {
+            PassiveAllocationSet.WeaponSet1 => ("Weapon Set 1 allocation", WeaponSet1Brush),
+            PassiveAllocationSet.WeaponSet2 => ("Weapon Set 2 allocation", WeaponSet2Brush),
+            _ => (null, null),
+        };
+        if (text is null || brush is null)
+        {
+            return;
+        }
+        AddWrappedLines(lines, [text], contentWidth, brush, 13, Typeface.Default, gapBefore: lines.Count > 0);
     }
 
     private List<TooltipLine> BuildItemTooltipLines(ItemViewModel item, double contentWidth)
@@ -906,8 +950,10 @@ public sealed class PassiveTreeView : Control
     private void DrawNode(DrawingContext ctx, Node n, bool alloc, bool hover, bool useClusterSocketFrame)
     {
         var screen = TreeToScreen(n.X, n.Y);
+        var allocationSet = alloc ? _vm.AllocationSetOf(n.Id) : PassiveAllocationSet.Normal;
         if (TryDrawGameSpecificNode(ctx, n, alloc, hover, screen))
         {
+            DrawWeaponSetMarker(ctx, n, allocationSet, screen);
             if (n.Type == NodeType.JewelSocket && _vm.SocketedJewelOverlayAt(n) is { } jewelOverlay)
             {
                 DrawSocketedJewelOverlay(ctx, jewelOverlay, screen);
@@ -946,9 +992,38 @@ public sealed class PassiveTreeView : Control
         if (!drewFrame && (frameKey is not null || iconAtlas is null))
         {
             var r = NodeRadius * _scale;
-            ctx.DrawEllipse(alloc ? AllocatedBrush : NormalBrush, NodeOutlinePen, screen, r, r);
+            var outline = allocationSet == PassiveAllocationSet.Normal
+                ? NodeOutlinePen
+                : new Pen(BrushForAllocationSet(allocationSet), Math.Max(1.5, 5.0 * _scale));
+            ctx.DrawEllipse(alloc ? AllocatedBrush : NormalBrush, outline, screen, r, r);
+            if (allocationSet != PassiveAllocationSet.Normal)
+            {
+                ctx.DrawEllipse(null, NodeOutlinePen, screen, r * 0.84, r * 0.84);
+            }
         }
     }
+
+    private void DrawWeaponSetMarker(DrawingContext ctx, Node node, PassiveAllocationSet allocationSet, Point centre)
+    {
+        if (allocationSet == PassiveAllocationSet.Normal)
+        {
+            return;
+        }
+        var half = node.Visual is not null
+            ? Poe2FrameHalfSize(node, string.Empty)
+            : new Size(NodeRadius, NodeRadius);
+        var rx = Math.Max(NodeRadius * _scale, half.Width * _scale * 0.82);
+        var ry = Math.Max(NodeRadius * _scale, half.Height * _scale * 0.82);
+        var thickness = Math.Max(1.5, 6.0 * _scale);
+        ctx.DrawEllipse(null, new Pen(BrushForAllocationSet(allocationSet), thickness), centre, rx, ry);
+    }
+
+    private static IBrush BrushForAllocationSet(PassiveAllocationSet allocationSet) => allocationSet switch
+    {
+        PassiveAllocationSet.WeaponSet1 => WeaponSet1Brush,
+        PassiveAllocationSet.WeaponSet2 => WeaponSet2Brush,
+        _ => AllocatedBrush,
+    };
 
     private bool TryDrawGameSpecificNode(DrawingContext ctx, Node node, bool allocated, bool hover, Point screen)
     {

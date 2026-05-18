@@ -100,6 +100,7 @@ public static class PobBuildCodeDecoder
             ClassInternalId = active.ClassInternalId,
             AscendancyInternalId = active.AscendancyInternalId,
             AttributeOverrides = active.AttributeOverrides,
+            AllocationSets = active.AllocationSets,
             Items = items.ActiveItems,
             ItemsById = items.ItemsById,
             SocketedJewels = active.SocketedJewels,
@@ -122,6 +123,7 @@ public static class PobBuildCodeDecoder
         var attributeOverrides = ParseAttributeOverrides(spec);
         var socketedJewels = ParseSocketedJewels(spec);
         var displayName = DisplayName(spec, "Tree", index);
+        var allocationSets = ParseWeaponSetAllocations(spec);
 
         var nodesAttr = (string?)spec.Attribute("nodes");
         if (!string.IsNullOrWhiteSpace(nodesAttr))
@@ -141,7 +143,10 @@ public static class PobBuildCodeDecoder
                 classInternalId,
                 ascendancyInternalId,
                 attributeOverrides,
-                socketedJewels);
+                socketedJewels)
+            {
+                AllocationSets = allocationSets,
+            };
         }
 
         var urlElement = spec.Element("URL");
@@ -165,7 +170,10 @@ public static class PobBuildCodeDecoder
             classInternalId,
             ascendancyInternalId,
             attributeOverrides,
-            socketedJewels);
+            socketedJewels)
+        {
+            AllocationSets = allocationSets,
+        };
     }
 
     private static List<XElement> ExtractSpecElements(string xml)
@@ -293,6 +301,39 @@ public static class PobBuildCodeDecoder
             (id >= 65536 ? cluster : main).Add(id);
         }
         return (main.ToArray(), cluster.ToArray());
+    }
+
+    private static IReadOnlyDictionary<int, PassiveAllocationSet> ParseWeaponSetAllocations(XElement spec)
+    {
+        var result = new Dictionary<int, PassiveAllocationSet>();
+        foreach (var element in spec.Elements())
+        {
+            var set = element.Name.LocalName switch
+            {
+                "WeaponSet1" => PassiveAllocationSet.WeaponSet1,
+                "WeaponSet2" => PassiveAllocationSet.WeaponSet2,
+                _ => PassiveAllocationSet.Normal,
+            };
+            if (set == PassiveAllocationSet.Normal)
+            {
+                continue;
+            }
+
+            var nodes = (string?)element.Attribute("nodes");
+            if (string.IsNullOrWhiteSpace(nodes))
+            {
+                continue;
+            }
+
+            foreach (var part in nodes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (int.TryParse(part, out var id))
+                {
+                    result[id] = set;
+                }
+            }
+        }
+        return result;
     }
 
     private static Dictionary<int, int> ParseMasteryEffects(string? raw)

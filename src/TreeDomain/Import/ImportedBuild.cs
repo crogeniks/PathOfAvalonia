@@ -16,6 +16,8 @@ public sealed record ImportedBuild(
     public string? AscendancyInternalId { get; init; }
     public IReadOnlyDictionary<int, AttributeNodeOverride> AttributeOverrides { get; init; } =
         new Dictionary<int, AttributeNodeOverride>();
+    public IReadOnlyDictionary<int, PassiveAllocationSet> AllocationSets { get; init; } =
+        new Dictionary<int, PassiveAllocationSet>();
     public IReadOnlyList<ImportedItem> Items { get; init; } = [];
     public IReadOnlyDictionary<int, ImportedItem> ItemsById { get; init; } = new Dictionary<int, ImportedItem>();
     public IReadOnlyList<ImportedSocketedJewel> SocketedJewels { get; init; } = [];
@@ -49,6 +51,7 @@ public sealed record ImportedBuild(
             ClassInternalId = variant.ClassInternalId,
             AscendancyInternalId = variant.AscendancyInternalId,
             AttributeOverrides = variant.AttributeOverrides,
+            AllocationSets = variant.AllocationSets,
             SocketedJewels = variant.SocketedJewels,
             ActivePassiveTreeVariantIndex = index,
         };
@@ -91,7 +94,11 @@ public sealed record ImportedPassiveTreeVariant(
     string? ClassInternalId,
     string? AscendancyInternalId,
     IReadOnlyDictionary<int, AttributeNodeOverride> AttributeOverrides,
-    IReadOnlyList<ImportedSocketedJewel> SocketedJewels);
+    IReadOnlyList<ImportedSocketedJewel> SocketedJewels)
+{
+    public IReadOnlyDictionary<int, PassiveAllocationSet> AllocationSets { get; init; } =
+        new Dictionary<int, PassiveAllocationSet>();
+}
 
 public sealed record ImportedItemSetVariant(
     int Index,

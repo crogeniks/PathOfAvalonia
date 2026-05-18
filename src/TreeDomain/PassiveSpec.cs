@@ -17,6 +17,7 @@ public sealed class PassiveSpec
     private readonly HashSet<int> _allocated = new();
     private readonly Dictionary<int, int> _masterySelections = new();
     private readonly Dictionary<int, AttributeNodeOverride> _attributeOverrides = new();
+    private readonly Dictionary<int, PassiveAllocationSet> _allocationSets = new();
     private readonly Dictionary<int, int> _classStartNodeByIndex;
     private readonly Dictionary<string, int> _ascendancyStartNodeByName;
     private int _selectedClassIndex;
@@ -36,6 +37,7 @@ public sealed class PassiveSpec
     public IReadOnlyDictionary<int, ClusterSubgraph> ActiveSubgraphs => _activeSubgraphs;
     public IReadOnlyDictionary<int, ImportedItem> SocketedJewels => _socketedJewels;
     public IReadOnlyDictionary<int, AttributeNodeOverride> AttributeOverrides => _attributeOverrides;
+    public IReadOnlyDictionary<int, PassiveAllocationSet> AllocationSets => _allocationSets;
     public IReadOnlyList<JewelRadiusVisual> ActiveJewelRadii => _activeJewelRadii;
 
     public PassiveSpec(TreeModel tree)
@@ -87,6 +89,8 @@ public sealed class PassiveSpec
 
     public IReadOnlySet<int> AllocatedNodes => _allocated;
     public bool IsAllocated(int id) => _allocated.Contains(id);
+    public PassiveAllocationSet AllocationSetOf(int nodeId) =>
+        _allocationSets.TryGetValue(nodeId, out var set) ? set : PassiveAllocationSet.Normal;
 
     public bool TryGetSocketedJewel(int socketNodeId, out ImportedItem item) =>
         _socketedJewels.TryGetValue(socketNodeId, out item!);
@@ -170,6 +174,7 @@ public sealed class PassiveSpec
         _allocated.Clear();
         _masterySelections.Clear();
         _attributeOverrides.Clear();
+        _allocationSets.Clear();
         _selectedClassIndex = classIndex;
         _selectedAscendancyIndex = 0;
         _allocated.Add(_classStartNodeByIndex[classIndex]);
@@ -257,6 +262,7 @@ public sealed class PassiveSpec
         {
             _allocated.Remove(id);
             _masterySelections.Remove(id);
+            _allocationSets.Remove(id);
             RebuildActiveRadiusEffects();
             if (wasActiveRadiusSocket)
             {
@@ -297,11 +303,13 @@ public sealed class PassiveSpec
 
         _allocated.Remove(id);
         _masterySelections.Remove(id);
+        _allocationSets.Remove(id);
         var orphans = _allocated.Where(a => affected.Contains(a) && !reachable.Contains(a)).ToList();
         foreach (var o in orphans)
         {
             _allocated.Remove(o);
             _masterySelections.Remove(o);
+            _allocationSets.Remove(o);
         }
         RebuildActiveRadiusEffects();
         if (wasActiveRadiusSocket)
@@ -510,7 +518,7 @@ public sealed class PassiveSpec
 
     public void Clear()
     {
-        if (_allocated.Count == 0 && _masterySelections.Count == 0 && _attributeOverrides.Count == 0 && _activeSubgraphs.Count == 0 && _socketedJewels.Count == 0)
+        if (_allocated.Count == 0 && _masterySelections.Count == 0 && _attributeOverrides.Count == 0 && _allocationSets.Count == 0 && _activeSubgraphs.Count == 0 && _socketedJewels.Count == 0)
         {
             return;
         }
@@ -521,6 +529,7 @@ public sealed class PassiveSpec
         _allocated.Clear();
         _masterySelections.Clear();
         _attributeOverrides.Clear();
+        _allocationSets.Clear();
         _socketedJewels.Clear();
         _selectedAscendancyIndex = 0;
         if (_classStartNodeByIndex.TryGetValue(_selectedClassIndex, out var nodeId))
@@ -539,6 +548,7 @@ public sealed class PassiveSpec
         _allocated.Clear();
         _masterySelections.Clear();
         _attributeOverrides.Clear();
+        _allocationSets.Clear();
         _socketedJewels.Clear();
         foreach (var socketId in _activeSubgraphs.Keys.ToArray())
         {
@@ -618,6 +628,7 @@ public sealed class PassiveSpec
             if (Tree.Nodes.ContainsKey(mappedId) || _clusterNodes.ContainsKey(mappedId))
             {
                 _allocated.Add(mappedId);
+                StoreImportedAllocationSet(build, id, mappedId);
                 applied++;
             }
             else
@@ -646,6 +657,7 @@ public sealed class PassiveSpec
             if (_clusterNodes.ContainsKey(mappedId))
             {
                 _allocated.Add(mappedId);
+                StoreImportedAllocationSet(build, id, mappedId);
                 applied++;
             }
             else
@@ -676,7 +688,19 @@ public sealed class PassiveSpec
             UnsupportedClusterJewels = unsupportedClusterJewels,
             UnsupportedAttributeOverrides = unsupportedAttributeOverrides,
             UnsupportedSocketedJewels = unsupportedSocketedJewels,
+            WeaponSet1Allocations = _allocationSets.Count(kv => kv.Value == PassiveAllocationSet.WeaponSet1),
+            WeaponSet2Allocations = _allocationSets.Count(kv => kv.Value == PassiveAllocationSet.WeaponSet2),
         };
+    }
+
+    private void StoreImportedAllocationSet(ImportedBuild build, int importedId, int mappedId)
+    {
+        if ((build.AllocationSets.TryGetValue(mappedId, out var set)
+                || build.AllocationSets.TryGetValue(importedId, out set))
+            && set != PassiveAllocationSet.Normal)
+        {
+            _allocationSets[mappedId] = set;
+        }
     }
 
     private int AllocateUniqueClusterFallbacks()
@@ -870,6 +894,7 @@ public sealed class PassiveSpec
         foreach (var n in old.Nodes)
         {
             _allocated.Remove(n.Id);
+            _allocationSets.Remove(n.Id);
             _clusterNodes.Remove(n.Id);
         }
 
@@ -958,6 +983,7 @@ public sealed class PassiveSpec
             }
             _allocated.Remove(id);
             _masterySelections.Remove(id);
+            _allocationSets.Remove(id);
             changed = true;
         }
         if (changed)
@@ -1045,6 +1071,7 @@ public sealed class PassiveSpec
             {
                 _allocated.Remove(id);
                 _masterySelections.Remove(id);
+                _allocationSets.Remove(id);
             }
         }
     }
@@ -1204,6 +1231,8 @@ public sealed record ImportResult(int Applied, int Skipped, int ClusterSkipped, 
     public int UnsupportedClusterJewels { get; init; }
     public int UnsupportedAttributeOverrides { get; init; }
     public int UnsupportedSocketedJewels { get; init; }
+    public int WeaponSet1Allocations { get; init; }
+    public int WeaponSet2Allocations { get; init; }
 }
 
 public sealed record HoverPath(IReadOnlyList<int> Nodes, IReadOnlySet<(int Min, int Max)> Edges)
