@@ -51,6 +51,16 @@
                                 <Button Content="Import" Command="{Binding ImportCommand}"/>
                                 <Button Content="Clear" Command="{Binding ClearCommand}"/>
                             </StackPanel>
+                            <TextBlock Text="Passive tree"
+                                       Foreground="#EAEAEA"
+                                       FontWeight="Bold"
+                                       Margin="0,6,0,0"
+                                       IsVisible="{Binding HasPassiveTreeVariants}"/>
+                            <ComboBox ItemsSource="{Binding PassiveTreeVariantOptions}"
+                                      SelectedIndex="{Binding SelectedPassiveTreeVariantIndex}"
+                                      DisplayMemberBinding="{Binding DisplayName}"
+                                      HorizontalAlignment="Stretch"
+                                      IsVisible="{Binding HasPassiveTreeVariants}"/>
                             <TextBlock Text="{Binding UnsupportedImportStatus}"
                                        Foreground="#AAAACC"
                                        TextWrapping="Wrap"
@@ -63,7 +73,25 @@
                 </Grid>
             </TabItem>
             <TabItem Header="Equipment" IsEnabled="{Binding SupportsEquipment}">
-                <local:EquipmentView DataContext="{Binding Workspace.Equipment}"/>
+                <Grid RowDefinitions="Auto,*" Background="#101018">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="8"
+                                Margin="14,12,14,4"
+                                HorizontalAlignment="Left"
+                                DataContext="{Binding TreePanel}"
+                                x:DataType="vm:MainWindowViewModel"
+                                IsVisible="{Binding HasItemSetVariants}">
+                        <TextBlock Text="Item set"
+                                   Foreground="#EAEAEA"
+                                   FontWeight="Bold"
+                                   VerticalAlignment="Center"/>
+                        <ComboBox Width="260"
+                                  ItemsSource="{Binding ItemSetVariantOptions}"
+                                  SelectedIndex="{Binding SelectedItemSetVariantIndex}"
+                                  DisplayMemberBinding="{Binding DisplayName}"/>
+                    </StackPanel>
+                    <local:EquipmentView Grid.Row="1" DataContext="{Binding Workspace.Equipment}"/>
+                </Grid>
             </TabItem>
         </TabControl>
     </Grid>
