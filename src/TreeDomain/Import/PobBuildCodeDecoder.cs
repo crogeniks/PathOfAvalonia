@@ -80,9 +80,38 @@ public static class PobBuildCodeDecoder
         {
             throw new InvalidDataException("PoB XML contains no <Spec> element");
         }
-        var activeIndex = ExtractActiveSpecIndex(xml, specElements.Count);
-        var spec = specElements[activeIndex];
+        var passiveVariants = specElements
+            .Select((spec, index) => ParsePassiveTreeVariant(spec, index))
+            .ToArray();
+        var activeIndex = ExtractActiveSpecIndex(xml, passiveVariants.Length);
+        var active = passiveVariants[activeIndex];
 
+        return new ImportedBuild(
+            ClassId: active.ClassId,
+            AscendClassId: active.AscendClassId,
+            SecondaryAscendClassId: active.SecondaryAscendClassId,
+            NodeHashes: active.NodeHashes,
+            ClusterNodeHashes: active.ClusterNodeHashes,
+            MasterySelections: active.MasterySelections,
+            TreeVersion: active.TreeVersion,
+            Source: source)
+        {
+            ClusterHashFormatVersion = active.ClusterHashFormatVersion,
+            ClassInternalId = active.ClassInternalId,
+            AscendancyInternalId = active.AscendancyInternalId,
+            AttributeOverrides = active.AttributeOverrides,
+            Items = items.ActiveItems,
+            ItemsById = items.ItemsById,
+            SocketedJewels = active.SocketedJewels,
+            PassiveTreeVariants = passiveVariants,
+            ItemSetVariants = items.ItemSetVariants,
+            ActivePassiveTreeVariantIndex = activeIndex,
+            ActiveItemSetVariantIndex = items.ActiveItemSetVariantIndex,
+        };
+    }
+
+    private static ImportedPassiveTreeVariant ParsePassiveTreeVariant(XElement spec, int index)
+    {
         var classId = ParseIntOrZero((string?)spec.Attribute("classId"));
         var ascendClassId = ParseIntOrZero((string?)spec.Attribute("ascendClassId"));
         var secondaryAscendClassId = ParseIntOrZero((string?)spec.Attribute("secondaryAscendClassId"));
@@ -91,30 +120,28 @@ public static class PobBuildCodeDecoder
         var classInternalId = (string?)spec.Attribute("classInternalId");
         var ascendancyInternalId = (string?)spec.Attribute("ascendancyInternalId");
         var attributeOverrides = ParseAttributeOverrides(spec);
+        var socketedJewels = ParseSocketedJewels(spec);
+        var displayName = DisplayName(spec, "Tree", index);
 
         var nodesAttr = (string?)spec.Attribute("nodes");
         if (!string.IsNullOrWhiteSpace(nodesAttr))
         {
             var (main, cluster) = SplitNodes(nodesAttr!);
-            var masteries = ParseMasteryEffects((string?)spec.Attribute("masteryEffects"));
-            return new ImportedBuild(
-                ClassId: classId,
-                AscendClassId: ascendClassId,
-                SecondaryAscendClassId: secondaryAscendClassId,
-                NodeHashes: main,
-                ClusterNodeHashes: cluster,
-                MasterySelections: masteries,
-                TreeVersion: treeVersion,
-                Source: source)
-            {
-                ClusterHashFormatVersion = clusterHashFormatVersion,
-                ClassInternalId = classInternalId,
-                AscendancyInternalId = ascendancyInternalId,
-                AttributeOverrides = attributeOverrides,
-                Items = items.ActiveItems,
-                ItemsById = items.ItemsById,
-                SocketedJewels = ParseSocketedJewels(spec),
-            };
+            return new ImportedPassiveTreeVariant(
+                index,
+                displayName,
+                classId,
+                ascendClassId,
+                secondaryAscendClassId,
+                main,
+                cluster,
+                ParseMasteryEffects((string?)spec.Attribute("masteryEffects")),
+                treeVersion,
+                clusterHashFormatVersion,
+                classInternalId,
+                ascendancyInternalId,
+                attributeOverrides,
+                socketedJewels);
         }
 
         var urlElement = spec.Element("URL");
@@ -122,19 +149,23 @@ public static class PobBuildCodeDecoder
         {
             throw new InvalidDataException("Spec has neither 'nodes' attribute nor <URL> child");
         }
+
         var embedded = PobTreeUrlDecoder.Decode(urlElement.Value);
-        return embedded with
-        {
-            TreeVersion = treeVersion,
-            Source = source,
-            ClusterHashFormatVersion = clusterHashFormatVersion,
-            ClassInternalId = classInternalId,
-            AscendancyInternalId = ascendancyInternalId,
-            AttributeOverrides = attributeOverrides,
-            Items = items.ActiveItems,
-            ItemsById = items.ItemsById,
-            SocketedJewels = ParseSocketedJewels(spec),
-        };
+        return new ImportedPassiveTreeVariant(
+            index,
+            displayName,
+            embedded.ClassId,
+            embedded.AscendClassId,
+            embedded.SecondaryAscendClassId,
+            embedded.NodeHashes,
+            embedded.ClusterNodeHashes,
+            embedded.MasterySelections,
+            treeVersion ?? embedded.TreeVersion,
+            clusterHashFormatVersion,
+            classInternalId,
+            ascendancyInternalId,
+            attributeOverrides,
+            socketedJewels);
     }
 
     private static List<XElement> ExtractSpecElements(string xml)
@@ -339,20 +370,22 @@ public static class PobBuildCodeDecoder
 
     private sealed record ParsedItems(
         IReadOnlyList<ImportedItem> ActiveItems,
-        IReadOnlyDictionary<int, ImportedItem> ItemsById);
+        IReadOnlyDictionary<int, ImportedItem> ItemsById,
+        IReadOnlyList<ImportedItemSetVariant> ItemSetVariants,
+        int ActiveItemSetVariantIndex);
 
     private static ParsedItems ParseItemsSection(string xml)
     {
         var start = FindTagBoundary(xml, "Items", 0);
         if (start < 0)
         {
-            return new ParsedItems([], new Dictionary<int, ImportedItem>());
+            return new ParsedItems([], new Dictionary<int, ImportedItem>(), [], 0);
         }
 
         var end = xml.IndexOf("</Items>", start, StringComparison.Ordinal);
         if (end < 0)
         {
-            return new ParsedItems([], new Dictionary<int, ImportedItem>());
+            return new ParsedItems([], new Dictionary<int, ImportedItem>(), [], 0);
         }
 
         var block = xml[start..(end + 8)];
@@ -363,7 +396,7 @@ public static class PobBuildCodeDecoder
         }
         catch
         {
-            return new ParsedItems([], new Dictionary<int, ImportedItem>());
+            return new ParsedItems([], new Dictionary<int, ImportedItem>(), [], 0);
         }
 
         // Build id → raw text map
@@ -378,36 +411,24 @@ public static class PobBuildCodeDecoder
             }
         }
 
-        // Find the active ItemSet
-        var activeId = (int?)itemsEl.Attribute("activeItemSet")
-            ?? (int?)itemsEl.Attribute("active")
-            ?? 1;
-        XElement? activeSet = null;
-        foreach (var setEl in itemsEl.Elements("ItemSet"))
+        var itemSets = itemsEl.Elements("ItemSet").ToArray();
+        var variants = itemSets
+            .Select((setEl, index) => ParseItemSetVariant(setEl, index, texts))
+            .ToArray();
+        if (variants.Length == 0)
         {
-            var isActive = string.Equals((string?)setEl.Attribute("active"), "true", StringComparison.OrdinalIgnoreCase)
-                || string.Equals((string?)setEl.Attribute("active"), "1", StringComparison.OrdinalIgnoreCase);
-            if (isActive || ((int?)setEl.Attribute("id") ?? 1) == activeId)
-            {
-                activeSet = setEl;
-                break;
-            }
-        }
-        if (activeSet is null)
-        {
-            foreach (var setEl in itemsEl.Elements("ItemSet"))
-            {
-                activeSet = setEl;
-                break;
-            }
-        }
-        if (activeSet is null)
-        {
-            return new ParsedItems([], itemsById);
+            return new ParsedItems([], itemsById, [], 0);
         }
 
+        var activeIndex = ActiveItemSetIndex(itemsEl, itemSets);
+        return new ParsedItems(variants[activeIndex].Items, itemsById, variants, activeIndex);
+    }
+
+    private static ImportedItemSetVariant ParseItemSetVariant(XElement setEl, int index, IReadOnlyDictionary<int, string> texts)
+    {
+        var id = (int?)setEl.Attribute("id") ?? 0;
         var result = new List<ImportedItem>();
-        foreach (var slotEl in activeSet.Elements("Slot"))
+        foreach (var slotEl in setEl.Elements("Slot"))
         {
             var slotName = (string?)slotEl.Attribute("name") ?? string.Empty;
             var itemId = (int?)slotEl.Attribute("itemId") ?? 0;
@@ -418,7 +439,52 @@ public static class PobBuildCodeDecoder
         }
 
         result.Sort((a, b) => SlotIndex(a.Slot).CompareTo(SlotIndex(b.Slot)));
-        return new ParsedItems(result, itemsById);
+        return new ImportedItemSetVariant(index, id, ItemSetDisplayName(setEl, id, index), result);
+    }
+
+    private static int ActiveItemSetIndex(XElement itemsEl, IReadOnlyList<XElement> itemSets)
+    {
+        if ((int?)itemsEl.Attribute("activeItemSet") is int activeItemSet)
+        {
+            var index = IndexOfItemSetId(itemSets, activeItemSet);
+            if (index >= 0)
+            {
+                return index;
+            }
+        }
+        if ((int?)itemsEl.Attribute("active") is int active)
+        {
+            var index = IndexOfItemSetId(itemSets, active);
+            if (index >= 0)
+            {
+                return index;
+            }
+        }
+
+        for (var i = 0; i < itemSets.Count; i++)
+        {
+            var isActive = string.Equals((string?)itemSets[i].Attribute("active"), "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals((string?)itemSets[i].Attribute("active"), "1", StringComparison.OrdinalIgnoreCase);
+            if (isActive)
+            {
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
+    private static int IndexOfItemSetId(IReadOnlyList<XElement> itemSets, int id)
+    {
+        for (var i = 0; i < itemSets.Count; i++)
+        {
+            if (((int?)itemSets[i].Attribute("id") ?? 0) == id)
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private static IReadOnlyList<ImportedSocketedJewel> ParseSocketedJewels(XElement spec)
@@ -470,6 +536,35 @@ public static class PobBuildCodeDecoder
 
             pos = after;
         }
+    }
+
+    private static string DisplayName(XElement element, string prefix, int index)
+    {
+        var title = ((string?)element.Attribute("title"))?.Trim();
+        if (!string.IsNullOrEmpty(title))
+        {
+            return title;
+        }
+
+        var name = ((string?)element.Attribute("name"))?.Trim();
+        return !string.IsNullOrEmpty(name) ? name : $"{prefix} {index + 1}";
+    }
+
+    private static string ItemSetDisplayName(XElement element, int id, int index)
+    {
+        var title = ((string?)element.Attribute("title"))?.Trim();
+        if (!string.IsNullOrEmpty(title))
+        {
+            return title;
+        }
+
+        var name = ((string?)element.Attribute("name"))?.Trim();
+        if (!string.IsNullOrEmpty(name))
+        {
+            return name;
+        }
+
+        return id > 0 ? $"Item Set {id}" : $"Item Set {index + 1}";
     }
 
     private static ImportedItem ParseRawItem(string slot, string rawText)

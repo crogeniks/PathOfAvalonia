@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -15,6 +16,9 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly IImportStrategy _importStrategy;
     private bool _syncingClass;
     private bool _syncingAscendancy;
+    private bool _syncingVariants;
+    private ImportedBuild? _lastImportedBuild;
+    private ImportResult? _lastImportResult;
 
     // Multi-KB PoB build codes lag Avalonia's TextBox on every click/select.
     // After paste, we stash the full string here and replace the TextBox text
@@ -47,6 +51,12 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private string _importInput = string.Empty;
     [ObservableProperty] private string _importStatus = string.Empty;
     [ObservableProperty] private bool _importStatusIsError;
+    [ObservableProperty] private IReadOnlyList<ImportedVariantOptionViewModel> _passiveTreeVariantOptions = [];
+    [ObservableProperty] private IReadOnlyList<ImportedVariantOptionViewModel> _itemSetVariantOptions = [];
+    [ObservableProperty] private bool _hasPassiveTreeVariants;
+    [ObservableProperty] private bool _hasItemSetVariants;
+    [ObservableProperty] private int _selectedPassiveTreeVariantIndex;
+    [ObservableProperty] private int _selectedItemSetVariantIndex;
 
     public IBrush ImportStatusForeground =>
         string.IsNullOrEmpty(ImportStatus) ? StatusDefaultBrush :
@@ -143,6 +153,48 @@ public partial class MainWindowViewModel : ObservableObject
     partial void OnImportStatusIsErrorChanged(bool value) =>
         OnPropertyChanged(nameof(ImportStatusForeground));
 
+    partial void OnSelectedPassiveTreeVariantIndexChanged(int value)
+    {
+        if (_syncingVariants || _lastImportedBuild is null || value < 0)
+        {
+            return;
+        }
+
+        try
+        {
+            _lastImportedBuild = _lastImportedBuild.WithPassiveTreeVariant(value);
+            _lastImportResult = _spec.ApplyImport(_lastImportedBuild);
+            Equipment.LoadBuild(_lastImportedBuild);
+            ImportStatus = BuildImportStatus(_lastImportResult);
+            ImportStatusIsError = false;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+        }
+    }
+
+    partial void OnSelectedItemSetVariantIndexChanged(int value)
+    {
+        if (_syncingVariants || _lastImportedBuild is null || value < 0)
+        {
+            return;
+        }
+
+        try
+        {
+            _lastImportedBuild = _lastImportedBuild.WithItemSetVariant(value);
+            Equipment.LoadBuild(_lastImportedBuild);
+            if (_lastImportResult is not null)
+            {
+                ImportStatus = BuildImportStatus(_lastImportResult with { Build = _lastImportedBuild });
+                ImportStatusIsError = false;
+            }
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+        }
+    }
+
     [RelayCommand]
     private void Import()
     {
@@ -154,13 +206,29 @@ public partial class MainWindowViewModel : ObservableObject
         try
         {
             var build = _importStrategy.Import(text);
+            _syncingVariants = true;
+            _lastImportedBuild = build;
+            PassiveTreeVariantOptions = build.PassiveTreeVariants
+                .Select(variant => new ImportedVariantOptionViewModel(variant.Index, variant.DisplayName))
+                .ToArray();
+            ItemSetVariantOptions = build.ItemSetVariants
+                .Select(variant => new ImportedVariantOptionViewModel(variant.Index, variant.DisplayName))
+                .ToArray();
+            HasPassiveTreeVariants = PassiveTreeVariantOptions.Count > 1;
+            HasItemSetVariants = ItemSetVariantOptions.Count > 1;
+            SelectedPassiveTreeVariantIndex = build.ActivePassiveTreeVariantIndex;
+            SelectedItemSetVariantIndex = build.ActiveItemSetVariantIndex;
+            _syncingVariants = false;
+
             var result = _spec.ApplyImport(build);
+            _lastImportResult = result;
             Equipment.LoadBuild(build);
             ImportStatus = BuildImportStatus(result);
             ImportStatusIsError = false;
         }
         catch (Exception ex)
         {
+            ResetVariantState();
             ImportStatus = $"Import failed: {ex.Message}";
             ImportStatusIsError = true;
         }
@@ -170,6 +238,16 @@ public partial class MainWindowViewModel : ObservableObject
     {
         var build = result.Build;
         var status = $"{build.Source}: {result.Applied} nodes applied, {result.Skipped} skipped";
+        if (build.PassiveTreeVariants.Count > 1
+            && build.PassiveTreeVariants.FirstOrDefault(v => v.Index == build.ActivePassiveTreeVariantIndex) is { } selectedPassive)
+        {
+            status += $", tree: {selectedPassive.DisplayName}";
+        }
+        if (build.ItemSetVariants.Count > 1
+            && build.ItemSetVariants.FirstOrDefault(v => v.Index == build.ActiveItemSetVariantIndex) is { } selectedItemSet)
+        {
+            status += $", item set: {selectedItemSet.DisplayName}";
+        }
         if (build.Items.Count > 0)
         {
             status += $", {build.Items.Count} items imported";
@@ -200,10 +278,25 @@ public partial class MainWindowViewModel : ObservableObject
     {
         _spec.Clear();
         Equipment.Clear();
+        ResetVariantState();
         _pastedBuildCode = null;
         ImportInput = string.Empty;
         ImportStatus = "cleared";
         ImportStatusIsError = false;
+    }
+
+    private void ResetVariantState()
+    {
+        _lastImportedBuild = null;
+        _lastImportResult = null;
+        _syncingVariants = true;
+        PassiveTreeVariantOptions = [];
+        ItemSetVariantOptions = [];
+        HasPassiveTreeVariants = false;
+        HasItemSetVariants = false;
+        SelectedPassiveTreeVariantIndex = 0;
+        SelectedItemSetVariantIndex = 0;
+        _syncingVariants = false;
     }
 
     private string AscendancyNameAt(int classIndex, int ascendancyIndex)
@@ -230,3 +323,5 @@ public partial class MainWindowViewModel : ObservableObject
         public ImportedBuild Import(string text) => importService.Import(text);
     }
 }
+
+public sealed record ImportedVariantOptionViewModel(int Index, string DisplayName);
