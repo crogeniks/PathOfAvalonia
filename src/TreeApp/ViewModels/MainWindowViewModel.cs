@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -14,11 +16,14 @@ public partial class MainWindowViewModel : ObservableObject
 {
     private readonly PassiveSpec _spec;
     private readonly IImportStrategy _importStrategy;
+    private readonly IPobCalculationService? _pobCalculationService;
     private bool _syncingClass;
     private bool _syncingAscendancy;
     private bool _syncingVariants;
     private ImportedBuild? _lastImportedBuild;
     private ImportResult? _lastImportResult;
+    private CancellationTokenSource? _metricsCts;
+    private int _metricsRequestId;
 
     // Multi-KB PoB build codes lag Avalonia's TextBox on every click/select.
     // After paste, we stash the full string here and replace the TextBox text
@@ -68,9 +73,19 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     public MainWindowViewModel(PassiveSpec spec, IImportStrategy importStrategy, EquipmentViewModel equipment)
+        : this(spec, importStrategy, equipment, null)
+    {
+    }
+
+    public MainWindowViewModel(
+        PassiveSpec spec,
+        IImportStrategy importStrategy,
+        EquipmentViewModel equipment,
+        IPobCalculationService? pobCalculationService)
     {
         _spec = spec;
         _importStrategy = importStrategy;
+        _pobCalculationService = pobCalculationService;
         Equipment = equipment;
         TreeViewModel = new PassiveTreeViewModel(spec);
         _selectedClassIndex = spec.SelectedClassIndex;
@@ -167,6 +182,7 @@ public partial class MainWindowViewModel : ObservableObject
             Equipment.LoadBuild(_lastImportedBuild);
             ImportStatus = BuildImportStatus(_lastImportResult);
             ImportStatusIsError = false;
+            StartMetricsCalculation(_lastImportedBuild);
         }
         catch (ArgumentOutOfRangeException)
         {
@@ -189,6 +205,7 @@ public partial class MainWindowViewModel : ObservableObject
                 ImportStatus = BuildImportStatus(_lastImportResult with { Build = _lastImportedBuild });
                 ImportStatusIsError = false;
             }
+            StartMetricsCalculation(_lastImportedBuild);
         }
         catch (ArgumentOutOfRangeException)
         {
@@ -225,6 +242,7 @@ public partial class MainWindowViewModel : ObservableObject
             Equipment.LoadBuild(build);
             ImportStatus = BuildImportStatus(result);
             ImportStatusIsError = false;
+            StartMetricsCalculation(build);
         }
         catch (Exception ex)
         {
@@ -260,6 +278,19 @@ public partial class MainWindowViewModel : ObservableObject
         {
             status += $", {build.Items.Count} items imported";
         }
+        var skillGroupCount = build.Skills.SkillSets.Sum(set => set.Groups.Count);
+        if (skillGroupCount > 0)
+        {
+            status += $", {skillGroupCount} skill groups imported";
+        }
+        if (build.Metrics.Source == ImportedMetricSource.PobBackend)
+        {
+            status += ", DPS: PoB backend";
+        }
+        else if (build.Metrics.Source == ImportedMetricSource.SavedXmlSnapshot)
+        {
+            status += ", DPS: saved snapshot";
+        }
 
         var unsupported = new List<string>();
         if (result.UnsupportedClusterJewels > 0)
@@ -285,6 +316,7 @@ public partial class MainWindowViewModel : ObservableObject
     private void Clear()
     {
         _spec.Clear();
+        _metricsCts?.Cancel();
         Equipment.Clear();
         ResetVariantState();
         _pastedBuildCode = null;
@@ -305,6 +337,49 @@ public partial class MainWindowViewModel : ObservableObject
         SelectedPassiveTreeVariantIndex = 0;
         SelectedItemSetVariantIndex = 0;
         _syncingVariants = false;
+    }
+
+    private void StartMetricsCalculation(ImportedBuild build)
+    {
+        if (_pobCalculationService is null || string.IsNullOrWhiteSpace(build.RawXml))
+        {
+            return;
+        }
+
+        var service = _pobCalculationService;
+        _metricsCts?.Cancel();
+        _metricsCts = new CancellationTokenSource();
+        var requestId = ++_metricsRequestId;
+        _ = ApplyMetricsAsync(service, build, requestId, _metricsCts.Token);
+    }
+
+    private async Task ApplyMetricsAsync(IPobCalculationService service, ImportedBuild build, int requestId, CancellationToken cancellationToken)
+    {
+        ImportedBuildMetrics metrics;
+        try
+        {
+            metrics = await service.CalculateAsync(_spec.Tree.GameId, build, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (cancellationToken.IsCancellationRequested
+            || requestId != _metricsRequestId
+            || _lastImportedBuild is null
+            || !ReferenceEquals(build, _lastImportedBuild))
+        {
+            return;
+        }
+
+        _lastImportedBuild = _lastImportedBuild with { Metrics = metrics };
+        Equipment.LoadBuild(_lastImportedBuild);
+        if (_lastImportResult is not null)
+        {
+            _lastImportResult = _lastImportResult with { Build = _lastImportedBuild };
+            ImportStatus = BuildImportStatus(_lastImportResult);
+        }
     }
 
     private string AscendancyNameAt(int classIndex, int ascendancyIndex)

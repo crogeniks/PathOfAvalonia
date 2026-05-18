@@ -1,0 +1,98 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PathOfAvalonia.TreeApp.ViewModels"
+             x:Class="PathOfAvalonia.TreeApp.BuildOutputView"
+             x:DataType="vm:EquipmentViewModel"
+             Background="#101018">
+    <Grid>
+        <TextBlock Text="Import a build to see gems and DPS."
+                   IsVisible="{Binding !HasContent}"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Foreground="#AAAACC"
+                   FontSize="16"/>
+
+        <ScrollViewer IsVisible="{Binding HasContent}">
+            <StackPanel Spacing="12" Margin="12">
+                <StackPanel IsVisible="{Binding HasMetrics}" Spacing="8">
+                    <TextBlock Text="{Binding Metrics.SourceText}"
+                               Foreground="#DDDDEE"
+                               FontWeight="Bold"
+                               FontSize="14"/>
+                    <TextBlock Text="{Binding Metrics.BackendText}"
+                               IsVisible="{Binding Metrics.HasBackend}"
+                               Foreground="#8888AA"
+                               FontSize="11"
+                               TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding Metrics.ErrorMessage}"
+                               IsVisible="{Binding Metrics.HasError}"
+                               Foreground="#E0A080"
+                               FontSize="11"
+                               TextWrapping="Wrap"/>
+                    <ItemsControl ItemsSource="{Binding Metrics.SkillDps}"
+                                  IsVisible="{Binding Metrics.HasSkillDps}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:ImportedSkillDpsMetricViewModel">
+                                <Grid ColumnDefinitions="*,54,96" Margin="0,2">
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{Binding Name}" Foreground="#DDDDDD" FontSize="12" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding Detail}" IsVisible="{Binding HasDetail}" Foreground="#777799" FontSize="10"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding Count}" Foreground="#AAAACC" FontSize="12" HorizontalAlignment="Right"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Dps}" Foreground="#D8D090" FontSize="12" HorizontalAlignment="Right"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl ItemsSource="{Binding Metrics.PlayerStats}"
+                                  IsVisible="{Binding Metrics.HasPlayerStats}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:ImportedStatMetricViewModel">
+                                <Border Margin="0,2,8,2" Padding="8,5" Background="#171722" CornerRadius="4">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Label}" Foreground="#8888AA" FontSize="10"/>
+                                        <TextBlock Text="{Binding Value}" Foreground="#DDDDDD" FontSize="12"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <StackPanel IsVisible="{Binding HasSkillGroups}" Spacing="6">
+                    <TextBlock Text="Imported Skill Groups"
+                               Foreground="#DDDDEE"
+                               FontWeight="Bold"
+                               FontSize="14"/>
+                    <ItemsControl ItemsSource="{Binding SkillGroups}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:ImportedSkillGroupViewModel">
+                                <Border Margin="0,2" Padding="8" Background="#141420" BorderBrush="#252536" BorderThickness="1" CornerRadius="4">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="{Binding Header}" Foreground="#DDDDDD" FontWeight="Bold" FontSize="12" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding Metadata}" IsVisible="{Binding HasMetadata}" Foreground="#8888AA" FontSize="10" TextWrapping="Wrap"/>
+                                        <ItemsControl ItemsSource="{Binding Gems}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="vm:ImportedGemViewModel">
+                                                    <Grid ColumnDefinitions="*,Auto" Margin="0,1">
+                                                        <TextBlock Grid.Column="0" Text="{Binding Name}" Foreground="#BFC8E8" FontSize="11" TextWrapping="Wrap"/>
+                                                        <TextBlock Grid.Column="1" Text="{Binding Metadata}" IsVisible="{Binding HasMetadata}" Foreground="#8888AA" FontSize="10" Margin="8,0,0,0"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
