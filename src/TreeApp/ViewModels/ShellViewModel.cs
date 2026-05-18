@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -37,6 +38,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _settings = settings;
         _pobCalculationService = pobCalculationService;
         Games = _games.Games.Select(g => new GameChoiceViewModel(g, settings.LastGameId == g.Id)).ToArray();
+        ResetBackendSettingsFields();
 
         if (settings.LastGameId is { } lastGame && _games.TryGet(lastGame, out var game))
         {
@@ -60,6 +62,12 @@ public sealed partial class ShellViewModel : ObservableObject
     [ObservableProperty] private GameWorkspaceViewModel? _activeWorkspace;
     [ObservableProperty] private string _statusMessage = string.Empty;
     [ObservableProperty] private bool _isConfirmingGameChange;
+    [ObservableProperty] private bool _isBackendSettingsOpen;
+    [ObservableProperty] private bool _enablePobBackend;
+    [ObservableProperty] private string _poe1PobPath = string.Empty;
+    [ObservableProperty] private string _poe2PobPath = string.Empty;
+    [ObservableProperty] private string _luaExecutablePath = string.Empty;
+    [ObservableProperty] private string _pobBackendTimeoutSeconds = "120";
 
     [RelayCommand]
     private void SelectGame(GameId gameId)
@@ -91,6 +99,42 @@ public sealed partial class ShellViewModel : ObservableObject
         IsConfirmingGameChange = false;
     }
 
+    [RelayCommand]
+    private void OpenBackendSettings()
+    {
+        ResetBackendSettingsFields();
+        IsBackendSettingsOpen = true;
+    }
+
+    [RelayCommand]
+    private void CloseBackendSettings()
+    {
+        ResetBackendSettingsFields();
+        IsBackendSettingsOpen = false;
+    }
+
+    [RelayCommand]
+    private void SaveBackendSettings()
+    {
+        if (!int.TryParse(PobBackendTimeoutSeconds, out var timeoutSeconds))
+        {
+            StatusMessage = "PoB backend timeout must be a whole number of seconds.";
+            return;
+        }
+
+        timeoutSeconds = Math.Clamp(timeoutSeconds, 1, 600);
+        _settings.EnablePobBackend = EnablePobBackend;
+        _settings.Poe1PobPath = EmptyToNull(Poe1PobPath);
+        _settings.Poe2PobPath = EmptyToNull(Poe2PobPath);
+        _settings.LuaExecutablePath = EmptyToNull(LuaExecutablePath);
+        _settings.PobBackendTimeoutSeconds = timeoutSeconds;
+        _settings.Save();
+
+        PobBackendTimeoutSeconds = timeoutSeconds.ToString();
+        IsBackendSettingsOpen = false;
+        StatusMessage = "PoB backend settings saved.";
+    }
+
     private void OpenWorkspace(GameDefinition game)
     {
         var tree = _assets.LoadTree(game);
@@ -108,7 +152,12 @@ public sealed partial class ShellViewModel : ObservableObject
             TreeViewModel = treePanel.TreeViewModel,
             Equipment = equipment,
         };
-        ActiveWorkspace = new GameWorkspaceViewModel(workspace, treePanel, new TreeImageAssetResolver(game), BackToLandingCommand);
+        ActiveWorkspace = new GameWorkspaceViewModel(
+            workspace,
+            treePanel,
+            new TreeImageAssetResolver(game),
+            BackToLandingCommand,
+            OpenBackendSettingsCommand);
         CurrentPage = ShellPage.Workspace;
         _settings.LastGameId = game.Id;
         _settings.Save();
@@ -123,6 +172,18 @@ public sealed partial class ShellViewModel : ObservableObject
         ActiveWorkspace = null;
         CurrentPage = ShellPage.Landing;
     }
+
+    private void ResetBackendSettingsFields()
+    {
+        EnablePobBackend = _settings.EnablePobBackend;
+        Poe1PobPath = _settings.Poe1PobPath ?? string.Empty;
+        Poe2PobPath = _settings.Poe2PobPath ?? string.Empty;
+        LuaExecutablePath = _settings.LuaExecutablePath ?? string.Empty;
+        PobBackendTimeoutSeconds = Math.Clamp(_settings.PobBackendTimeoutSeconds, 1, 600).ToString();
+    }
+
+    private static string? EmptyToNull(string value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private sealed class NullPobCalculationService : IPobCalculationService
     {

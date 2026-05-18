@@ -33,7 +33,8 @@ public sealed record PobBackendConfig(
     GameId GameId,
     string? RepositoryPath,
     string? LuaExecutablePath,
-    bool IsEnabled);
+    bool IsEnabled,
+    TimeSpan Timeout);
 
 public interface IProcessRunner
 {
@@ -54,7 +55,13 @@ public sealed class PobBackendLocator(IUserSettingsService settings) : IPobBacke
     {
         var repoPath = gameId == GameId.PathOfExile2 ? settings.Poe2PobPath : settings.Poe1PobPath;
         repoPath = FirstExistingDirectory(repoPath, DefaultRepoPath(gameId));
-        return new PobBackendConfig(gameId, repoPath, ResolveLua(settings.LuaExecutablePath), settings.EnablePobBackend);
+        var timeoutSeconds = Math.Clamp(settings.PobBackendTimeoutSeconds, 1, 600);
+        return new PobBackendConfig(
+            gameId,
+            repoPath,
+            ResolveLua(settings.LuaExecutablePath),
+            settings.EnablePobBackend,
+            TimeSpan.FromSeconds(timeoutSeconds));
     }
 
     private static string DefaultRepoPath(GameId gameId)
@@ -100,7 +107,6 @@ public sealed class PobBackendLocator(IUserSettingsService settings) : IPobBacke
 
 public sealed class PobCalculationService(IPobBackendLocator locator, IProcessRunner processRunner) : IPobCalculationService
 {
-    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -161,7 +167,7 @@ public sealed class PobCalculationService(IPobBackendLocator locator, IProcessRu
                 $"{Quote(adapter)} {Quote(inputPath)} {Quote(outputPath)}",
                 srcDir,
                 environment,
-                Timeout,
+                config.Timeout,
                 cancellationToken);
 
             if (result.TimedOut)
@@ -301,12 +307,30 @@ public sealed class PobCalculationService(IPobBackendLocator locator, IProcessRu
 
     private static string ConciseError(string prefix, string stderr, string stdout)
     {
-        var detail = FirstLine(stderr) ?? FirstLine(stdout);
+        var detail = FirstUsefulErrorLine(stderr) ?? FirstUsefulErrorLine(stdout) ?? FirstLine(stderr) ?? FirstLine(stdout);
         return detail is null ? $"{prefix}; showing saved DPS snapshot." : $"{prefix}: {detail}";
     }
 
     private static string? FirstLine(string value) =>
-        value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim();
+        value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(CleanConsoleLine)
+            .FirstOrDefault(line => !string.IsNullOrWhiteSpace(line));
+
+    private static string? FirstUsefulErrorLine(string value) =>
+        value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(CleanConsoleLine)
+            .FirstOrDefault(line =>
+                !string.IsNullOrWhiteSpace(line)
+                && !line.Equals("Error:", StringComparison.OrdinalIgnoreCase)
+                && !line.StartsWith("Loading main script", StringComparison.OrdinalIgnoreCase)
+                && !line.StartsWith("Press ", StringComparison.OrdinalIgnoreCase)
+                && line.Contains("error", StringComparison.OrdinalIgnoreCase));
+
+    private static string CleanConsoleLine(string value)
+    {
+        var cleaned = System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\^[0-9A-Fa-fx]{1,7}", string.Empty);
+        return cleaned.Trim();
+    }
 
     private static string BackendName(GameId gameId) =>
         gameId == GameId.PathOfExile2 ? "PathOfBuilding-PoE2" : "PathOfBuilding";
@@ -373,6 +397,7 @@ public sealed class ProcessRunner : IProcessRunner
                 WorkingDirectory = workingDirectory,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
+                RedirectStandardInput = true,
                 UseShellExecute = false,
             },
         };
@@ -382,6 +407,7 @@ public sealed class ProcessRunner : IProcessRunner
         }
 
         process.Start();
+        process.StandardInput.Close();
         var stdoutTask = process.StandardOutput.ReadToEndAsync(linkedCts.Token);
         var stderrTask = process.StandardError.ReadToEndAsync(linkedCts.Token);
         try

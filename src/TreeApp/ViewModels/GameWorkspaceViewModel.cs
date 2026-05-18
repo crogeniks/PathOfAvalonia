@@ -25,12 +25,14 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
         GameWorkspace workspace,
         MainWindowViewModel treePanel,
         ITreeImageAssetResolver imageResolver,
-        IRelayCommand backToLandingCommand)
+        IRelayCommand backToLandingCommand,
+        IRelayCommand openBackendSettingsCommand)
     {
         Workspace = workspace;
         TreePanel = treePanel;
         ImageResolver = imageResolver;
         BackToLandingCommand = backToLandingCommand;
+        OpenBackendSettingsCommand = openBackendSettingsCommand;
         _initialClassIndex = workspace.Spec.SelectedClassIndex;
         _initialAllocatedCount = workspace.Spec.AllocatedNodes.Count;
         workspace.Spec.SpecChanged += () => OnPropertyChanged(nameof(IsDirty));
@@ -40,6 +42,7 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
     public MainWindowViewModel TreePanel { get; }
     public ITreeImageAssetResolver ImageResolver { get; }
     public IRelayCommand BackToLandingCommand { get; }
+    public IRelayCommand OpenBackendSettingsCommand { get; }
     public string GameName => Workspace.Game.DisplayName;
     public string TreeVersion => Workspace.Tree.Version;
     public bool SupportsEquipment => Workspace.Game.FeatureFlags.SupportsEquipmentImport;

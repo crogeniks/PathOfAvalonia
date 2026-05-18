@@ -31,13 +31,37 @@ local ok, err = pcall(function()
   input:close()
 
   package.path = "../runtime/lua/?.lua;../runtime/lua/?/init.lua;?.lua;" .. package.path
+  package.preload["lua-utf8"] = package.preload["lua-utf8"] or function()
+    local utf8 = {}
+    utf8.gsub = string.gsub
+    utf8.find = string.find
+    utf8.match = string.match
+    utf8.reverse = string.reverse
+    utf8.sub = string.sub
+    utf8.len = string.len
+    utf8.lower = string.lower
+    utf8.upper = string.upper
+    utf8.char = string.char
+    utf8.byte = string.byte
+    utf8.next = function(value, index, direction)
+      value = value or ""
+      index = index or 0
+      direction = direction or 1
+      if direction < 0 then
+        return index > 1 and index - 1 or nil
+      end
+      return index < #value and index + 1 or nil
+    end
+    return utf8
+  end
   local wrapper = dofile("HeadlessWrapper.lua")
   local loadBuildFromXML = _G.loadBuildFromXML or (type(wrapper) == "table" and wrapper.loadBuildFromXML)
   if type(loadBuildFromXML) ~= "function" then
     error("HeadlessWrapper.lua did not expose loadBuildFromXML")
   end
 
-  local build = loadBuildFromXML(xml, "PathOfAvalonia import")
+  loadBuildFromXML(xml, "PathOfAvalonia import")
+  local build = _G.build or (type(wrapper) == "table" and wrapper.build)
   for _ = 1, 20 do
     if build and build.calcsTab and type(build.calcsTab.BuildOutput) == "function" then
       build.calcsTab:BuildOutput()

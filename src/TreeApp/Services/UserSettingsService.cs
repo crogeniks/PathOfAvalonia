@@ -13,6 +13,7 @@ public interface IUserSettingsService
     string? Poe2PobPath { get; set; }
     string? LuaExecutablePath { get; set; }
     bool EnablePobBackend { get; set; }
+    int PobBackendTimeoutSeconds { get; set; }
     void Save();
 }
 
@@ -30,7 +31,8 @@ public sealed class UserSettingsService : IUserSettingsService
     public string? Poe1PobPath { get; set; }
     public string? Poe2PobPath { get; set; }
     public string? LuaExecutablePath { get; set; }
-    public bool EnablePobBackend { get; set; } = true;
+    public bool EnablePobBackend { get; set; } = false;
+    public int PobBackendTimeoutSeconds { get; set; } = 120;
 
     public void Save()
     {
@@ -42,6 +44,7 @@ public sealed class UserSettingsService : IUserSettingsService
             Poe2PobPath = Poe2PobPath,
             LuaExecutablePath = LuaExecutablePath,
             EnablePobBackend = EnablePobBackend,
+            PobBackendTimeoutSeconds = PobBackendTimeoutSeconds,
         };
         File.WriteAllText(_path, JsonSerializer.Serialize(dto, JsonOpts));
     }
@@ -63,11 +66,15 @@ public sealed class UserSettingsService : IUserSettingsService
             Poe2PobPath = dto?.Poe2PobPath;
             LuaExecutablePath = dto?.LuaExecutablePath;
             EnablePobBackend = dto?.EnablePobBackend ?? true;
+            PobBackendTimeoutSeconds = dto?.PobBackendTimeoutSeconds is > 0
+                ? dto.PobBackendTimeoutSeconds.Value
+                : 120;
         }
         catch
         {
             LastGameId = null;
             EnablePobBackend = true;
+            PobBackendTimeoutSeconds = 120;
         }
     }
 
@@ -94,5 +101,6 @@ public sealed class UserSettingsService : IUserSettingsService
         [JsonPropertyName("poe2PobPath")] public string? Poe2PobPath { get; set; }
         [JsonPropertyName("luaExecutablePath")] public string? LuaExecutablePath { get; set; }
         [JsonPropertyName("enablePobBackend")] public bool? EnablePobBackend { get; set; }
+        [JsonPropertyName("pobBackendTimeoutSeconds")] public int? PobBackendTimeoutSeconds { get; set; }
     }
 }
