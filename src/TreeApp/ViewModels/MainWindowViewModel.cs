@@ -60,8 +60,12 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private IReadOnlyList<ImportedVariantOptionViewModel> _itemSetVariantOptions = [];
     [ObservableProperty] private bool _hasPassiveTreeVariants;
     [ObservableProperty] private bool _hasItemSetVariants;
+    [ObservableProperty] private bool _isTreeControlsCollapsed;
     [ObservableProperty] private int _selectedPassiveTreeVariantIndex;
     [ObservableProperty] private int _selectedItemSetVariantIndex;
+
+    public bool IsTreeControlsExpanded => !IsTreeControlsCollapsed;
+    public string TreeControlsToggleText => IsTreeControlsCollapsed ? "Show controls" : "Hide controls";
 
     public IBrush ImportStatusForeground =>
         string.IsNullOrEmpty(ImportStatus) ? StatusDefaultBrush :
@@ -167,6 +171,16 @@ public partial class MainWindowViewModel : ObservableObject
 
     partial void OnImportStatusIsErrorChanged(bool value) =>
         OnPropertyChanged(nameof(ImportStatusForeground));
+
+    partial void OnIsTreeControlsCollapsedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsTreeControlsExpanded));
+        OnPropertyChanged(nameof(TreeControlsToggleText));
+    }
+
+    [RelayCommand]
+    private void ToggleTreeControls() =>
+        IsTreeControlsCollapsed = !IsTreeControlsCollapsed;
 
     partial void OnSelectedPassiveTreeVariantIndexChanged(int value)
     {

@@ -9,6 +9,37 @@ namespace PathOfAvalonia.TreeDomain.Tests;
 public sealed class MainWindowViewModelTests
 {
     [Fact]
+    public void TreeControlsCanBeCollapsedAndExpanded()
+    {
+        var build = new ImportedBuild(
+            ClassId: 0,
+            AscendClassId: 0,
+            SecondaryAscendClassId: 0,
+            NodeHashes: [],
+            ClusterNodeHashes: [],
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: null,
+            Source: "test");
+        var vm = new MainWindowViewModel(LoadSpec(), new StubImportService(build), new EquipmentViewModel());
+
+        Assert.False(vm.IsTreeControlsCollapsed);
+        Assert.True(vm.IsTreeControlsExpanded);
+        Assert.Equal("Hide controls", vm.TreeControlsToggleText);
+
+        vm.ToggleTreeControlsCommand.Execute(null);
+
+        Assert.True(vm.IsTreeControlsCollapsed);
+        Assert.False(vm.IsTreeControlsExpanded);
+        Assert.Equal("Show controls", vm.TreeControlsToggleText);
+
+        vm.ToggleTreeControlsCommand.Execute(null);
+
+        Assert.False(vm.IsTreeControlsCollapsed);
+        Assert.True(vm.IsTreeControlsExpanded);
+        Assert.Equal("Hide controls", vm.TreeControlsToggleText);
+    }
+
+    [Fact]
     public void ImportUpdatesAscendancySelectionOnFirstImport()
     {
         var build = new ImportedBuild(

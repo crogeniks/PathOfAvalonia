@@ -63,14 +63,19 @@ public sealed class PobCalculationServiceTests : IDisposable
     public async Task TimeoutFallsBackToSavedSnapshot()
     {
         CreateBackendRepo();
-        var runner = new FakeProcessRunner((_, _, _, _, _, _) =>
-            Task.FromResult(new ProcessRunResult(-1, string.Empty, string.Empty, true)));
-        var service = new PobCalculationService(new FixedLocator(_repoPath, "lua"), runner);
+        TimeSpan? observedTimeout = null;
+        var runner = new FakeProcessRunner((_, _, _, _, timeout, _) =>
+        {
+            observedTimeout = timeout;
+            return Task.FromResult(new ProcessRunResult(-1, string.Empty, string.Empty, true));
+        });
+        var service = new PobCalculationService(new FixedLocator(_repoPath, "lua", TimeSpan.FromSeconds(90)), runner);
 
         var metrics = await service.CalculateAsync(GameId.PathOfExile2, Build(), CancellationToken.None);
 
         Assert.Equal(ImportedMetricSource.SavedXmlSnapshot, metrics.Source);
         Assert.Contains("timed out", metrics.ErrorMessage);
+        Assert.Equal(TimeSpan.FromSeconds(90), observedTimeout);
     }
 
     [Fact]
@@ -144,9 +149,9 @@ public sealed class PobCalculationServiceTests : IDisposable
         return matches[^1].Groups[1].Value;
     }
 
-    private sealed class FixedLocator(string? repoPath, string? luaPath) : IPobBackendLocator
+    private sealed class FixedLocator(string? repoPath, string? luaPath, TimeSpan? timeout = null) : IPobBackendLocator
     {
-        public PobBackendConfig Resolve(GameId gameId) => new(gameId, repoPath, luaPath, true);
+        public PobBackendConfig Resolve(GameId gameId) => new(gameId, repoPath, luaPath, true, timeout ?? TimeSpan.FromSeconds(120));
     }
 
     private sealed class FakeProcessRunner(

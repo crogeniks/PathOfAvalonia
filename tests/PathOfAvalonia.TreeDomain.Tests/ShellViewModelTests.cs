@@ -41,6 +41,29 @@ public sealed class ShellViewModelTests
         Assert.Equal(ShellPage.Workspace, vm.CurrentPage);
     }
 
+    [Fact]
+    public void SavesBackendSettings()
+    {
+        var settings = new StubSettings();
+        var vm = new ShellViewModel(new GameRegistry(), new StubAssets(), settings)
+        {
+            EnablePobBackend = false,
+            Poe1PobPath = " /pob1 ",
+            Poe2PobPath = " /pob2 ",
+            LuaExecutablePath = " luajit ",
+            PobBackendTimeoutSeconds = "180",
+        };
+
+        vm.SaveBackendSettingsCommand.Execute(null);
+
+        Assert.False(settings.EnablePobBackend);
+        Assert.Equal("/pob1", settings.Poe1PobPath);
+        Assert.Equal("/pob2", settings.Poe2PobPath);
+        Assert.Equal("luajit", settings.LuaExecutablePath);
+        Assert.Equal(180, settings.PobBackendTimeoutSeconds);
+        Assert.True(settings.Saved);
+    }
+
     private sealed class StubSettings : IUserSettingsService
     {
         public GameId? LastGameId { get; set; }
@@ -48,7 +71,9 @@ public sealed class ShellViewModelTests
         public string? Poe2PobPath { get; set; }
         public string? LuaExecutablePath { get; set; }
         public bool EnablePobBackend { get; set; } = true;
-        public void Save() { }
+        public int PobBackendTimeoutSeconds { get; set; } = 120;
+        public bool Saved { get; private set; }
+        public void Save() => Saved = true;
     }
 
     private sealed class StubAssets : IGameAssetService
