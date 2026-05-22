@@ -58,24 +58,27 @@ public sealed class PassiveSpec
         _ascendancyStartNodeByName = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var n in tree.Nodes.Values)
         {
-            if (n.Type == NodeType.ClassStart && n.ClassStartIndex is int idx)
+            if (n is { Type: NodeType.ClassStart, ClassStartIndex: { } idx })
             {
                 _classStartNodeByIndex[idx] = n.Id;
             }
-            if (n.Type == NodeType.ClassStart)
+            switch (n.Type)
             {
-                foreach (var classStartIdx in n.ClassStartIndexes)
+                case NodeType.ClassStart:
                 {
-                    _classStartNodeByIndex[classStartIdx] = n.Id;
+                    foreach (var classStartIdx in n.ClassStartIndexes)
+                    {
+                        _classStartNodeByIndex[classStartIdx] = n.Id;
+                    }
+
+                    break;
                 }
-            }
-            if (n.Type == NodeType.AscendancyStart && n.AscendancyName is { } ascendancyName)
-            {
-                _ascendancyStartNodeByName[ascendancyName] = n.Id;
-            }
-            if (n.Type == NodeType.Keystone)
-            {
-                _keystoneNodeIdsByName[n.Name] = n.Id;
+                case NodeType.AscendancyStart when n.AscendancyName is { } ascendancyName:
+                    _ascendancyStartNodeByName[ascendancyName] = n.Id;
+                    break;
+                case NodeType.Keystone:
+                    _keystoneNodeIdsByName[n.Name] = n.Id;
+                    break;
             }
         }
         _selectedClassIndex = 0;
@@ -90,7 +93,7 @@ public sealed class PassiveSpec
     public IReadOnlySet<int> AllocatedNodes => _allocated;
     public bool IsAllocated(int id) => _allocated.Contains(id);
     public PassiveAllocationSet AllocationSetOf(int nodeId) =>
-        _allocationSets.TryGetValue(nodeId, out var set) ? set : PassiveAllocationSet.Normal;
+        _allocationSets.GetValueOrDefault(nodeId, PassiveAllocationSet.Normal);
 
     public bool TryGetSocketedJewel(int socketNodeId, out ImportedItem item) =>
         _socketedJewels.TryGetValue(socketNodeId, out item!);
@@ -105,13 +108,8 @@ public sealed class PassiveSpec
         var stats = (IReadOnlyList<string>)node.Stats;
         var affectedBy = new List<int>();
         TimelessConqueror? conqueror = null;
-        foreach (var effect in _activeRadiusEffects)
+        foreach (var effect in _activeRadiusEffects.Where(effect => EffectAffectsNode(effect, nodeId)))
         {
-            if (!EffectAffectsNode(effect, nodeId))
-            {
-                continue;
-            }
-
             affectedBy.Add(effect.SocketNodeId);
             if (effect.Conqueror is { } c)
             {
@@ -136,11 +134,8 @@ public sealed class PassiveSpec
 
     public IReadOnlyList<ClusterJewelSize> AllowedClusterSizes(int socketId)
     {
-        if (!Features.SupportsClusterJewels)
-        {
-            return NoClusterSizes;
-        }
-        if (!TryGetNode(socketId, out var socket)
+        if (!Features.SupportsClusterJewels
+            || !TryGetNode(socketId, out var socket)
             || socket?.Type != NodeType.JewelSocket
             || socket.ExpansionSocket is not { } expansionSocket)
         {
