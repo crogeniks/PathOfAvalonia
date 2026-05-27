@@ -21,6 +21,46 @@ public sealed class Poe2TreeLoaderTests
     }
 
     [Fact]
+    public void LoadsGggExportVersions()
+    {
+        var tree04 = LoadTree("0.4.0");
+        var tree05 = LoadTree("0.5.0");
+
+        Assert.Equal("0.4.0", tree04.Version);
+        Assert.Equal("0.5.0", tree05.Version);
+        Assert.Contains("Ranger", tree04.Classes.ClassNames);
+        Assert.Contains("Ranger", tree05.Classes.ClassNames);
+        Assert.Contains(tree04.Nodes.Values, n => n.Type == NodeType.ClassStart);
+        Assert.Contains(tree05.Nodes.Values, n => n.Type == NodeType.ClassStart);
+    }
+
+    [Fact]
+    public void ComparesGggExportVersions()
+    {
+        var diff = TreeDiff.Compare(LoadTree("0.5.0"), LoadTree("0.4.0"));
+
+        Assert.True(diff.HasChanges);
+        Assert.True(diff.AddedCount + diff.ChangedCount + diff.RemovedCount > 0);
+    }
+
+    [Fact]
+    public void StatlessMasteryMarkersAreHiddenProxyNodes()
+    {
+        var tree = LoadTree();
+        var mastery = Assert.Single(tree.Nodes.Values.Where(n => n.Name == "Bow Mastery"));
+        var spec = new PassiveSpec(tree, tree.Classes, GameFeatureFlags.Poe2Milestone2);
+        var allocatedBefore = spec.AllocatedNodes.Count;
+
+        Assert.Equal(NodeType.Proxy, mastery.Type);
+        Assert.DoesNotContain(tree.Connectors, c => c.FromId == mastery.Id || c.ToId == mastery.Id);
+
+        spec.Toggle(mastery.Id);
+
+        Assert.DoesNotContain(mastery.Id, spec.AllocatedNodes);
+        Assert.Equal(allocatedBefore, spec.AllocatedNodes.Count);
+    }
+
+    [Fact]
     public void UsesOrbitAnglesAndWiresConnections()
     {
         var tree = LoadTree();
@@ -117,14 +157,31 @@ public sealed class Poe2TreeLoaderTests
 
     private static TreeModel LoadTree()
     {
-        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE2", "tree_0_4.json"));
+        return LoadTree("0.5.0");
+    }
+
+    private static TreeModel LoadTree(string version)
+    {
+        var path = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "..",
+            "assets",
+            "PoE2",
+            version.Replace('.', '_'),
+            "data.json"));
         using var stream = File.OpenRead(path);
-        return TreeLoader.LoadPoe2FromJson(stream, "0.4");
+        return TreeLoader.LoadPoe2FromJson(stream, version);
     }
 
     private static bool NeedsDrawableConnector(Node from, Node to)
     {
         return (from.GroupId == to.GroupId || from.AscendancyName is not null)
+            && from.Type != NodeType.Proxy
+            && to.Type != NodeType.Proxy
             && from.Type != NodeType.Mastery
             && to.Type != NodeType.Mastery
             && !((from.Type == NodeType.ClassStart && to.Type == NodeType.AscendancyStart)

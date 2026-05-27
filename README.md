@@ -7,8 +7,8 @@ planning workflows from Path of Building-style tooling.
 
 The app currently ships with embedded tree data and visual assets for:
 
-- Path of Exile, tree version `3.28`
-- Path of Exile 2, tree version `0.4`
+- Path of Exile, tree version `3.28.0`
+- Path of Exile 2, tree version `0.5.0`
 
 ## Features
 
@@ -27,11 +27,6 @@ The app currently ships with embedded tree data and visual assets for:
 
 - .NET SDK 10.0 or newer.
 - A desktop environment supported by Avalonia.
-
-For PoE2 asset regeneration only:
-
-- `zstd`
-- ImageMagick, available as `magick`
 
 ## Getting Started
 
@@ -69,8 +64,8 @@ assets/
   PoE2/           Path of Exile 2 tree data and visual assets
   Shared/         Shared jewel radius assets
 tools/
-  poe2-assets/    PoE2 sprite and atlas generation utility
-  tree-assets/    Notes for asset conversion and sprite-map generation
+  poe2-assets/    Legacy PoE2 sprite tooling for PoB-era assets
+  tree-assets/    Notes for asset conversion and historical sprite-map generation
 ```
 
 ## Development Notes
@@ -85,20 +80,17 @@ rendering is handled by `src/TreeApp/PassiveTreeView.cs`.
 
 ## Asset Generation
 
-The PoE2 sprite generator can rebuild the PoE2 sprite map and packed icon atlas
-from external Path of Building 2 tree data and assets:
+PoE2 now loads the official GGG passive tree export directly. Refresh the
+embedded PoE2 assets by copying a downloaded export into `assets/PoE2`:
 
 ```sh
-dotnet run --project tools/poe2-assets/generate-poe2-sprites.csproj -- \
-  --tree /path/to/PathOfBuilding-PoE2/src/TreeData/0_4/tree.json \
-  --tree-assets /path/to/PathOfBuilding-PoE2/src/TreeData/0_4 \
-  --ui-assets /path/to/PathOfBuilding-PoE2/src/Assets \
-  --out assets/PoE2 \
-  --version 0_4
+mkdir -p assets/PoE2/0_5_0/assets
+cp /path/to/poe2-skilltree-export-0.5.0/data.json assets/PoE2/0_5_0/data.json
+cp /path/to/poe2-skilltree-export-0.5.0/assets/* assets/PoE2/0_5_0/assets/
 ```
 
-See `tools/poe2-assets/README.md` for details about required source files and
-conversion behavior.
+At runtime the app derives each PoE2 sprite map from that version folder's
+`assets/skills.json`, `assets/frame.json`, and `assets/jewel.json`.
 
 ## Testing Focus
 

@@ -837,6 +837,11 @@ public sealed class PassiveSpec
 
     private bool CanAllocateNodeRules(Node node)
     {
+        if (Tree.GameId == GameId.PathOfExile2 && node.Type == NodeType.Mastery)
+        {
+            return false;
+        }
+
         if (node.AscendancyName is not { } ascendancyName)
         {
             return true;

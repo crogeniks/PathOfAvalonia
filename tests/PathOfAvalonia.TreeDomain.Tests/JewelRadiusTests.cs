@@ -20,7 +20,7 @@ public sealed class JewelRadiusTests
         Assert.Equal((960, 1320), Bounds(poe1[6]));
         Assert.Equal((2400, 2880), Bounds(poe1[10]));
 
-        var poe2 = JewelRadiusTable.For(GameId.PathOfExile2, "0.4");
+        var poe2 = JewelRadiusTable.For(GameId.PathOfExile2, "0.5.0");
         Assert.Equal((0, 1200), Bounds(poe2[1]));
         Assert.Equal((0, 1380), Bounds(poe2[2]));
         Assert.Equal((0, 1560), Bounds(poe2[3]));
@@ -45,7 +45,8 @@ public sealed class JewelRadiusTests
         var annulus = table[6];
         var member = tree.Nodes.Values.First(n =>
             n.Id != socket.Id &&
-            n.Type is not NodeType.Proxy and not NodeType.Mastery &&
+            n.Type is not NodeType.Proxy and not NodeType.Mastery and not NodeType.ClassStart and not NodeType.AscendancyStart &&
+            n.ExpansionSocket?.ParentSocketId is null &&
             DistanceSquared(n, socket) >= annulus.Inner * annulus.Inner &&
             DistanceSquared(n, socket) <= annulus.Outer * annulus.Outer);
         Assert.Contains(member.Id, sockets[socket.Id].NodesByRadiusIndex[6]);
@@ -137,11 +138,7 @@ public sealed class JewelRadiusTests
     public void EffectiveNodeStatsAreOverlayedWithoutMutatingBaseNode()
     {
         var tree = LoadPoe1Tree();
-        var socket = tree.Nodes.Values.First(n => n.Type == NodeType.JewelSocket);
-        var target = tree.Nodes.Values.First(n =>
-            n.Type == NodeType.Normal &&
-            n.Stats.Any(s => s.Contains("Strength", StringComparison.OrdinalIgnoreCase)) &&
-            DistanceSquared(n, socket) <= 960 * 960);
+        var (socket, target) = FindSocketAndStrengthTarget(tree);
         var spec = new PassiveSpec(tree);
         var item = RadiusItem(1, "Cobalt Jewel", """
             Radius: Small
@@ -194,11 +191,7 @@ public sealed class JewelRadiusTests
     public void ViewModelExposesActiveRadiiAndEffectiveStats()
     {
         var tree = LoadPoe1Tree();
-        var socket = tree.Nodes.Values.First(n => n.Type == NodeType.JewelSocket);
-        var target = tree.Nodes.Values.First(n =>
-            n.Type == NodeType.Normal &&
-            n.Stats.Any(s => s.Contains("Strength", StringComparison.OrdinalIgnoreCase)) &&
-            DistanceSquared(n, socket) <= 960 * 960);
+        var (socket, target) = FindSocketAndStrengthTarget(tree);
         var spec = new PassiveSpec(tree);
         var item = RadiusItem(1, "Cobalt Jewel", """
             Radius: Small
@@ -265,12 +258,29 @@ public sealed class JewelRadiusTests
 
     private static TreeModel LoadPoe1Tree()
     {
-        using var stream = File.OpenRead(Poe1Asset("tree_3_28.json"));
-        return TreeLoader.LoadFromJson(stream, "3.28");
+        using var stream = File.OpenRead(Poe1Asset("3_28_0", "data.json"));
+        return TreeLoader.LoadFromJson(stream, "3.28.0");
     }
 
-    private static string Poe1Asset(string fileName) =>
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE1", fileName));
+    private static (Node Socket, Node Target) FindSocketAndStrengthTarget(TreeModel tree)
+    {
+        foreach (var socket in tree.Nodes.Values.Where(n => n.Type == NodeType.JewelSocket))
+        {
+            var target = tree.Nodes.Values.FirstOrDefault(n =>
+                n.Type == NodeType.Normal &&
+                n.Stats.Any(s => s.Contains("Strength", StringComparison.OrdinalIgnoreCase)) &&
+                DistanceSquared(n, socket) <= 960 * 960);
+            if (target is not null)
+            {
+                return (socket, target);
+            }
+        }
+
+        throw new InvalidOperationException("No strength passive was found in a small jewel radius.");
+    }
+
+    private static string Poe1Asset(params string[] parts) =>
+        Path.GetFullPath(Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE1", .. parts]));
 
     private static string Poe1JewelAsset(string fileName) =>
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE1", "JewelRadius", fileName));

@@ -1,11 +1,12 @@
 # Generate PoE2 Sprite Map
 
-PoE2 milestone 1 ships with a minimal `assets/PoE2/sprites_0_4.json` so the tree can
-load and render with programmatic fallback frames.
+This note is historical. PoE2 now loads the official GGG atlas JSON files
+directly from `assets/PoE2/<version>/assets/` and no longer requires a generated
+`sprites_*.json` file.
 
-Future sprite-map generation should read `assets/PoE2/tree_0_4.json`, collect the
-passive icon and frame atlas references needed by visible nodes, and emit the same
-`SpriteMap` JSON shape used by PoE1:
+If a generated sprite map is needed again in the future, it should read
+`assets/PoE2/<version>/data.json` plus the exported atlas manifests under
+`assets/PoE2/<version>/assets/`, then emit the same `SpriteMap` JSON shape used by PoE1:
 
 ```json
 {
@@ -21,4 +22,3 @@ passive icon and frame atlas references needed by visible nodes, and emit the sa
 ```
 
 The app should continue to treat missing optional sprite entries as non-fatal.
-

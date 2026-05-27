@@ -84,6 +84,9 @@ public sealed class PassiveTreeView : Control
     private static readonly IBrush Poe2HoverFrameBrush = new SolidColorBrush(Color.FromArgb(0xF0, 0xD8, 0xC0, 0x78));
     private static readonly IBrush Poe2AllocatedFrameBrush = new SolidColorBrush(Color.FromArgb(0xF0, 0xE0, 0xB8, 0x58));
     private static readonly IBrush Poe2SocketFillBrush = new SolidColorBrush(Color.FromArgb(0xD0, 0x05, 0x06, 0x05));
+    private static readonly IBrush DiffAddedBrush = new SolidColorBrush(Color.FromArgb(0xF5, 0x00, 0xF0, 0x5A));
+    private static readonly IBrush DiffChangedBrush = new SolidColorBrush(Color.FromArgb(0x95, 0xF0, 0xC8, 0x4A));
+    private static readonly IBrush DiffRemovedBrush = new SolidColorBrush(Color.FromArgb(0x95, 0xE5, 0x56, 0x56));
     private static readonly IPen NodeOutlinePen = new Pen(Brushes.Black, 1.5);
     // Cluster background disc layers (programmatic stand-in for the missing art asset).
     // Colors approximate the PoB golden-medallion aesthetic.
@@ -482,6 +485,7 @@ public sealed class PassiveTreeView : Control
     private void DrawNodesAndHud(DrawingContext ctx, Rect visibleTree)
     {
         var allocated = _vm.AllocatedNodes;
+        DrawRemovedDiffNodes(ctx, visibleTree);
 
         // Base-tree nodes (skip proxies; skip jewel sockets that have an active cluster —
         // the cluster ring's slot 0 sits at the socket position and replaces it visually).
@@ -501,6 +505,7 @@ public sealed class PassiveTreeView : Control
             }
             var isHover = _vm.HoverNodeId == n.Id;
             var onPath = _vm.HoverPathNodes.Contains(n.Id);
+            DrawCurrentDiffHighlight(ctx, n);
             DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath, useClusterSocketFrame: true);
         }
 
@@ -520,11 +525,66 @@ public sealed class PassiveTreeView : Control
         }
 
         // HUD: alloc count. The hovered node details are drawn as a tooltip below.
-        var hud = $"v{_vm.Tree.Version} • allocated: {allocated.Count}";
+        var diff = _vm.Diff;
+        var diffText = diff.HasChanges
+            ? $" diff +{diff.AddedCount} ~{diff.ChangedCount} -{diff.RemovedCount}"
+            : string.Empty;
+        var hud = $"v{_vm.Tree.Version} • allocated: {allocated.Count}{diffText}";
         var ft = new FormattedText(hud, System.Globalization.CultureInfo.CurrentCulture,
             FlowDirection.LeftToRight, Typeface.Default, 14, Brushes.White);
         ctx.DrawText(ft, new Point(8, 8));
         DrawNodeTooltip(ctx);
+    }
+
+    private void DrawCurrentDiffHighlight(DrawingContext ctx, Node node)
+    {
+        if (!_vm.Diff.CurrentNodeDiffs.TryGetValue(node.Id, out var diff))
+        {
+            return;
+        }
+
+        var brush = diff.Kind switch
+        {
+            TreeNodeDiffKind.Added => DiffAddedBrush,
+            TreeNodeDiffKind.Changed => DiffChangedBrush,
+            _ => null,
+        };
+        if (brush is null)
+        {
+            return;
+        }
+
+        DrawDiffRing(ctx, node, brush, solidFill: false);
+    }
+
+    private void DrawRemovedDiffNodes(DrawingContext ctx, Rect visibleTree)
+    {
+        foreach (var diff in _vm.Diff.RemovedNodes)
+        {
+            var node = diff.Node;
+            if (!NodeIntersects(node, visibleTree))
+            {
+                continue;
+            }
+
+            DrawDiffRing(ctx, node, DiffRemovedBrush, solidFill: true);
+        }
+    }
+
+    private void DrawDiffRing(DrawingContext ctx, Node node, IBrush brush, bool solidFill)
+    {
+        var centre = TreeToScreen(node.X, node.Y);
+        var half = node.Visual is not null
+            ? Poe2FrameHalfSize(node, string.Empty)
+            : new Size(NodeRadius, NodeRadius);
+        var rx = Math.Max(NodeRadius * _scale, half.Width * _scale * 0.94);
+        var ry = Math.Max(NodeRadius * _scale, half.Height * _scale * 0.94);
+        var thickness = Math.Max(2.0, 9.0 * _scale);
+        ctx.DrawEllipse(solidFill ? new SolidColorBrush(Color.FromArgb(0x18, 0xE5, 0x56, 0x56)) : null,
+            new Pen(brush, thickness),
+            centre,
+            rx,
+            ry);
     }
 
     private void DrawNodeTooltip(DrawingContext ctx)

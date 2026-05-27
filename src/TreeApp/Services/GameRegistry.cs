@@ -15,11 +15,12 @@ public sealed class GameRegistry
             GameId.PathOfExile2,
             "Path of Exile 2",
             "PoE2",
-            "0.4",
+            "0.5.0",
             "Assets/PoE2",
             new Poe2TreeLoader(),
             new Poe2ImportStrategy(),
-            GameFeatureFlags.Poe2Milestone2),
+            GameFeatureFlags.Poe2Milestone2,
+            ["0.4.0", "0.5.0"]),
     ];
 
     public IReadOnlyList<GameDefinition> Games => _games;
@@ -45,9 +46,10 @@ public sealed class GameRegistry
         GameId.PathOfExile1,
         "Path of Exile",
         "PoE1",
-        "3.28",
+        "3.28.0",
         "Assets/PoE1",
         new Poe1TreeLoader(),
         new Poe1ImportStrategy(),
-        GameFeatureFlags.Poe1);
+        GameFeatureFlags.Poe1,
+        ["3.28.0"]);
 }

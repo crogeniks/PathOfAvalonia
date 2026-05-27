@@ -44,7 +44,7 @@ public sealed partial class ShellViewModel : ObservableObject
         {
             try
             {
-                OpenWorkspace(game);
+                OpenWorkspace(game, game.DefaultTreeVersion);
                 return;
             }
             catch
@@ -72,7 +72,8 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void SelectGame(GameId gameId)
     {
-        OpenWorkspace(_games.Get(gameId));
+        var game = _games.Get(gameId);
+        OpenWorkspace(game, game.DefaultTreeVersion);
     }
 
     [RelayCommand]
@@ -135,10 +136,10 @@ public sealed partial class ShellViewModel : ObservableObject
         StatusMessage = "PoB backend settings saved.";
     }
 
-    private void OpenWorkspace(GameDefinition game)
+    private void OpenWorkspace(GameDefinition game, string treeVersion)
     {
-        var tree = _assets.LoadTree(game);
-        var sprites = _assets.LoadSprites(game);
+        var tree = _assets.LoadTree(game, treeVersion);
+        var sprites = _assets.LoadSprites(game, treeVersion);
         var spec = new PassiveSpec(tree, tree.Classes, game.FeatureFlags);
         var equipment = new EquipmentViewModel();
         var treePanel = new MainWindowViewModel(spec, game.ImportStrategy, equipment, _pobCalculationService);
@@ -155,7 +156,9 @@ public sealed partial class ShellViewModel : ObservableObject
         ActiveWorkspace = new GameWorkspaceViewModel(
             workspace,
             treePanel,
-            new TreeImageAssetResolver(game),
+            new TreeImageAssetResolver(game, treeVersion),
+            _assets,
+            OpenWorkspace,
             BackToLandingCommand,
             OpenBackendSettingsCommand);
         CurrentPage = ShellPage.Workspace;

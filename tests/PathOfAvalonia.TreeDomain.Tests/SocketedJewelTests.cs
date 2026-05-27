@@ -66,8 +66,8 @@ public sealed class SocketedJewelTests
     [Fact]
     public void SpriteMapContainsSocketedJewelOverlayAssets()
     {
-        using var stream = File.OpenRead(AssetPath("sprites_3_28.json"));
-        var sprites = SpriteMap.LoadFromJson(stream);
+        using var stream = File.OpenRead(AssetPath("3_28_0", "data.json"));
+        var sprites = SpriteMap.LoadPoe1FromGggTree(stream, "3_28_0/assets");
 
         Assert.True(sprites.Atlases.ContainsKey("jewel"));
         foreach (var key in new[]
@@ -136,10 +136,10 @@ public sealed class SocketedJewelTests
 
     private static TreeModel LoadTree()
     {
-        using var stream = File.OpenRead(AssetPath("tree_3_28.json"));
-        return TreeLoader.LoadFromJson(stream, "3.28");
+        using var stream = File.OpenRead(AssetPath("3_28_0", "data.json"));
+        return TreeLoader.LoadFromJson(stream, "3.28.0");
     }
 
-    private static string AssetPath(string fileName) =>
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE1", fileName));
+    private static string AssetPath(params string[] parts) =>
+        Path.GetFullPath(Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE1", .. parts]));
 }

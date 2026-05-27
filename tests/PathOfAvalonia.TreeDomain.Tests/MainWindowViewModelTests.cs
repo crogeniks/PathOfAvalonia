@@ -417,9 +417,9 @@ public sealed class MainWindowViewModelTests
 
     private static TreeModel LoadTree()
     {
-        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE1", "tree_3_28.json"));
+        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE1", "3_28_0", "data.json"));
         using var stream = File.OpenRead(path);
-        return TreeLoader.LoadFromJson(stream, "3.28");
+        return TreeLoader.LoadFromJson(stream, "3.28.0");
     }
 
     private sealed class StubImportService(ImportedBuild build) : IImportService
