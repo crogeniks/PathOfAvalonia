@@ -166,15 +166,15 @@ public sealed class PassiveSpecTests
 
     private static TreeModel LoadTree()
     {
-        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE1", "tree_3_28.json"));
+        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE1", "3_28_0", "data.json"));
         using var stream = File.OpenRead(path);
-        return TreeLoader.LoadFromJson(stream, "3.28");
+        return TreeLoader.LoadFromJson(stream, "3.28.0");
     }
 
     private static TreeModel LoadPoe2Tree()
     {
-        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE2", "tree_0_4.json"));
+        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE2", "0_5_0", "data.json"));
         using var stream = File.OpenRead(path);
-        return TreeLoader.LoadPoe2FromJson(stream, "0.4");
+        return TreeLoader.LoadPoe2FromJson(stream, "0.5.0");
     }
 }

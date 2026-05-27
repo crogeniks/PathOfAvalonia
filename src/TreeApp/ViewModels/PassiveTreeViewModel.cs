@@ -16,6 +16,7 @@ public sealed class PassiveTreeViewModel
     private int? _hoverNodeId;
     private HoverPath _hoverPath = HoverPath.Empty;
     private HashSet<int> _hoverPathNodes = new();
+    private TreeDiff _diff = TreeDiff.Empty;
 
     // Fired whenever visual state changes (hover update or spec change).
     // PassiveTreeView subscribes and calls InvalidateVisual().
@@ -32,6 +33,7 @@ public sealed class PassiveTreeViewModel
     public int? HoverNodeId => _hoverNodeId;
     public HoverPath HoverPath => _hoverPath;
     public HashSet<int> HoverPathNodes => _hoverPathNodes;
+    public TreeDiff Diff => _diff;
     public Node? HoverNode
     {
         get
@@ -127,6 +129,12 @@ public sealed class PassiveTreeViewModel
         _hoverNodeId = nodeId;
         _hoverPath = nodeId is { } id ? _spec.HoverPathTo(id) : HoverPath.Empty;
         _hoverPathNodes = new HashSet<int>(_hoverPath.Nodes);
+        RedrawRequested?.Invoke();
+    }
+
+    public void SetDiff(TreeDiff? diff)
+    {
+        _diff = diff ?? TreeDiff.Empty;
         RedrawRequested?.Invoke();
     }
 

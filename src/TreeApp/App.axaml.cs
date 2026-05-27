@@ -33,8 +33,8 @@ public partial class App : Application
         sc.AddSingleton<IPobCalculationService, PobCalculationService>();
 
         // Singletons resolved from asset services at first request.
-        sc.AddSingleton(sp => sp.GetRequiredService<ITreeAssetService>().Load("3.28"));
-        sc.AddSingleton(sp => sp.GetRequiredService<ISpritesAssetService>().Load("3.28"));
+        sc.AddSingleton(sp => sp.GetRequiredService<ITreeAssetService>().Load("3.28.0"));
+        sc.AddSingleton(sp => sp.GetRequiredService<ISpritesAssetService>().Load("3.28.0"));
 
         // PassiveSpec constructor-injects TreeModel.
         sc.AddSingleton<PassiveSpec>();

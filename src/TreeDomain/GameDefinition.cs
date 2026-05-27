@@ -10,7 +10,12 @@ public sealed record GameDefinition(
     string AssetRoot,
     ITreeLoader TreeLoader,
     IImportStrategy ImportStrategy,
-    GameFeatureFlags FeatureFlags);
+    GameFeatureFlags FeatureFlags,
+    IReadOnlyList<string>? AvailableTreeVersions = null)
+{
+    public IReadOnlyList<string> TreeVersions =>
+        AvailableTreeVersions is { Count: > 0 } ? AvailableTreeVersions : [DefaultTreeVersion];
+}
 
 public interface ITreeLoader
 {

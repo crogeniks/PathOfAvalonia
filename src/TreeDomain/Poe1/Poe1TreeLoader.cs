@@ -36,8 +36,13 @@ public sealed class Poe1TreeLoader : ITreeLoader
         var clusterNodeTemplates = new Dictionary<string, Node>(StringComparer.Ordinal);
         var orbitInfo = new Dictionary<int, (int Group, int Orbit, double Cx, double Cy, double Angle, double Radius)>(dto.Nodes.Count);
 
-        foreach (var (_, nd) in dto.Nodes)
+        foreach (var (key, nd) in dto.Nodes)
         {
+            if (!TryResolveNodeId(key, nd, out var id))
+            {
+                continue;
+            }
+
             if (nd.Group is null || !dto.Groups.TryGetValue(nd.Group.Value.ToString(), out var grp))
             {
                 var templateType = ClassifyNode(nd);
@@ -45,7 +50,7 @@ public sealed class Poe1TreeLoader : ITreeLoader
                 {
                     clusterNodeTemplates[nd.Name] = new Node
                     {
-                        Id = nd.Id,
+                        Id = id,
                         Name = nd.Name,
                         Type = templateType,
                         X = 0,
@@ -98,10 +103,10 @@ public sealed class Poe1TreeLoader : ITreeLoader
                 effects = list;
             }
             var expansionSocket = ParseExpansionSocket(nd);
-            nodes[nd.Id] = new Node
+            nodes[id] = new Node
             {
-                Id = nd.Id,
-                Name = nd.Name ?? $"Node {nd.Id}",
+                Id = id,
+                Name = nd.Name ?? $"Node {id}",
                 Type = type,
                 X = x,
                 Y = y,
@@ -119,15 +124,15 @@ public sealed class Poe1TreeLoader : ITreeLoader
                 ExpansionSocket = expansionSocket,
                 MasteryEffects = effects,
             };
-            orbitInfo[nd.Id] = (nd.Group.Value, orbit, grp.X, grp.Y, angle, radius);
+            orbitInfo[id] = (nd.Group.Value, orbit, grp.X, grp.Y, angle, radius);
         }
 
         // Wire links (union of in + out), skip pairs that don't both resolve.
         var connectorSet = new HashSet<(int, int)>();
         var connectors = new List<Connector>();
-        foreach (var (_, nd) in dto.Nodes)
+        foreach (var (key, nd) in dto.Nodes)
         {
-            if (!nodes.TryGetValue(nd.Id, out var me))
+            if (!TryResolveNodeId(key, nd, out var id) || !nodes.TryGetValue(id, out var me))
             {
                 continue;
             }
@@ -163,8 +168,8 @@ public sealed class Poe1TreeLoader : ITreeLoader
                     continue;
                 }
 
-                var a = Math.Min(nd.Id, neighId);
-                var b = Math.Max(nd.Id, neighId);
+                var a = Math.Min(id, neighId);
+                var b = Math.Max(id, neighId);
                 if (!connectorSet.Add((a, b)))
                 {
                     continue;
@@ -223,6 +228,21 @@ public sealed class Poe1TreeLoader : ITreeLoader
             nd.ExpansionJewel.Index,
             int.Parse(nd.ExpansionJewel.Proxy),
             string.IsNullOrEmpty(nd.ExpansionJewel.Parent) ? null : int.Parse(nd.ExpansionJewel.Parent));
+    }
+
+    private static bool TryResolveNodeId(string key, NodeDto nd, out int id)
+    {
+        if (nd.Id > 0)
+        {
+            id = nd.Id;
+            return true;
+        }
+        if (nd.Skill is { } skill)
+        {
+            id = skill;
+            return true;
+        }
+        return int.TryParse(key, out id);
     }
 
     private static IReadOnlyList<string> NormalizeLines(string[]? values)
@@ -358,6 +378,7 @@ public sealed class Poe1TreeLoader : ITreeLoader
     private sealed class NodeDto
     {
         [JsonPropertyName("id")] public int Id { get; set; }
+        [JsonPropertyName("skill")] public int? Skill { get; set; }
         [JsonPropertyName("name")] public string? Name { get; set; }
         [JsonPropertyName("icon")] public string? Icon { get; set; }
         [JsonPropertyName("activeIcon")] public string? ActiveIcon { get; set; }

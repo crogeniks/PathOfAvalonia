@@ -78,8 +78,9 @@ public sealed class ShellViewModelTests
 
     private sealed class StubAssets : IGameAssetService
     {
-        public TreeModel LoadTree(GameDefinition game)
+        public TreeModel LoadTree(GameDefinition game, string? version = null)
         {
+            version ??= game.DefaultTreeVersion;
             var start = new Node
             {
                 Id = 1,
@@ -108,7 +109,7 @@ public sealed class ShellViewModelTests
             return new TreeModel
             {
                 GameId = game.Id,
-                Version = game.DefaultTreeVersion,
+                Version = version,
                 Classes = game.Id == GameId.PathOfExile1
                     ? ClassCatalog.CreatePoe1()
                     : new ClassCatalog
@@ -129,7 +130,7 @@ public sealed class ShellViewModelTests
             };
         }
 
-        public SpriteMap LoadSprites(GameDefinition game) => new()
+        public SpriteMap LoadSprites(GameDefinition game, string? version = null) => new()
         {
             Atlases = new Dictionary<string, SpriteAtlas>(),
         };

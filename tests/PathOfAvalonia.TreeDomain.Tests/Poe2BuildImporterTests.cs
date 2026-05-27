@@ -453,9 +453,9 @@ public sealed class Poe2BuildImporterTests
 
     private static TreeModel LoadTree()
     {
-        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE2", "tree_0_4.json"));
+        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE2", "0_5_0", "data.json"));
         using var stream = File.OpenRead(path);
-        return TreeLoader.LoadPoe2FromJson(stream, "0.4");
+        return TreeLoader.LoadPoe2FromJson(stream, "0.5.0");
     }
 
     private static string EncodeBuildXml(string xml)
