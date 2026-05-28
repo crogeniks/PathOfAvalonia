@@ -27,6 +27,9 @@ public partial class App : Application
         sc.AddSingleton<IUserPathService, UserPathService>();
         sc.AddSingleton<IBuildPlannerPathService, BuildPlannerPathService>();
         sc.AddSingleton<ITextFileSaveService, TextFileSaveService>();
+        sc.AddSingleton<IGameAssetLayout, Poe1GameAssetLayout>();
+        sc.AddSingleton<IGameAssetLayout, Poe2GameAssetLayout>();
+        sc.AddSingleton<IGameAssetLayoutRegistry, GameAssetLayoutRegistry>();
         sc.AddSingleton<IGameAssetService, GameAssetService>();
         sc.AddSingleton<IBuildPlannerExportService, BuildPlannerExportService>();
         sc.AddSingleton<IStorageProviderAccessor, StorageProviderAccessor>();
