@@ -34,7 +34,7 @@ public static class RawItemParser
 
         if (i < lines.Length && !lines[i].Trim().StartsWith("---", StringComparison.Ordinal))
         {
-            name = StripTags(lines[i++].Trim());
+            name = ItemText.StripTags(lines[i++].Trim());
         }
 
         while (i < lines.Length && string.IsNullOrWhiteSpace(lines[i]))
@@ -45,7 +45,7 @@ public static class RawItemParser
         var ru = rarity.ToUpperInvariant();
         if ((ru == "RARE" || ru == "UNIQUE") && i < lines.Length && !lines[i].Trim().StartsWith("---", StringComparison.Ordinal))
         {
-            baseType = StripTags(lines[i].Trim());
+            baseType = ItemText.StripTags(lines[i].Trim());
         }
         else
         {
@@ -64,7 +64,7 @@ public static class RawItemParser
             }
             else if (line.StartsWith("Rune:", StringComparison.OrdinalIgnoreCase))
             {
-                runes.Add(StripTags(line[5..].Trim()));
+                runes.Add(ItemText.StripTags(line[5..].Trim()));
             }
         }
 
@@ -75,18 +75,4 @@ public static class RawItemParser
         };
     }
 
-    private static string StripTags(string text)
-    {
-        var span = text.AsSpan();
-        while (span.StartsWith("{", StringComparison.Ordinal))
-        {
-            var close = span.IndexOf('}');
-            if (close < 0)
-            {
-                break;
-            }
-            span = span[(close + 1)..];
-        }
-        return span.ToString();
-    }
 }
