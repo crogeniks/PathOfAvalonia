@@ -11,6 +11,7 @@ public sealed class Node
     public string? Icon { get; init; }
     public NodeVisual? Visual { get; init; }
     public IReadOnlyList<string> Stats { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<IReadOnlyList<TextSpan>> StatLinkSpans { get; init; } = Array.Empty<IReadOnlyList<TextSpan>>();
     public IReadOnlyList<string> ReminderText { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> FlavourText { get; init; } = Array.Empty<string>();
     // Masteries have separate sprite keys per state, in different atlases
@@ -33,6 +34,7 @@ public sealed class Node
     public List<Node> LinkedNodes { get; } = new();
 }
 
+public sealed record TextSpan(int Start, int Length);
 public sealed record MasteryEffect(int Id, IReadOnlyList<string> Stats);
 public sealed record ExpansionSocketInfo(int Size, int Index, int ProxyNodeId, int? ParentSocketId);
 public sealed record NodeVisual(

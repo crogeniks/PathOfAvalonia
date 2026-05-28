@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -94,6 +95,7 @@ public sealed class Poe2TreeLoader : ITreeLoader
             var classStartIndexes = ResolveLegacyClassStartIndexes(nd, classIndexByName);
             var classStartIndex = classStartIndexes.Count > 0 ? classStartIndexes[0] : (int?)null;
             var type = ClassifyLegacyNode(nd, classStartIndexes);
+            var stats = NormalizeDescriptionLines(nd.Stats);
             nodes[id] = new Node
             {
                 Id = id,
@@ -109,7 +111,8 @@ public sealed class Poe2TreeLoader : ITreeLoader
                     nd.NodeOverlay?.Unalloc,
                     nd.ConnectionArt,
                     IconPathIsAssetPath: true),
-                Stats = NormalizeLines(nd.Stats),
+                Stats = stats.Lines,
+                StatLinkSpans = stats.LinkSpans,
                 AscendancyName = nd.AscendancyName,
                 ClassStartIndex = classStartIndex,
                 ClassStartIndexes = classStartIndexes,
@@ -219,6 +222,7 @@ public sealed class Poe2TreeLoader : ITreeLoader
             var classStartIndex = classStartIndexes.Count > 0 ? classStartIndexes[0] : (int?)null;
             var ascendancyName = ResolveAscendancyName(nd.AscendancyId, ascendancyNameById);
 
+            var stats = NormalizeDescriptionLines(nd.Stats);
             nodes[id] = new Node
             {
                 Id = id,
@@ -235,7 +239,8 @@ public sealed class Poe2TreeLoader : ITreeLoader
                     null,
                     null,
                     IconPathIsAssetPath: true),
-                Stats = NormalizeLines(nd.Stats),
+                Stats = stats.Lines,
+                StatLinkSpans = stats.LinkSpans,
                 AscendancyName = ascendancyName,
                 ClassStartIndex = classStartIndex,
                 ClassStartIndexes = classStartIndexes,
@@ -666,7 +671,7 @@ public sealed class Poe2TreeLoader : ITreeLoader
                 var trimmed = line.Trim();
                 if (trimmed.Length > 0)
                 {
-                    lines.Add(trimmed);
+                    lines.Add(PlainDescriptionText(trimmed).Text);
                 }
             }
         }
@@ -674,6 +679,79 @@ public sealed class Poe2TreeLoader : ITreeLoader
         return lines;
     }
 
+    private static NormalizedDescriptionLines NormalizeDescriptionLines(string[]? values)
+    {
+        if (values is null || values.Length == 0)
+        {
+            return new NormalizedDescriptionLines(Array.Empty<string>(), Array.Empty<IReadOnlyList<TextSpan>>());
+        }
+
+        var lines = new List<string>();
+        var linkSpans = new List<IReadOnlyList<TextSpan>>();
+        foreach (var value in values)
+        {
+            foreach (var line in value.Replace("\r\n", "\n").Split('\n'))
+            {
+                var trimmed = line.Trim();
+                if (trimmed.Length == 0)
+                {
+                    continue;
+                }
+
+                var parsed = PlainDescriptionText(trimmed);
+                lines.Add(parsed.Text);
+                linkSpans.Add(parsed.LinkSpans);
+            }
+        }
+
+        return new NormalizedDescriptionLines(lines, linkSpans);
+    }
+
+    private static ParsedDescriptionText PlainDescriptionText(string value)
+    {
+        var openIndex = value.IndexOf('[');
+        if (openIndex < 0)
+        {
+            return new ParsedDescriptionText(value, Array.Empty<TextSpan>());
+        }
+
+        var result = new StringBuilder(value.Length);
+        var linkSpans = new List<TextSpan>();
+        var index = 0;
+        while (index < value.Length)
+        {
+            openIndex = value.IndexOf('[', index);
+            if (openIndex < 0)
+            {
+                result.Append(value, index, value.Length - index);
+                break;
+            }
+
+            var closeIndex = value.IndexOf(']', openIndex + 1);
+            if (closeIndex < 0)
+            {
+                result.Append(value, index, value.Length - index);
+                break;
+            }
+
+            result.Append(value, index, openIndex - index);
+            var pipeIndex = value.IndexOf('|', openIndex + 1, closeIndex - openIndex - 1);
+            var displayStart = pipeIndex >= 0 ? pipeIndex + 1 : openIndex + 1;
+            var resultStart = result.Length;
+            var displayLength = closeIndex - displayStart;
+            result.Append(value, displayStart, displayLength);
+            if (displayLength > 0)
+            {
+                linkSpans.Add(new TextSpan(resultStart, displayLength));
+            }
+            index = closeIndex + 1;
+        }
+
+        return new ParsedDescriptionText(result.ToString(), linkSpans);
+    }
+
     private sealed record OrbitInfo(int Group, int Orbit, double Cx, double Cy, double Angle, double Radius);
     private sealed record OrbitData(int[] SkillsPerOrbit, double[] OrbitRadii, IReadOnlyList<double>[] OrbitAngles);
+    private sealed record ParsedDescriptionText(string Text, IReadOnlyList<TextSpan> LinkSpans);
+    private sealed record NormalizedDescriptionLines(IReadOnlyList<string> Lines, IReadOnlyList<IReadOnlyList<TextSpan>> LinkSpans);
 }

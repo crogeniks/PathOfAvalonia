@@ -43,6 +43,19 @@ public sealed class Poe2TreeLoaderTests
     }
 
     [Fact]
+    public void DisplaysGggDescriptionLinksAsPlainText()
+    {
+        var tree = LoadTree("0.5.0");
+
+        Assert.Equal(
+            ["+30 to Accuracy Rating", "8% increased Melee Attack Speed"],
+            tree.Nodes[7604].Stats);
+        Assert.Equal([new TextSpan(7, 8)], tree.Nodes[7604].StatLinkSpans[0]);
+        Assert.Equal([new TextSpan(13, 5), new TextSpan(19, 6)], tree.Nodes[7604].StatLinkSpans[1]);
+        Assert.DoesNotContain(tree.Nodes.Values.SelectMany(n => n.Stats), stat => stat.Contains('[') || stat.Contains(']'));
+    }
+
+    [Fact]
     public void ComparesGggExportVersions()
     {
         var diff = TreeDiff.Compare(LoadTree("0.5.0"), LoadTree("0.4.0"));
