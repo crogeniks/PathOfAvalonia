@@ -769,11 +769,11 @@ public sealed class PassiveTreeView : Control
         double width,
         double height)
     {
-        var cy = y + (height - TextBlockHeight(titleLines)) * 0.5 - 1;
+        var lineY = y + (height - TextBlockHeight(titleLines)) * 0.5 - 1;
         foreach (var line in titleLines)
         {
-            ctx.DrawText(line, new Point(x + (width - line.Width) * 0.5, cy));
-            cy += line.Height + 2;
+            ctx.DrawText(line, new Point(x + (width - line.Width) * 0.5, lineY));
+            lineY += line.Height + 2;
         }
     }
 
@@ -792,33 +792,31 @@ public sealed class PassiveTreeView : Control
             textHeight += 1;
         }
 
-        var cy = y + (height - textHeight) * 0.5 - 1;
+        var lineY = y + (height - textHeight) * 0.5 - 1;
         foreach (var line in titleLines)
         {
-            ctx.DrawText(line, new Point(x + (width - line.Width) * 0.5, cy));
-            cy += line.Height + 2;
+            ctx.DrawText(line, new Point(x + (width - line.Width) * 0.5, lineY));
+            lineY += line.Height + 2;
         }
 
         if (titleLines.Count > 0 && subtitleLines.Count > 0)
         {
-            cy -= 1;
+            lineY -= 1;
         }
 
         foreach (var line in subtitleLines)
         {
-            ctx.DrawText(line, new Point(x + (width - line.Width) * 0.5, cy));
-            cy += line.Height + 2;
+            ctx.DrawText(line, new Point(x + (width - line.Width) * 0.5, lineY));
+            lineY += line.Height + 2;
         }
     }
 
     private static double MaxTextWidth(IReadOnlyList<FormattedText> lines)
     {
-        var max = 0.0;
-        foreach (var line in lines)
-        {
-            max = Math.Max(max, line.Width);
-        }
-        return max;
+        return lines
+            .Select(line => line.Width)
+            .Prepend(0.0)
+            .Max();
     }
 
     private static double MaxTextWidth(IEnumerable<TooltipLine> lines)
