@@ -15,8 +15,8 @@ public partial class MainWindowViewModel : ObservableObject
 {
     private readonly PassiveSpec _spec;
     private readonly IImportStrategy _importStrategy;
-    private readonly IBuildPlannerExportService? _buildPlannerExportService;
-    private readonly IStorageProviderAccessor? _storageProviderAccessor;
+    private readonly IBuildPlannerExportService _buildPlannerExportService;
+    private readonly IStorageProviderAccessor _storageProviderAccessor;
     private bool _syncingClass;
     private bool _syncingAscendancy;
     private bool _syncingVariants;
@@ -72,26 +72,12 @@ public partial class MainWindowViewModel : ObservableObject
         string.IsNullOrEmpty(ImportStatus) ? StatusDefaultBrush :
         ImportStatusIsError ? StatusErrorBrush : StatusSuccessBrush;
 
-    public MainWindowViewModel(PassiveSpec spec, IImportStrategy importStrategy, EquipmentViewModel equipment)
-        : this(spec, importStrategy, equipment, null)
-    {
-    }
-
     public MainWindowViewModel(
         PassiveSpec spec,
         IImportStrategy importStrategy,
         EquipmentViewModel equipment,
-        IBuildPlannerExportService? buildPlannerExportService)
-        : this(spec, importStrategy, equipment, buildPlannerExportService, null)
-    {
-    }
-
-    public MainWindowViewModel(
-        PassiveSpec spec,
-        IImportStrategy importStrategy,
-        EquipmentViewModel equipment,
-        IBuildPlannerExportService? buildPlannerExportService,
-        IStorageProviderAccessor? storageProviderAccessor)
+        IBuildPlannerExportService buildPlannerExportService,
+        IStorageProviderAccessor storageProviderAccessor)
     {
         _spec = spec;
         _importStrategy = importStrategy;
@@ -342,8 +328,8 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private async Task ExportBuildPlanner()
     {
-        var storageProvider = _storageProviderAccessor?.StorageProvider;
-        if (_buildPlannerExportService is null || storageProvider is null || _lastImportedBuild is not { } build)
+        var storageProvider = _storageProviderAccessor.StorageProvider;
+        if (storageProvider is null || _lastImportedBuild is not { } build)
         {
             return;
         }

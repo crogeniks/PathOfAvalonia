@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PathOfAvalonia.TreeApp.Services;
@@ -21,16 +20,6 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly IUserSettingsService _settings;
     private readonly IBuildPlannerExportService _buildPlannerExportService;
     private readonly IStorageProviderAccessor _storageProviderAccessor;
-
-    public ShellViewModel(GameRegistry games, IGameAssetService assets, IUserSettingsService settings)
-        : this(
-            games,
-            assets,
-            settings,
-            NullBuildPlannerExportService.Instance,
-            NullStorageProviderAccessor.Instance)
-    {
-    }
 
     public ShellViewModel(
         GameRegistry games,
@@ -142,24 +131,5 @@ public sealed partial class ShellViewModel : ObservableObject
     {
         ActiveWorkspace = null;
         CurrentPage = ShellPage.Landing;
-    }
-
-    private sealed class NullBuildPlannerExportService : IBuildPlannerExportService
-    {
-        public static NullBuildPlannerExportService Instance { get; } = new();
-
-        public Task<BuildPlannerExportFileResult?> ExportAsync(
-            Avalonia.Platform.Storage.IStorageProvider storageProvider,
-            TreeModel tree,
-            ClassCatalog classes,
-            PathOfAvalonia.TreeDomain.Import.ImportedBuild build,
-            System.Threading.CancellationToken cancellationToken) =>
-            Task.FromResult<BuildPlannerExportFileResult?>(null);
-    }
-
-    private sealed class NullStorageProviderAccessor : IStorageProviderAccessor
-    {
-        public static NullStorageProviderAccessor Instance { get; } = new();
-        public Avalonia.Platform.Storage.IStorageProvider? StorageProvider { get; set; }
     }
 }
