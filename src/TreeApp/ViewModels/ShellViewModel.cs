@@ -125,7 +125,7 @@ public sealed partial class ShellViewModel : ObservableObject
         ActiveWorkspace = new GameWorkspaceViewModel(
             workspace,
             treePanel,
-            new TreeImageAssetResolver(game, treeVersion),
+            new TreeImageAssetResolver(game, _assets, treeVersion),
             _assets,
             OpenWorkspace,
             BackToLandingCommand);

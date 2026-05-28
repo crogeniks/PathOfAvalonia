@@ -72,11 +72,6 @@ public partial class MainWindowViewModel : ObservableObject
         string.IsNullOrEmpty(ImportStatus) ? StatusDefaultBrush :
         ImportStatusIsError ? StatusErrorBrush : StatusSuccessBrush;
 
-    public MainWindowViewModel(PassiveSpec spec, IImportService importService, EquipmentViewModel equipment)
-        : this(spec, new ImportServiceStrategyAdapter(importService), equipment)
-    {
-    }
-
     public MainWindowViewModel(PassiveSpec spec, IImportStrategy importStrategy, EquipmentViewModel equipment)
         : this(spec, importStrategy, equipment, null)
     {
@@ -415,12 +410,6 @@ public partial class MainWindowViewModel : ObservableObject
             }
         }
         return -1;
-    }
-
-    private sealed class ImportServiceStrategyAdapter(IImportService importService) : IImportStrategy
-    {
-        public bool IsSupported => true;
-        public ImportedBuild Import(string text) => importService.Import(text);
     }
 }
 

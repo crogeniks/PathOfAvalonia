@@ -24,16 +24,14 @@ public partial class App : Application
 
         sc.AddSingleton<GameRegistry>();
         sc.AddSingleton<IUserSettingsService, UserSettingsService>();
+        sc.AddSingleton<IUserPathService, UserPathService>();
         sc.AddSingleton<IGameAssetService, GameAssetService>();
-        sc.AddSingleton<ITreeAssetService, TreeAssetService>();
-        sc.AddSingleton<ISpritesAssetService, SpritesAssetService>();
-        sc.AddSingleton<IImportService, ImportService>();
         sc.AddSingleton<IBuildPlannerExportService, BuildPlannerExportService>();
         sc.AddSingleton<IStorageProviderAccessor, StorageProviderAccessor>();
 
         // Singletons resolved from asset services at first request.
-        sc.AddSingleton(sp => sp.GetRequiredService<ITreeAssetService>().Load("3.28.0"));
-        sc.AddSingleton(sp => sp.GetRequiredService<ISpritesAssetService>().Load("3.28.0"));
+        sc.AddSingleton(sp => sp.GetRequiredService<IGameAssetService>().LoadTree(sp.GetRequiredService<GameRegistry>().Get(GameId.PathOfExile1)));
+        sc.AddSingleton(sp => sp.GetRequiredService<IGameAssetService>().LoadSprites(sp.GetRequiredService<GameRegistry>().Get(GameId.PathOfExile1)));
 
         // PassiveSpec constructor-injects TreeModel.
         sc.AddSingleton<PassiveSpec>();

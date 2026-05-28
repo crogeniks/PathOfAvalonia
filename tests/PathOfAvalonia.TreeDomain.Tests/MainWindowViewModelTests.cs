@@ -20,7 +20,7 @@ public sealed class MainWindowViewModelTests
             MasterySelections: new Dictionary<int, int>(),
             TreeVersion: null,
             Source: "test");
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportService(build), new EquipmentViewModel());
+        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel());
 
         Assert.False(vm.IsTreeControlsCollapsed);
         Assert.True(vm.IsTreeControlsExpanded);
@@ -51,7 +51,7 @@ public sealed class MainWindowViewModelTests
             MasterySelections: new Dictionary<int, int>(),
             TreeVersion: null,
             Source: "test");
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportService(build), new EquipmentViewModel())
+        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel())
         {
             ImportInput = "test",
         };
@@ -71,7 +71,7 @@ public sealed class MainWindowViewModelTests
         var build = BuildWithPassiveVariants(
             PassiveVariant(0, "Leveling", nodes[0]),
             PassiveVariant(1, "Endgame", nodes[1]));
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportService(build), new EquipmentViewModel())
+        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel())
         {
             ImportInput = "test",
         };
@@ -90,7 +90,7 @@ public sealed class MainWindowViewModelTests
         var build = BuildWithPassiveVariants(
             PassiveVariant(0, "Leveling", nodes[0]),
             PassiveVariant(1, "Endgame", nodes[1]));
-        var vm = new MainWindowViewModel(spec, new StubImportService(build), new EquipmentViewModel())
+        var vm = new MainWindowViewModel(spec, new StubImportStrategy(build), new EquipmentViewModel())
         {
             ImportInput = "test",
         };
@@ -108,7 +108,7 @@ public sealed class MainWindowViewModelTests
         var build = BuildWithItemSetVariants(
             ItemSetVariant(0, 1, "Boss Gear", ImportedItem("First Ring")),
             ItemSetVariant(1, 2, "Mapping Gear", ImportedItem("Second Ring")));
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportService(build), new EquipmentViewModel())
+        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel())
         {
             ImportInput = "test",
         };
@@ -126,7 +126,7 @@ public sealed class MainWindowViewModelTests
         var build = BuildWithItemSetVariants(
             ItemSetVariant(0, 1, "Boss Gear", ImportedItem("First Ring")),
             ItemSetVariant(1, 2, "Mapping Gear", ImportedItem("Second Ring")));
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportService(build), equipment)
+        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), equipment)
         {
             ImportInput = "test",
         };
@@ -152,7 +152,7 @@ public sealed class MainWindowViewModelTests
                 ItemSetVariant(1, 2, "Mapping Gear", ImportedItem("Second Ring")),
             ],
         };
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportService(build), new EquipmentViewModel())
+        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel())
         {
             ImportInput = "test",
         };
@@ -186,7 +186,7 @@ public sealed class MainWindowViewModelTests
                 [nodes[1]] = PassiveAllocationSet.WeaponSet2,
             },
         };
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportService(build), new EquipmentViewModel())
+        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel())
         {
             ImportInput = "test",
         };
@@ -216,7 +216,7 @@ public sealed class MainWindowViewModelTests
                 0),
             Metrics = ImportedBuildMetrics.Empty with { Source = ImportedMetricSource.SavedXmlSnapshot },
         };
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportService(build), new EquipmentViewModel())
+        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel())
         {
             ImportInput = "test",
         };
@@ -252,7 +252,7 @@ public sealed class MainWindowViewModelTests
                 SkillDps = [new ImportedSkillDpsMetric("Spark", 10, "10", 1, null, null)],
             },
         };
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportService(build), equipment)
+        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), equipment)
         {
             ImportInput = "test",
         };
@@ -392,11 +392,6 @@ public sealed class MainWindowViewModelTests
         var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE1", "3_28_0", "data.json"));
         using var stream = File.OpenRead(path);
         return TreeLoader.LoadFromJson(stream, "3.28.0");
-    }
-
-    private sealed class StubImportService(ImportedBuild build) : IImportService
-    {
-        public ImportedBuild Import(string text) => build;
     }
 
     private sealed class StubImportStrategy(ImportedBuild build) : IImportStrategy
