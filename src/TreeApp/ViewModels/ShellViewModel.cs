@@ -21,9 +21,17 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly IGameAssetService _assets;
     private readonly IUserSettingsService _settings;
     private readonly IPobCalculationService _pobCalculationService;
+    private readonly IBuildPlannerExportService _buildPlannerExportService;
+    private readonly IStorageProviderAccessor _storageProviderAccessor;
 
     public ShellViewModel(GameRegistry games, IGameAssetService assets, IUserSettingsService settings)
-        : this(games, assets, settings, NullPobCalculationService.Instance)
+        : this(
+            games,
+            assets,
+            settings,
+            NullPobCalculationService.Instance,
+            NullBuildPlannerExportService.Instance,
+            NullStorageProviderAccessor.Instance)
     {
     }
 
@@ -32,11 +40,30 @@ public sealed partial class ShellViewModel : ObservableObject
         IGameAssetService assets,
         IUserSettingsService settings,
         IPobCalculationService pobCalculationService)
+        : this(
+            games,
+            assets,
+            settings,
+            pobCalculationService,
+            NullBuildPlannerExportService.Instance,
+            NullStorageProviderAccessor.Instance)
+    {
+    }
+
+    public ShellViewModel(
+        GameRegistry games,
+        IGameAssetService assets,
+        IUserSettingsService settings,
+        IPobCalculationService pobCalculationService,
+        IBuildPlannerExportService buildPlannerExportService,
+        IStorageProviderAccessor storageProviderAccessor)
     {
         _games = games;
         _assets = assets;
         _settings = settings;
         _pobCalculationService = pobCalculationService;
+        _buildPlannerExportService = buildPlannerExportService;
+        _storageProviderAccessor = storageProviderAccessor;
         Games = _games.Games.Select(g => new GameChoiceViewModel(g, settings.LastGameId == g.Id)).ToArray();
         ResetBackendSettingsFields();
 
@@ -58,16 +85,16 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public IReadOnlyList<GameChoiceViewModel> Games { get; }
 
-    [ObservableProperty] private ShellPage _currentPage;
-    [ObservableProperty] private GameWorkspaceViewModel? _activeWorkspace;
-    [ObservableProperty] private string _statusMessage = string.Empty;
-    [ObservableProperty] private bool _isConfirmingGameChange;
-    [ObservableProperty] private bool _isBackendSettingsOpen;
-    [ObservableProperty] private bool _enablePobBackend;
-    [ObservableProperty] private string _poe1PobPath = string.Empty;
-    [ObservableProperty] private string _poe2PobPath = string.Empty;
-    [ObservableProperty] private string _luaExecutablePath = string.Empty;
-    [ObservableProperty] private string _pobBackendTimeoutSeconds = "120";
+    [ObservableProperty] public partial ShellPage CurrentPage { get; set; }
+    [ObservableProperty] public partial GameWorkspaceViewModel? ActiveWorkspace { get; set; }
+    [ObservableProperty] public partial string StatusMessage { get; set; } = string.Empty;
+    [ObservableProperty] public partial bool IsConfirmingGameChange { get; set; }
+    [ObservableProperty] public partial bool IsBackendSettingsOpen { get; set; }
+    [ObservableProperty] public partial bool EnablePobBackend { get; set; }
+    [ObservableProperty] public partial string Poe1PobPath { get; set; } = string.Empty;
+    [ObservableProperty] public partial string Poe2PobPath { get; set; } = string.Empty;
+    [ObservableProperty] public partial string LuaExecutablePath { get; set; } = string.Empty;
+    [ObservableProperty] public partial string PobBackendTimeoutSeconds { get; set; } = "120";
 
     [RelayCommand]
     private void SelectGame(GameId gameId)
@@ -142,7 +169,13 @@ public sealed partial class ShellViewModel : ObservableObject
         var sprites = _assets.LoadSprites(game, treeVersion);
         var spec = new PassiveSpec(tree, tree.Classes, game.FeatureFlags);
         var equipment = new EquipmentViewModel();
-        var treePanel = new MainWindowViewModel(spec, game.ImportStrategy, equipment, _pobCalculationService);
+        var treePanel = new MainWindowViewModel(
+            spec,
+            game.ImportStrategy,
+            equipment,
+            _pobCalculationService,
+            _buildPlannerExportService,
+            _storageProviderAccessor);
         var workspace = new GameWorkspace
         {
             Game = game,
@@ -197,5 +230,24 @@ public sealed partial class ShellViewModel : ObservableObject
             PathOfAvalonia.TreeDomain.Import.ImportedBuild build,
             System.Threading.CancellationToken cancellationToken) =>
             Task.FromResult(build.Metrics);
+    }
+
+    private sealed class NullBuildPlannerExportService : IBuildPlannerExportService
+    {
+        public static NullBuildPlannerExportService Instance { get; } = new();
+
+        public Task<BuildPlannerExportFileResult?> ExportAsync(
+            Avalonia.Platform.Storage.IStorageProvider storageProvider,
+            TreeModel tree,
+            ClassCatalog classes,
+            PathOfAvalonia.TreeDomain.Import.ImportedBuild build,
+            System.Threading.CancellationToken cancellationToken) =>
+            Task.FromResult<BuildPlannerExportFileResult?>(null);
+    }
+
+    private sealed class NullStorageProviderAccessor : IStorageProviderAccessor
+    {
+        public static NullStorageProviderAccessor Instance { get; } = new();
+        public Avalonia.Platform.Storage.IStorageProvider? StorageProvider { get; set; }
     }
 }

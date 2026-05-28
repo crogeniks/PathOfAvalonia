@@ -14,27 +14,27 @@ public partial class EquipmentViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasItems))]
     [NotifyPropertyChangedFor(nameof(HasContent))]
-    private ObservableCollection<ItemGroupViewModel> _groups = new();
+    public partial ObservableCollection<ItemGroupViewModel> Groups { get; set; } = new();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasMetrics))]
     [NotifyPropertyChangedFor(nameof(HasContent))]
-    private ImportedBuildMetricsViewModel? _metrics;
+    public partial ImportedBuildMetricsViewModel? Metrics { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSkillGroups))]
     [NotifyPropertyChangedFor(nameof(HasContent))]
-    private ObservableCollection<ImportedSkillGroupViewModel> _skillGroups = new();
+    public partial ObservableCollection<ImportedSkillGroupViewModel> SkillGroups { get; set; } = new();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSkillSetVariants))]
-    private ObservableCollection<ImportedSkillSetOptionViewModel> _skillSetOptions = new();
+    public partial ObservableCollection<ImportedSkillSetOptionViewModel> SkillSetOptions { get; set; } = new();
 
     [ObservableProperty]
-    private int _selectedSkillSetIndex;
+    public partial int SelectedSkillSetIndex { get; set; }
 
     [ObservableProperty]
-    private string _emptyMessage = "Import a build to see equipment.";
+    public partial string EmptyMessage { get; set; } = "Import a build to see equipment.";
 
     public bool HasItems => Groups.Any(group => group.Items.Count > 0);
     public bool HasMetrics => Metrics is not null;

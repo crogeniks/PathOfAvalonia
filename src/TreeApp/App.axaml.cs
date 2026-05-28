@@ -31,6 +31,8 @@ public partial class App : Application
         sc.AddSingleton<IPobBackendLocator, PobBackendLocator>();
         sc.AddSingleton<IProcessRunner, ProcessRunner>();
         sc.AddSingleton<IPobCalculationService, PobCalculationService>();
+        sc.AddSingleton<IBuildPlannerExportService, BuildPlannerExportService>();
+        sc.AddSingleton<IStorageProviderAccessor, StorageProviderAccessor>();
 
         // Singletons resolved from asset services at first request.
         sc.AddSingleton(sp => sp.GetRequiredService<ITreeAssetService>().Load("3.28.0"));

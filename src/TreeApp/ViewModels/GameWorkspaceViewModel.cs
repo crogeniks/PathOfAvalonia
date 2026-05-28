@@ -43,7 +43,7 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
         _switchTreeVersion = switchTreeVersion;
         BackToLandingCommand = backToLandingCommand;
         OpenBackendSettingsCommand = openBackendSettingsCommand;
-        _selectedTreeVersion = workspace.Tree.Version;
+        SelectedTreeVersion = workspace.Tree.Version;
         TreeVersionOptions = workspace.Game.TreeVersions;
         DiffTreeVersionOptions = [NoDiffVersion, .. workspace.Game.TreeVersions.Where(version => version != workspace.Tree.Version)];
         _initialClassIndex = workspace.Spec.SelectedClassIndex;
@@ -74,8 +74,8 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
         || Workspace.Spec.SocketedJewels.Count > 0
         || Workspace.Spec.AttributeOverrides.Count > 0;
 
-    [ObservableProperty] private string _selectedTreeVersion = string.Empty;
-    [ObservableProperty] private string _selectedDiffTreeVersion = NoDiffVersion;
+    [ObservableProperty] public partial string SelectedTreeVersion { get; set; } = string.Empty;
+    [ObservableProperty] public partial string SelectedDiffTreeVersion { get; set; } = NoDiffVersion;
 
     partial void OnSelectedTreeVersionChanged(string value)
     {
@@ -100,4 +100,5 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
         TreePanel.TreeViewModel.SetDiff(TreeDiff.Compare(Workspace.Tree, baseline));
         OnPropertyChanged(nameof(DiffSummary));
     }
+
 }

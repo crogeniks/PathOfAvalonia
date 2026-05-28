@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Avalonia.Controls;
 using Microsoft.Extensions.DependencyInjection;
+using PathOfAvalonia.TreeApp.Services;
 using PathOfAvalonia.TreeApp.ViewModels;
 using PathOfAvalonia.TreeApp.Views;
 
@@ -8,13 +9,16 @@ namespace PathOfAvalonia.TreeApp;
 
 public partial class MainWindow : Window
 {
-    public MainWindow() : this(App.Services.GetRequiredService<ShellViewModel>())
+    public MainWindow() : this(
+        App.Services.GetRequiredService<ShellViewModel>(),
+        App.Services.GetRequiredService<IStorageProviderAccessor>())
     {
     }
 
-    public MainWindow(ShellViewModel vm)
+    public MainWindow(ShellViewModel vm, IStorageProviderAccessor storageProviderAccessor)
     {
         InitializeComponent();
+        storageProviderAccessor.StorageProvider = StorageProvider;
         DataContext = vm;
         vm.PropertyChanged += OnShellPropertyChanged;
         UpdateShellHost(vm);
@@ -43,4 +47,3 @@ public partial class MainWindow : Window
         }
     }
 }
-
