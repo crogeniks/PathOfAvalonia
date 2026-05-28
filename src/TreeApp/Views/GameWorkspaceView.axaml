@@ -37,7 +37,7 @@
                                         <TextBlock Text="Added" Foreground="#EAEAEA"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Ellipse Width="12" Height="12" Fill="#F0C84A"/>
+                                        <Ellipse Width="12" Height="12" Fill="#A85CFF"/>
                                         <TextBlock Text="Changed" Foreground="#EAEAEA"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="8">

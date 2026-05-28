@@ -82,7 +82,7 @@ public sealed partial class PassiveTreeView : Control
     private static readonly IBrush Poe2AllocatedFrameBrush = new SolidColorBrush(Color.FromArgb(0xF0, 0xE0, 0xB8, 0x58));
     private static readonly IBrush Poe2SocketFillBrush = new SolidColorBrush(Color.FromArgb(0xD0, 0x05, 0x06, 0x05));
     private static readonly IBrush DiffAddedBrush = new SolidColorBrush(Color.FromArgb(0xF5, 0x00, 0xF0, 0x5A));
-    private static readonly IBrush DiffChangedBrush = new SolidColorBrush(Color.FromArgb(0x95, 0xF0, 0xC8, 0x4A));
+    private static readonly IBrush DiffChangedBrush = new SolidColorBrush(Color.FromArgb(0xC8, 0xA8, 0x5C, 0xFF));
     private static readonly IBrush DiffRemovedBrush = new SolidColorBrush(Color.FromArgb(0x95, 0xE5, 0x56, 0x56));
     private static readonly IPen NodeOutlinePen = new Pen(Brushes.Black, 1.5);
     // Cluster background disc layers (programmatic stand-in for the missing art asset).
@@ -582,7 +582,7 @@ public sealed partial class PassiveTreeView : Control
             : new Size(NodeRadius, NodeRadius);
         var rx = Math.Max(NodeRadius * _scale, half.Width * _scale * 0.94);
         var ry = Math.Max(NodeRadius * _scale, half.Height * _scale * 0.94);
-        var thickness = Math.Max(2.0, 9.0 * _scale);
+        var thickness = Math.Max(4.0, 15.0 * _scale);
         ctx.DrawEllipse(solidFill ? new SolidColorBrush(Color.FromArgb(0x18, 0xE5, 0x56, 0x56)) : null,
             new Pen(brush, thickness),
             centre,

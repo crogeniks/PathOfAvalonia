@@ -13,10 +13,16 @@ public sealed class TreeDiff
 {
     public static readonly TreeDiff Empty = new(
         new Dictionary<int, TreeNodeDiff>(),
-        Array.Empty<TreeNodeDiff>());
+        new Dictionary<int, Node>(),
+        Array.Empty<TreeNodeDiff>(),
+        null,
+        null);
 
     public IReadOnlyDictionary<int, TreeNodeDiff> CurrentNodeDiffs { get; }
+    public IReadOnlyDictionary<int, Node> BaselineNodes { get; }
     public IReadOnlyList<TreeNodeDiff> RemovedNodes { get; }
+    public string? CurrentVersion { get; }
+    public string? BaselineVersion { get; }
 
     public int AddedCount => CurrentNodeDiffs.Values.Count(diff => diff.Kind == TreeNodeDiffKind.Added);
     public int ChangedCount => CurrentNodeDiffs.Values.Count(diff => diff.Kind == TreeNodeDiffKind.Changed);
@@ -25,10 +31,16 @@ public sealed class TreeDiff
 
     private TreeDiff(
         IReadOnlyDictionary<int, TreeNodeDiff> currentNodeDiffs,
-        IReadOnlyList<TreeNodeDiff> removedNodes)
+        IReadOnlyDictionary<int, Node> baselineNodes,
+        IReadOnlyList<TreeNodeDiff> removedNodes,
+        string? currentVersion,
+        string? baselineVersion)
     {
         CurrentNodeDiffs = currentNodeDiffs;
+        BaselineNodes = baselineNodes;
         RemovedNodes = removedNodes;
+        CurrentVersion = currentVersion;
+        BaselineVersion = baselineVersion;
     }
 
     public static TreeDiff Compare(TreeModel current, TreeModel baseline)
@@ -57,20 +69,17 @@ public sealed class TreeDiff
             }
         }
 
-        return new TreeDiff(currentDiffs, removed);
+        return new TreeDiff(currentDiffs, baseline.Nodes, removed, current.Version, baseline.Version);
     }
 
     private static bool NodeChanged(Node current, Node baseline)
     {
         return current.Name != baseline.Name
             || current.Type != baseline.Type
-            || current.Icon != baseline.Icon
             || current.AscendancyName != baseline.AscendancyName
             || current.ClassStartIndexes.Count != baseline.ClassStartIndexes.Count
             || !current.ClassStartIndexes.SequenceEqual(baseline.ClassStartIndexes)
             || current.Stats.Count != baseline.Stats.Count
-            || !current.Stats.SequenceEqual(baseline.Stats)
-            || Math.Abs(current.X - baseline.X) > 0.01
-            || Math.Abs(current.Y - baseline.Y) > 0.01;
+            || !current.Stats.SequenceEqual(baseline.Stats);
     }
 }
