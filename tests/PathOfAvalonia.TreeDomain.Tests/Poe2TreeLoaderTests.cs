@@ -35,6 +35,14 @@ public sealed class Poe2TreeLoaderTests
     }
 
     [Fact]
+    public void PreservesBuildPlannerPassiveIds()
+    {
+        var tree = LoadTree("0.5.0");
+
+        Assert.Equal("strength89", tree.Nodes[35426].BuildPlannerId);
+    }
+
+    [Fact]
     public void ComparesGggExportVersions()
     {
         var diff = TreeDiff.Compare(LoadTree("0.5.0"), LoadTree("0.4.0"));

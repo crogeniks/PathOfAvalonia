@@ -69,6 +69,7 @@ public sealed class ShellViewModelTests
         public GameId? LastGameId { get; set; }
         public string? Poe1PobPath { get; set; }
         public string? Poe2PobPath { get; set; }
+        public string? Poe2BuildPlannerDirectory { get; set; }
         public string? LuaExecutablePath { get; set; }
         public bool EnablePobBackend { get; set; } = true;
         public int PobBackendTimeoutSeconds { get; set; } = 120;

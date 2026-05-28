@@ -101,6 +101,10 @@
                                 <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsImportSupported}">
                                     <Button Content="Import" Command="{Binding ImportCommand}"/>
                                     <Button Content="Clear" Command="{Binding ClearCommand}"/>
+                                    <Button Content="Export .build"
+                                            Command="{Binding ExportBuildPlannerCommand}"
+                                            IsVisible="{Binding SupportsBuildPlannerExport}"
+                                            IsEnabled="{Binding CanExportBuildPlanner}"/>
                                 </StackPanel>
                                 <TextBlock Text="Passive tree"
                                            Foreground="#EAEAEA"

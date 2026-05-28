@@ -222,6 +222,7 @@ public sealed class Poe2TreeLoader : ITreeLoader
             nodes[id] = new Node
             {
                 Id = id,
+                BuildPlannerId = string.IsNullOrWhiteSpace(nd.Id) ? null : nd.Id,
                 Name = string.IsNullOrWhiteSpace(nd.Name) ? $"Node {id}" : nd.Name,
                 Type = ClassifyGggNode(nd, classStartIndexes),
                 X = nd.X.Value,

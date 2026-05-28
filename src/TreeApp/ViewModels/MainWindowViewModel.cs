@@ -17,6 +17,8 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly PassiveSpec _spec;
     private readonly IImportStrategy _importStrategy;
     private readonly IPobCalculationService? _pobCalculationService;
+    private readonly IBuildPlannerExportService? _buildPlannerExportService;
+    private readonly IStorageProviderAccessor? _storageProviderAccessor;
     private bool _syncingClass;
     private bool _syncingAscendancy;
     private bool _syncingVariants;
@@ -42,6 +44,9 @@ public partial class MainWindowViewModel : ObservableObject
     public IReadOnlyList<string> AscendancyNames => _spec.Classes.AscendancyNames(SelectedClassIndex);
     public bool IsImportSupported => _importStrategy.IsSupported;
     public bool IsImportUnsupported => !_importStrategy.IsSupported;
+    public bool SupportsBuildPlannerExport => _spec.Tree.GameId == GameId.PathOfExile2;
+    public bool CanExportBuildPlanner => _spec.Tree.GameId == GameId.PathOfExile2 && _lastImportedBuild is not null;
+    public ImportedBuild? CurrentImportedBuild => _lastImportedBuild;
     public string UnsupportedImportStatus => "Build import is not available for this game yet.";
     public string ImportPrompt => _spec.Tree.GameId == GameId.PathOfExile2
         ? "Paste a Path of Building 2 build code"
@@ -50,19 +55,19 @@ public partial class MainWindowViewModel : ObservableObject
         ? "Paste a Path of Building 2 build code"
         : "https://www.pathofexile.com/passive-skill-tree/... or PoB code";
 
-    [ObservableProperty] private int _selectedClassIndex;
-    [ObservableProperty] private int _selectedAscendancyIndex;
-    [ObservableProperty] private string _selectedAscendancyName = "None";
-    [ObservableProperty] private string _importInput = string.Empty;
-    [ObservableProperty] private string _importStatus = string.Empty;
-    [ObservableProperty] private bool _importStatusIsError;
-    [ObservableProperty] private IReadOnlyList<ImportedVariantOptionViewModel> _passiveTreeVariantOptions = [];
-    [ObservableProperty] private IReadOnlyList<ImportedVariantOptionViewModel> _itemSetVariantOptions = [];
-    [ObservableProperty] private bool _hasPassiveTreeVariants;
-    [ObservableProperty] private bool _hasItemSetVariants;
-    [ObservableProperty] private bool _isTreeControlsCollapsed;
-    [ObservableProperty] private int _selectedPassiveTreeVariantIndex;
-    [ObservableProperty] private int _selectedItemSetVariantIndex;
+    [ObservableProperty] public partial int SelectedClassIndex { get; set; }
+    [ObservableProperty] public partial int SelectedAscendancyIndex { get; set; }
+    [ObservableProperty] public partial string SelectedAscendancyName { get; set; } = "None";
+    [ObservableProperty] public partial string ImportInput { get; set; } = string.Empty;
+    [ObservableProperty] public partial string ImportStatus { get; set; } = string.Empty;
+    [ObservableProperty] public partial bool ImportStatusIsError { get; set; }
+    [ObservableProperty] public partial IReadOnlyList<ImportedVariantOptionViewModel> PassiveTreeVariantOptions { get; set; } = [];
+    [ObservableProperty] public partial IReadOnlyList<ImportedVariantOptionViewModel> ItemSetVariantOptions { get; set; } = [];
+    [ObservableProperty] public partial bool HasPassiveTreeVariants { get; set; }
+    [ObservableProperty] public partial bool HasItemSetVariants { get; set; }
+    [ObservableProperty] public partial bool IsTreeControlsCollapsed { get; set; }
+    [ObservableProperty] public partial int SelectedPassiveTreeVariantIndex { get; set; }
+    [ObservableProperty] public partial int SelectedItemSetVariantIndex { get; set; }
 
     public bool IsTreeControlsExpanded => !IsTreeControlsCollapsed;
     public string TreeControlsToggleText => IsTreeControlsCollapsed ? "Show controls" : "Hide controls";
@@ -86,15 +91,28 @@ public partial class MainWindowViewModel : ObservableObject
         IImportStrategy importStrategy,
         EquipmentViewModel equipment,
         IPobCalculationService? pobCalculationService)
+        : this(spec, importStrategy, equipment, pobCalculationService, null, null)
+    {
+    }
+
+    public MainWindowViewModel(
+        PassiveSpec spec,
+        IImportStrategy importStrategy,
+        EquipmentViewModel equipment,
+        IPobCalculationService? pobCalculationService,
+        IBuildPlannerExportService? buildPlannerExportService,
+        IStorageProviderAccessor? storageProviderAccessor)
     {
         _spec = spec;
         _importStrategy = importStrategy;
         _pobCalculationService = pobCalculationService;
+        _buildPlannerExportService = buildPlannerExportService;
+        _storageProviderAccessor = storageProviderAccessor;
         Equipment = equipment;
         TreeViewModel = new PassiveTreeViewModel(spec);
-        _selectedClassIndex = spec.SelectedClassIndex;
-        _selectedAscendancyIndex = spec.SelectedAscendancyIndex;
-        _selectedAscendancyName = AscendancyNameAt(_selectedClassIndex, _selectedAscendancyIndex);
+        SelectedClassIndex = spec.SelectedClassIndex;
+        SelectedAscendancyIndex = spec.SelectedAscendancyIndex;
+        SelectedAscendancyName = AscendancyNameAt(SelectedClassIndex, SelectedAscendancyIndex);
         _spec.SpecChanged += OnSpecChanged;
     }
 
@@ -239,6 +257,7 @@ public partial class MainWindowViewModel : ObservableObject
             var build = _importStrategy.Import(text);
             _syncingVariants = true;
             _lastImportedBuild = build;
+            OnExportStateChanged();
             PassiveTreeVariantOptions = build.PassiveTreeVariants
                 .Select(variant => new ImportedVariantOptionViewModel(variant.Index, variant.DisplayName))
                 .ToArray();
@@ -339,6 +358,40 @@ public partial class MainWindowViewModel : ObservableObject
         ImportStatusIsError = false;
     }
 
+    [RelayCommand]
+    private async Task ExportBuildPlanner()
+    {
+        var storageProvider = _storageProviderAccessor?.StorageProvider;
+        if (_buildPlannerExportService is null || storageProvider is null || _lastImportedBuild is not { } build)
+        {
+            return;
+        }
+
+        try
+        {
+            var result = await _buildPlannerExportService.ExportAsync(
+                storageProvider,
+                _spec.Tree,
+                _spec.Classes,
+                build,
+                default);
+            if (result is null)
+            {
+                return;
+            }
+
+            ImportStatus = result.SkippedNodeCount == 0
+                ? $"Exported {result.Name}"
+                : $"Exported {result.Name}; skipped {result.SkippedNodeCount} node(s) without Build Planner ids";
+            ImportStatusIsError = false;
+        }
+        catch (Exception ex)
+        {
+            ImportStatus = $"Export failed: {ex.Message}";
+            ImportStatusIsError = true;
+        }
+    }
+
     private void ResetVariantState()
     {
         _lastImportedBuild = null;
@@ -351,6 +404,13 @@ public partial class MainWindowViewModel : ObservableObject
         SelectedPassiveTreeVariantIndex = 0;
         SelectedItemSetVariantIndex = 0;
         _syncingVariants = false;
+        OnExportStateChanged();
+    }
+
+    private void OnExportStateChanged()
+    {
+        OnPropertyChanged(nameof(CanExportBuildPlanner));
+        OnPropertyChanged(nameof(CurrentImportedBuild));
     }
 
     private void StartMetricsCalculation(ImportedBuild build)
