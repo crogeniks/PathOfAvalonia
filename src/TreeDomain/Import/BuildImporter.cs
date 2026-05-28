@@ -6,27 +6,16 @@ public static class BuildImporter
 {
     public static ImportedBuild Import(string text)
     {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            throw new InvalidDataException("Import text is empty");
-        }
-        var input = text.Trim();
+        var input = ImportInput.From(text);
 
-        if (PobTreeUrlDecoder.LooksLikeTreeUrl(input))
+        if (PobTreeUrlDecoder.LooksLikeTreeUrl(input.Text))
         {
-            return PobTreeUrlDecoder.Decode(input);
+            return PobTreeUrlDecoder.Decode(input.Text);
         }
 
-        // PoB build code. Some share sites prefix the base64 with a host URL — strip that.
-        var code = input;
-        var lastSlash = code.LastIndexOf('/');
-        if (lastSlash >= 0 && lastSlash < code.Length - 1)
+        if (PobBuildCodeDecoder.LooksLikeBuildCode(input.LastPathSegment))
         {
-            code = code[(lastSlash + 1)..];
-        }
-        if (PobBuildCodeDecoder.LooksLikeBuildCode(code))
-        {
-            return PobBuildCodeDecoder.Decode(code);
+            return PobBuildCodeDecoder.Decode(input.LastPathSegment);
         }
 
         throw new InvalidDataException("Unrecognised input — expected a passive tree URL or a PoB build code");

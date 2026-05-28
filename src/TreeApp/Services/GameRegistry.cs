@@ -11,16 +11,7 @@ public sealed class GameRegistry
     private readonly IReadOnlyList<GameDefinition> _games =
     [
         CreatePoe1(),
-        new GameDefinition(
-            GameId.PathOfExile2,
-            "Path of Exile 2",
-            "PoE2",
-            "0.5.0",
-            "Assets/PoE2",
-            new Poe2TreeLoader(),
-            new Poe2ImportStrategy(),
-            GameFeatureFlags.Poe2Milestone2,
-            ["0.4.0", "0.5.0"]),
+        CreatePoe2(),
     ];
 
     public IReadOnlyList<GameDefinition> Games => _games;
@@ -52,4 +43,15 @@ public sealed class GameRegistry
         new Poe1ImportStrategy(),
         GameFeatureFlags.Poe1,
         ["3.28.0"]);
+
+    public static GameDefinition CreatePoe2() => new(
+        GameId.PathOfExile2,
+        "Path of Exile 2",
+        "PoE2",
+        "0.5.0",
+        "Assets/PoE2",
+        new Poe2TreeLoader(),
+        new Poe2ImportStrategy(),
+        GameFeatureFlags.Poe2Milestone2,
+        ["0.4.0", "0.5.0"]);
 }

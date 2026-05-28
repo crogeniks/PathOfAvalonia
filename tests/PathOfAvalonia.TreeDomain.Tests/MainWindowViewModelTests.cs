@@ -2,6 +2,7 @@ using PathOfAvalonia.TreeApp.Services;
 using PathOfAvalonia.TreeApp.ViewModels;
 using PathOfAvalonia.TreeDomain;
 using PathOfAvalonia.TreeDomain.Import;
+using Moq;
 using Xunit;
 
 namespace PathOfAvalonia.TreeDomain.Tests;
@@ -20,7 +21,7 @@ public sealed class MainWindowViewModelTests
             MasterySelections: new Dictionary<int, int>(),
             TreeVersion: null,
             Source: "test");
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel());
+        var vm = CreateViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel());
 
         Assert.False(vm.IsTreeControlsCollapsed);
         Assert.True(vm.IsTreeControlsExpanded);
@@ -51,10 +52,8 @@ public sealed class MainWindowViewModelTests
             MasterySelections: new Dictionary<int, int>(),
             TreeVersion: null,
             Source: "test");
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel())
-        {
-            ImportInput = "test",
-        };
+        var vm = CreateViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel());
+        vm.ImportInput = "test";
 
         vm.ImportCommand.Execute(null);
 
@@ -71,10 +70,8 @@ public sealed class MainWindowViewModelTests
         var build = BuildWithPassiveVariants(
             PassiveVariant(0, "Leveling", nodes[0]),
             PassiveVariant(1, "Endgame", nodes[1]));
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel())
-        {
-            ImportInput = "test",
-        };
+        var vm = CreateViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel());
+        vm.ImportInput = "test";
 
         vm.ImportCommand.Execute(null);
 
@@ -90,10 +87,8 @@ public sealed class MainWindowViewModelTests
         var build = BuildWithPassiveVariants(
             PassiveVariant(0, "Leveling", nodes[0]),
             PassiveVariant(1, "Endgame", nodes[1]));
-        var vm = new MainWindowViewModel(spec, new StubImportStrategy(build), new EquipmentViewModel())
-        {
-            ImportInput = "test",
-        };
+        var vm = CreateViewModel(spec, new StubImportStrategy(build), new EquipmentViewModel());
+        vm.ImportInput = "test";
         vm.ImportCommand.Execute(null);
 
         vm.SelectedPassiveTreeVariantIndex = 1;
@@ -108,10 +103,8 @@ public sealed class MainWindowViewModelTests
         var build = BuildWithItemSetVariants(
             ItemSetVariant(0, 1, "Boss Gear", ImportedItem("First Ring")),
             ItemSetVariant(1, 2, "Mapping Gear", ImportedItem("Second Ring")));
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel())
-        {
-            ImportInput = "test",
-        };
+        var vm = CreateViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel());
+        vm.ImportInput = "test";
 
         vm.ImportCommand.Execute(null);
 
@@ -126,10 +119,8 @@ public sealed class MainWindowViewModelTests
         var build = BuildWithItemSetVariants(
             ItemSetVariant(0, 1, "Boss Gear", ImportedItem("First Ring")),
             ItemSetVariant(1, 2, "Mapping Gear", ImportedItem("Second Ring")));
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), equipment)
-        {
-            ImportInput = "test",
-        };
+        var vm = CreateViewModel(LoadSpec(), new StubImportStrategy(build), equipment);
+        vm.ImportInput = "test";
         vm.ImportCommand.Execute(null);
 
         vm.SelectedItemSetVariantIndex = 1;
@@ -152,10 +143,8 @@ public sealed class MainWindowViewModelTests
                 ItemSetVariant(1, 2, "Mapping Gear", ImportedItem("Second Ring")),
             ],
         };
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel())
-        {
-            ImportInput = "test",
-        };
+        var vm = CreateViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel());
+        vm.ImportInput = "test";
         vm.ImportCommand.Execute(null);
 
         vm.ClearCommand.Execute(null);
@@ -186,10 +175,8 @@ public sealed class MainWindowViewModelTests
                 [nodes[1]] = PassiveAllocationSet.WeaponSet2,
             },
         };
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel())
-        {
-            ImportInput = "test",
-        };
+        var vm = CreateViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel());
+        vm.ImportInput = "test";
 
         vm.ImportCommand.Execute(null);
 
@@ -216,10 +203,8 @@ public sealed class MainWindowViewModelTests
                 0),
             Metrics = ImportedBuildMetrics.Empty with { Source = ImportedMetricSource.SavedXmlSnapshot },
         };
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel())
-        {
-            ImportInput = "test",
-        };
+        var vm = CreateViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel());
+        vm.ImportInput = "test";
 
         vm.ImportCommand.Execute(null);
 
@@ -252,10 +237,8 @@ public sealed class MainWindowViewModelTests
                 SkillDps = [new ImportedSkillDpsMetric("Spark", 10, "10", 1, null, null)],
             },
         };
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), equipment)
-        {
-            ImportInput = "test",
-        };
+        var vm = CreateViewModel(LoadSpec(), new StubImportStrategy(build), equipment);
+        vm.ImportInput = "test";
 
         vm.ImportCommand.Execute(null);
 
@@ -303,6 +286,17 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal("Spark", Assert.Single(equipment.SkillGroups).Header);
     }
+
+    private static MainWindowViewModel CreateViewModel(
+        PassiveSpec spec,
+        IImportStrategy importStrategy,
+        EquipmentViewModel equipment) =>
+        new(
+            spec,
+            importStrategy,
+            equipment,
+            Mock.Of<IBuildPlannerExportService>(),
+            Mock.Of<IStorageProviderAccessor>());
 
     private static PassiveSpec LoadSpec() => new(LoadTree());
 

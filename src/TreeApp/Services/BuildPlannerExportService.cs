@@ -23,7 +23,9 @@ public interface IBuildPlannerExportService
 
 public sealed record BuildPlannerExportFileResult(string Name, int SkippedNodeCount);
 
-public sealed class BuildPlannerExportService(IUserSettingsService settings, IUserPathService paths) : IBuildPlannerExportService
+public sealed class BuildPlannerExportService(
+    IBuildPlannerPathService buildPlannerPaths,
+    ITextFileSaveService files) : IBuildPlannerExportService
 {
     private static readonly FilePickerFileType BuildFileType = new("Path of Exile 2 Build")
     {
@@ -39,37 +41,19 @@ public sealed class BuildPlannerExportService(IUserSettingsService settings, IUs
         CancellationToken cancellationToken)
     {
         var export = Poe2BuildPlannerExporter.Export(build, tree, classes);
-        var startPath = ResolveBuildPlannerDirectory(settings, paths);
-        IStorageFolder? startFolder = null;
-        try
-        {
-            Directory.CreateDirectory(startPath);
-            startFolder = await storageProvider.TryGetFolderFromPathAsync(startPath);
-        }
-        catch
-        {
-            startFolder = null;
-        }
-
-        var file = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-        {
-            Title = "Export Path of Exile 2 build",
-            SuggestedStartLocation = startFolder,
-            SuggestedFileName = SanitizeFileName(BuildName(build)) + ".build",
-            DefaultExtension = "build",
-            FileTypeChoices = [BuildFileType],
-            ShowOverwritePrompt = true,
-        });
+        var file = await files.SaveAsync(
+            storageProvider,
+            new TextFileSaveRequest(
+                "Export Path of Exile 2 build",
+                buildPlannerPaths.CurrentDirectory,
+                SanitizeFileName(BuildName(build)) + ".build",
+                "build",
+                [BuildFileType],
+                export.Json),
+            cancellationToken);
         if (file is null)
         {
             return null;
-        }
-
-        await using (var stream = await file.OpenWriteAsync())
-        {
-            stream.SetLength(0);
-            var bytes = Encoding.UTF8.GetBytes(export.Json);
-            await stream.WriteAsync(bytes, cancellationToken);
         }
 
         if (file.Path.IsFile)
@@ -77,22 +61,11 @@ public sealed class BuildPlannerExportService(IUserSettingsService settings, IUs
             var directory = Path.GetDirectoryName(file.Path.LocalPath);
             if (!string.IsNullOrWhiteSpace(directory))
             {
-                settings.Poe2BuildPlannerDirectory = directory;
-                settings.Save();
+                buildPlannerPaths.RememberDirectory(directory);
             }
         }
 
         return new BuildPlannerExportFileResult(file.Name, export.SkippedNodeIds.Count);
-    }
-
-    private static string ResolveBuildPlannerDirectory(IUserSettingsService settings, IUserPathService paths)
-    {
-        if (!string.IsNullOrWhiteSpace(settings.Poe2BuildPlannerDirectory))
-        {
-            return settings.Poe2BuildPlannerDirectory;
-        }
-
-        return paths.DefaultPoe2BuildPlannerDirectory;
     }
 
     private static string BuildName(ImportedBuild build)

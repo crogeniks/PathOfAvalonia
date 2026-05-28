@@ -1,5 +1,6 @@
 using System.IO;
 using Avalonia.Media.Imaging;
+using Moq;
 using PathOfAvalonia.TreeApp.Services;
 using PathOfAvalonia.TreeApp.ViewModels;
 using PathOfAvalonia.TreeDomain;
@@ -12,7 +13,7 @@ public sealed class ShellViewModelTests
     [Fact]
     public void StartsOnLandingWithoutRememberedGame()
     {
-        var vm = new ShellViewModel(new GameRegistry(), new StubAssets(), new StubSettings());
+        var vm = CreateViewModel(new StubSettings());
 
         Assert.Equal(ShellPage.Landing, vm.CurrentPage);
         Assert.Null(vm.ActiveWorkspace);
@@ -21,7 +22,7 @@ public sealed class ShellViewModelTests
     [Fact]
     public void OpensRememberedGame()
     {
-        var vm = new ShellViewModel(new GameRegistry(), new StubAssets(), new StubSettings { LastGameId = GameId.PathOfExile2 });
+        var vm = CreateViewModel(new StubSettings { LastGameId = GameId.PathOfExile2 });
 
         Assert.Equal(ShellPage.Workspace, vm.CurrentPage);
         Assert.Equal(GameId.PathOfExile2, vm.ActiveWorkspace!.Workspace.Game.Id);
@@ -31,7 +32,7 @@ public sealed class ShellViewModelTests
     [Fact]
     public void DirtyWorkspaceRequestsConfirmation()
     {
-        var vm = new ShellViewModel(new GameRegistry(), new StubAssets(), new StubSettings());
+        var vm = CreateViewModel(new StubSettings());
 
         vm.SelectGameCommand.Execute(GameId.PathOfExile1);
         vm.ActiveWorkspace!.Workspace.Spec.Toggle(2);
@@ -40,6 +41,14 @@ public sealed class ShellViewModelTests
         Assert.True(vm.IsConfirmingGameChange);
         Assert.Equal(ShellPage.Workspace, vm.CurrentPage);
     }
+
+    private static ShellViewModel CreateViewModel(IUserSettingsService settings) =>
+        new(
+            new GameRegistry(),
+            new StubAssets(),
+            settings,
+            Mock.Of<IBuildPlannerExportService>(),
+            Mock.Of<IStorageProviderAccessor>());
 
     private sealed class StubSettings : IUserSettingsService
     {
