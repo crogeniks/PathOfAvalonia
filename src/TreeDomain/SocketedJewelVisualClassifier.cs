@@ -137,7 +137,7 @@ public static class SocketedJewelVisualClassifier
 
         foreach (var raw in rawText.Split('\n'))
         {
-            var line = StripTags(raw.Trim());
+            var line = ItemText.StripTags(raw.Trim());
             if (line.Length == 0 || line.StartsWith("Rarity:", StringComparison.OrdinalIgnoreCase) || line == "--------")
             {
                 continue;
@@ -146,17 +146,4 @@ public static class SocketedJewelVisualClassifier
         }
     }
 
-    private static string StripTags(string line)
-    {
-        while (line.StartsWith('{'))
-        {
-            var close = line.IndexOf('}', StringComparison.Ordinal);
-            if (close < 0)
-            {
-                break;
-            }
-            line = line[(close + 1)..].TrimStart();
-        }
-        return line;
-    }
 }

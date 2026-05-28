@@ -29,7 +29,7 @@ public static class ImportedClusterJewelParser
 
         foreach (var raw in item.RawText.Split('\n'))
         {
-            var line = StripTags(raw.Trim());
+            var line = ItemText.StripTags(raw.Trim());
             if (line.Length == 0)
             {
                 continue;
@@ -141,7 +141,7 @@ public static class ImportedClusterJewelParser
 
     private static bool ContainsClusterBase(ImportedItem item, string baseType) =>
         item.BaseType.Equals(baseType, StringComparison.OrdinalIgnoreCase)
-        || item.RawText.Split('\n').Any(line => StripTags(line.Trim()).Equals(baseType, StringComparison.OrdinalIgnoreCase));
+        || item.RawText.Split('\n').Any(line => ItemText.StripTags(line.Trim()).Equals(baseType, StringComparison.OrdinalIgnoreCase));
 
     private static int ParseMatchedCount(Match match)
     {
@@ -155,17 +155,4 @@ public static class ImportedClusterJewelParser
         return 0;
     }
 
-    private static string StripTags(string line)
-    {
-        while (line.StartsWith('{'))
-        {
-            var close = line.IndexOf('}', StringComparison.Ordinal);
-            if (close < 0)
-            {
-                break;
-            }
-            line = line[(close + 1)..].TrimStart();
-        }
-        return line;
-    }
 }

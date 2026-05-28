@@ -1,5 +1,3 @@
-using System.Xml.Linq;
-
 namespace PathOfAvalonia.TreeDomain.Import;
 
 public static class Poe2BuildCodeDecoder
