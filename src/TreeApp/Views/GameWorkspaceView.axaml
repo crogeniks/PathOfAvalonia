@@ -6,7 +6,7 @@
              x:DataType="vm:GameWorkspaceViewModel">
     <Grid Background="#101018" RowDefinitions="48,*">
         <Border Background="#15151D" BorderBrush="#30303A" BorderThickness="0,0,0,1">
-            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto" Margin="14,0" VerticalAlignment="Center">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" Margin="14,0" VerticalAlignment="Center">
                 <TextBlock Text="PathOfAvalonia" Foreground="#F0F0F4" FontWeight="SemiBold" VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="1" Text="{Binding GameName}" Foreground="#CFCFE0" Margin="18,0,0,0" VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="2" Text="Tree" Foreground="#9090A0" Margin="12,0,6,0" VerticalAlignment="Center"
@@ -50,8 +50,7 @@
                     </Button.Flyout>
                 </Button>
                 <TextBlock Grid.Column="7" Text="{Binding DiffSummary}" Foreground="#C6B36A" Margin="12,0,0,0" VerticalAlignment="Center"/>
-                <Button Grid.Column="8" Content="Backend Settings" Command="{Binding OpenBackendSettingsCommand}" Margin="0,0,8,0"/>
-                <Button Grid.Column="9" Content="Change Game" Command="{Binding BackToLandingCommand}"/>
+                <Button Grid.Column="8" Content="Change Game" Command="{Binding BackToLandingCommand}"/>
             </Grid>
         </Border>
         <TabControl Grid.Row="1" Background="#101018">

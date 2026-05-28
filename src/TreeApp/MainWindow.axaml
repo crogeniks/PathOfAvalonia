@@ -7,57 +7,6 @@
         Title="PathOfAvalonia">
     <Grid Background="#101018">
         <ContentControl Name="ShellHost"/>
-        <Border IsVisible="{Binding IsBackendSettingsOpen}"
-                Background="#AA000000">
-            <Border Width="640"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    Padding="18"
-                    Background="#1A1A24"
-                    BorderBrush="#4A4A58"
-                    BorderThickness="1"
-                    CornerRadius="6">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="PoB Backend Settings"
-                               Foreground="#F0F0F0"
-                               FontSize="18"
-                               FontWeight="SemiBold"/>
-                    <CheckBox Content="Enable PoB backend"
-                              Foreground="#EAEAEA"
-                              IsChecked="{Binding EnablePobBackend}"/>
-                    <TextBlock Text="Path of Building folder"
-                               Foreground="#EAEAEA"
-                               FontWeight="SemiBold"/>
-                    <TextBox Text="{Binding Poe1PobPath}"
-                             PlaceholderText="/path/to/PathOfBuilding"/>
-                    <TextBlock Text="Path of Building 2 folder"
-                               Foreground="#EAEAEA"
-                               FontWeight="SemiBold"/>
-                    <TextBox Text="{Binding Poe2PobPath}"
-                             PlaceholderText="/path/to/PathOfBuilding-PoE2"/>
-                    <TextBlock Text="Lua executable"
-                               Foreground="#EAEAEA"
-                               FontWeight="SemiBold"/>
-                    <TextBox Text="{Binding LuaExecutablePath}"
-                             PlaceholderText="luajit, lua5.1, lua, or full path"/>
-                    <TextBlock Text="Backend timeout seconds"
-                               Foreground="#EAEAEA"
-                               FontWeight="SemiBold"/>
-                    <TextBox Text="{Binding PobBackendTimeoutSeconds}"
-                             Width="120"
-                             HorizontalAlignment="Left"/>
-                    <TextBlock Text="Leave paths blank to auto-detect a sibling PathOfBuilding repo and Lua from PATH."
-                               Foreground="#AAAACC"
-                               TextWrapping="Wrap"/>
-                    <StackPanel Orientation="Horizontal"
-                                HorizontalAlignment="Right"
-                                Spacing="8">
-                        <Button Content="Cancel" Command="{Binding CloseBackendSettingsCommand}"/>
-                        <Button Content="Save" Command="{Binding SaveBackendSettingsCommand}"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-        </Border>
         <Border IsVisible="{Binding IsConfirmingGameChange}"
                 Background="#AA000000">
             <Border Width="460"

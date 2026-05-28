@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -20,7 +19,6 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly GameRegistry _games;
     private readonly IGameAssetService _assets;
     private readonly IUserSettingsService _settings;
-    private readonly IPobCalculationService _pobCalculationService;
     private readonly IBuildPlannerExportService _buildPlannerExportService;
     private readonly IStorageProviderAccessor _storageProviderAccessor;
 
@@ -29,7 +27,6 @@ public sealed partial class ShellViewModel : ObservableObject
             games,
             assets,
             settings,
-            NullPobCalculationService.Instance,
             NullBuildPlannerExportService.Instance,
             NullStorageProviderAccessor.Instance)
     {
@@ -39,33 +36,15 @@ public sealed partial class ShellViewModel : ObservableObject
         GameRegistry games,
         IGameAssetService assets,
         IUserSettingsService settings,
-        IPobCalculationService pobCalculationService)
-        : this(
-            games,
-            assets,
-            settings,
-            pobCalculationService,
-            NullBuildPlannerExportService.Instance,
-            NullStorageProviderAccessor.Instance)
-    {
-    }
-
-    public ShellViewModel(
-        GameRegistry games,
-        IGameAssetService assets,
-        IUserSettingsService settings,
-        IPobCalculationService pobCalculationService,
         IBuildPlannerExportService buildPlannerExportService,
         IStorageProviderAccessor storageProviderAccessor)
     {
         _games = games;
         _assets = assets;
         _settings = settings;
-        _pobCalculationService = pobCalculationService;
         _buildPlannerExportService = buildPlannerExportService;
         _storageProviderAccessor = storageProviderAccessor;
         Games = _games.Games.Select(g => new GameChoiceViewModel(g, settings.LastGameId == g.Id)).ToArray();
-        ResetBackendSettingsFields();
 
         if (settings.LastGameId is { } lastGame && _games.TryGet(lastGame, out var game))
         {
@@ -89,12 +68,6 @@ public sealed partial class ShellViewModel : ObservableObject
     [ObservableProperty] public partial GameWorkspaceViewModel? ActiveWorkspace { get; set; }
     [ObservableProperty] public partial string StatusMessage { get; set; } = string.Empty;
     [ObservableProperty] public partial bool IsConfirmingGameChange { get; set; }
-    [ObservableProperty] public partial bool IsBackendSettingsOpen { get; set; }
-    [ObservableProperty] public partial bool EnablePobBackend { get; set; }
-    [ObservableProperty] public partial string Poe1PobPath { get; set; } = string.Empty;
-    [ObservableProperty] public partial string Poe2PobPath { get; set; } = string.Empty;
-    [ObservableProperty] public partial string LuaExecutablePath { get; set; } = string.Empty;
-    [ObservableProperty] public partial string PobBackendTimeoutSeconds { get; set; } = "120";
 
     [RelayCommand]
     private void SelectGame(GameId gameId)
@@ -127,42 +100,6 @@ public sealed partial class ShellViewModel : ObservableObject
         IsConfirmingGameChange = false;
     }
 
-    [RelayCommand]
-    private void OpenBackendSettings()
-    {
-        ResetBackendSettingsFields();
-        IsBackendSettingsOpen = true;
-    }
-
-    [RelayCommand]
-    private void CloseBackendSettings()
-    {
-        ResetBackendSettingsFields();
-        IsBackendSettingsOpen = false;
-    }
-
-    [RelayCommand]
-    private void SaveBackendSettings()
-    {
-        if (!int.TryParse(PobBackendTimeoutSeconds, out var timeoutSeconds))
-        {
-            StatusMessage = "PoB backend timeout must be a whole number of seconds.";
-            return;
-        }
-
-        timeoutSeconds = Math.Clamp(timeoutSeconds, 1, 600);
-        _settings.EnablePobBackend = EnablePobBackend;
-        _settings.Poe1PobPath = EmptyToNull(Poe1PobPath);
-        _settings.Poe2PobPath = EmptyToNull(Poe2PobPath);
-        _settings.LuaExecutablePath = EmptyToNull(LuaExecutablePath);
-        _settings.PobBackendTimeoutSeconds = timeoutSeconds;
-        _settings.Save();
-
-        PobBackendTimeoutSeconds = timeoutSeconds.ToString();
-        IsBackendSettingsOpen = false;
-        StatusMessage = "PoB backend settings saved.";
-    }
-
     private void OpenWorkspace(GameDefinition game, string treeVersion)
     {
         var tree = _assets.LoadTree(game, treeVersion);
@@ -173,7 +110,6 @@ public sealed partial class ShellViewModel : ObservableObject
             spec,
             game.ImportStrategy,
             equipment,
-            _pobCalculationService,
             _buildPlannerExportService,
             _storageProviderAccessor);
         var workspace = new GameWorkspace
@@ -192,8 +128,7 @@ public sealed partial class ShellViewModel : ObservableObject
             new TreeImageAssetResolver(game, treeVersion),
             _assets,
             OpenWorkspace,
-            BackToLandingCommand,
-            OpenBackendSettingsCommand);
+            BackToLandingCommand);
         CurrentPage = ShellPage.Workspace;
         _settings.LastGameId = game.Id;
         _settings.Save();
@@ -207,29 +142,6 @@ public sealed partial class ShellViewModel : ObservableObject
     {
         ActiveWorkspace = null;
         CurrentPage = ShellPage.Landing;
-    }
-
-    private void ResetBackendSettingsFields()
-    {
-        EnablePobBackend = _settings.EnablePobBackend;
-        Poe1PobPath = _settings.Poe1PobPath ?? string.Empty;
-        Poe2PobPath = _settings.Poe2PobPath ?? string.Empty;
-        LuaExecutablePath = _settings.LuaExecutablePath ?? string.Empty;
-        PobBackendTimeoutSeconds = Math.Clamp(_settings.PobBackendTimeoutSeconds, 1, 600).ToString();
-    }
-
-    private static string? EmptyToNull(string value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private sealed class NullPobCalculationService : IPobCalculationService
-    {
-        public static NullPobCalculationService Instance { get; } = new();
-
-        public Task<PathOfAvalonia.TreeDomain.Import.ImportedBuildMetrics> CalculateAsync(
-            GameId gameId,
-            PathOfAvalonia.TreeDomain.Import.ImportedBuild build,
-            System.Threading.CancellationToken cancellationToken) =>
-            Task.FromResult(build.Metrics);
     }
 
     private sealed class NullBuildPlannerExportService : IBuildPlannerExportService

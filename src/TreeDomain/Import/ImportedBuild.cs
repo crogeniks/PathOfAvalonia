@@ -170,7 +170,6 @@ public enum ImportedMetricSource
 {
     None,
     SavedXmlSnapshot,
-    PobBackend,
 }
 
 public sealed record ImportedBuildMetrics(

@@ -250,7 +250,6 @@ public sealed class MainWindowViewModelTests
                 Source = ImportedMetricSource.SavedXmlSnapshot,
                 PlayerStats = [new ImportedStatMetric("FullDPS", "Full DPS", 10, "10")],
                 SkillDps = [new ImportedSkillDpsMetric("Spark", 10, "10", 1, null, null)],
-                ErrorMessage = "PoB backend not configured; showing saved DPS snapshot.",
             },
         };
         var vm = new MainWindowViewModel(LoadSpec(), new StubImportService(build), equipment)
@@ -263,7 +262,6 @@ public sealed class MainWindowViewModelTests
         Assert.True(equipment.HasMetrics);
         Assert.True(equipment.HasSkillGroups);
         Assert.Equal("DPS source: Saved snapshot", equipment.Metrics!.SourceText);
-        Assert.Contains("not configured", equipment.Metrics.ErrorMessage);
         Assert.Equal("Spark", Assert.Single(equipment.SkillGroups).Header);
 
         vm.ClearCommand.Execute(null);
@@ -304,32 +302,6 @@ public sealed class MainWindowViewModelTests
         equipment.SelectedSkillSetIndex = 0;
 
         Assert.Equal("Spark", Assert.Single(equipment.SkillGroups).Header);
-    }
-
-    [Fact]
-    public async Task StaleBackendResultIsNotAppliedAfterVariantSwitch()
-    {
-        var nodes = ImportableNodeIds();
-        var build = BuildWithPassiveVariants(
-            PassiveVariant(0, "Leveling", nodes[0]),
-            PassiveVariant(1, "Endgame", nodes[1])) with
-        {
-            RawXml = "<PathOfBuilding><Tree><Spec nodes=\"1\" /><Spec nodes=\"2\" /></Tree></PathOfBuilding>",
-            Metrics = ImportedBuildMetrics.Empty with { Source = ImportedMetricSource.SavedXmlSnapshot },
-        };
-        var backend = new DeferredPobCalculationService();
-        var vm = new MainWindowViewModel(LoadSpec(), new StubImportStrategy(build), new EquipmentViewModel(), backend)
-        {
-            ImportInput = "test",
-        };
-        vm.ImportCommand.Execute(null);
-
-        vm.SelectedPassiveTreeVariantIndex = 1;
-        backend.Complete(0, ImportedBuildMetrics.Empty with { Source = ImportedMetricSource.PobBackend });
-        await Task.Delay(50);
-
-        Assert.Contains("DPS: saved snapshot", vm.ImportStatus);
-        Assert.DoesNotContain("DPS: PoB backend", vm.ImportStatus);
     }
 
     private static PassiveSpec LoadSpec() => new(LoadTree());
@@ -433,18 +405,4 @@ public sealed class MainWindowViewModelTests
         public ImportedBuild Import(string text) => build;
     }
 
-    private sealed class DeferredPobCalculationService : IPobCalculationService
-    {
-        private readonly Dictionary<int, TaskCompletionSource<ImportedBuildMetrics>> _requests = new();
-
-        public Task<ImportedBuildMetrics> CalculateAsync(GameId gameId, ImportedBuild build, CancellationToken cancellationToken)
-        {
-            var tcs = new TaskCompletionSource<ImportedBuildMetrics>();
-            _requests[build.ActivePassiveTreeVariantIndex] = tcs;
-            return tcs.Task;
-        }
-
-        public void Complete(int passiveVariantIndex, ImportedBuildMetrics metrics) =>
-            _requests[passiveVariantIndex].TrySetResult(metrics);
-    }
 }
