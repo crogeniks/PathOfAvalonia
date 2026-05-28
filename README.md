@@ -8,7 +8,7 @@ planning workflows from Path of Building-style tooling.
 The app currently ships with embedded tree data and visual assets for:
 
 - Path of Exile, tree version `3.28.0`
-- Path of Exile 2, tree version `0.5.0`
+- Path of Exile 2, tree versions `0.4.0` and `0.5.0` (`0.5.0` by default)
 
 ## Features
 
@@ -16,8 +16,11 @@ The app currently ships with embedded tree data and visual assets for:
 - Game selection for Path of Exile and Path of Exile 2.
 - Passive tree rendering with class and ascendancy selection.
 - Passive allocation, hover path previews, and clear/reset support.
+- Tree version switching and passive tree diff summaries where multiple
+  embedded versions are available.
 - Path of Exile import from passive tree URLs and Path of Building build codes.
 - Path of Exile 2 import from Path of Building 2 build codes.
+- Path of Exile 2 export to `.build` files for the official Build Planner.
 - Equipment import display for supported imported builds.
 - Cluster jewel and socketed jewel domain support.
 - Jewel radius visuals and radius-based node effect handling.
@@ -54,7 +57,7 @@ dotnet test PathOfAvalonia.slnx
 ```text
 PathOfAvalonia.slnx
 src/
-  TreeApp/        Avalonia desktop app, views, view models, services, assets wiring
+  TreeApp/        Avalonia desktop app, controls, views, view models, services, assets wiring
   TreeDomain/     Passive tree model, loaders, importers, jewels, cluster logic
 tests/
   PathOfAvalonia.TreeDomain.Tests/
@@ -76,7 +79,11 @@ domain library, test project, and asset tool. The desktop app embeds files under
 
 Tree loading and planning behavior lives in `src/TreeDomain`. UI state and
 interaction mediation live in `src/TreeApp/ViewModels`, while custom tree
-rendering is handled by `src/TreeApp/PassiveTreeView.cs`.
+rendering is handled by `src/TreeApp/Controls/PassiveTreeView*.cs`.
+
+Game asset path conventions are isolated behind `IGameAssetLayout`
+implementations in `src/TreeApp/Services`. The app registers one layout per
+game and resolves them through `IGameAssetLayoutRegistry`.
 
 ## Asset Generation
 
@@ -100,6 +107,7 @@ The test project covers the main domain surfaces used by the app:
 - PoE2 sprite map loading.
 - Passive spec allocation and import application.
 - PoE1 and PoE2 build import.
+- PoE2 Build Planner export.
 - Cluster jewel insertion and socketed jewel behavior.
 - Jewel radius parsing and membership.
 - App view model state transitions.
