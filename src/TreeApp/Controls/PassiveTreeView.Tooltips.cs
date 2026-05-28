@@ -74,7 +74,7 @@ public sealed partial class PassiveTreeView
         ctx.DrawLine(new Pen(borderBrush, 1), new Point(rect.X, rect.Y + headerHeight), new Point(rect.Right, rect.Y + headerHeight));
 
         DrawCenteredTextLines(ctx, titleLines, subtitleLines, rect.X, rect.Y, rect.Width, headerHeight);
-        DrawTooltipBody(ctx, bodyLines, rect.X + paddingX, rect.Y + headerHeight + paddingY);
+        DrawTooltipBody(ctx, bodyLines, rect.X + paddingX, rect.Y + headerHeight + paddingY, rect.Width - paddingX * 2);
     }
 
     private Rect PlaceTooltip(double width, double height)
@@ -100,12 +100,24 @@ public sealed partial class PassiveTreeView
         var height = headerHeight + paddingY;
         foreach (var line in bodyLines)
         {
-            height += line.IsGap ? 8 : line.Text.Height + 2;
+            if (line.IsGap)
+            {
+                height += 8;
+                continue;
+            }
+
+            if (line.IsSeparator)
+            {
+                height += 10;
+                continue;
+            }
+
+            height += line.Text.Height + 2;
         }
         return height + paddingY;
     }
 
-    private static void DrawTooltipBody(DrawingContext ctx, IEnumerable<TooltipLine> lines, double x, double lineY)
+    private static void DrawTooltipBody(DrawingContext ctx, IEnumerable<TooltipLine> lines, double x, double lineY, double width)
     {
         foreach (var line in lines)
         {
@@ -114,6 +126,15 @@ public sealed partial class PassiveTreeView
                 lineY += 8;
                 continue;
             }
+
+            if (line.IsSeparator)
+            {
+                lineY += 4;
+                ctx.DrawLine(new Pen(TooltipBorderBrush, 1), new Point(x, lineY), new Point(x + width, lineY));
+                lineY += 6;
+                continue;
+            }
+
             ctx.DrawText(line.Text, new Point(x, lineY));
             lineY += line.Text.Height + 2;
         }
@@ -237,6 +258,7 @@ public sealed partial class PassiveTreeView
         AddWrappedLines(lines, node.FlavourText, contentWidth, TooltipFlavourBrush, 14,
             new Typeface(FontFamily.Default, FontStyle.Italic, FontWeight.Normal));
         AddWrappedLines(lines, node.ReminderText, contentWidth, TooltipReminderBrush, 12, Typeface.Default, gapBefore: lines.Count > 0);
+        AddDiffTooltipLine(lines, node, contentWidth);
 
         return lines;
     }
@@ -254,6 +276,53 @@ public sealed partial class PassiveTreeView
             return;
         }
         AddWrappedLines(lines, [text], contentWidth, brush, 13, Typeface.Default, gapBefore: lines.Count > 0);
+    }
+
+    private void AddDiffTooltipLine(List<TooltipLine> lines, Node node, double contentWidth)
+    {
+        if (!_vm.Diff.CurrentNodeDiffs.TryGetValue(node.Id, out var diff))
+        {
+            return;
+        }
+
+        var prefix = string.IsNullOrWhiteSpace(_vm.Diff.BaselineVersion)
+            ? "Diff"
+            : $"Diff vs {_vm.Diff.BaselineVersion}";
+        IReadOnlyList<string> diffLines;
+        IBrush brush;
+        if (diff.Kind == TreeNodeDiffKind.Added)
+        {
+            diffLines = ["Added"];
+            brush = DiffAddedBrush;
+        }
+        else if (_vm.Diff.BaselineNodes.TryGetValue(node.Id, out var baselineNode))
+        {
+            diffLines = BaselineStatLines(baselineNode);
+            brush = TooltipStatBrush;
+        }
+        else
+        {
+            diffLines = ["Changed"];
+            brush = DiffChangedBrush;
+        }
+
+        if (lines.Count > 0)
+        {
+            lines.Add(TooltipLine.Separator);
+        }
+
+        AddWrappedLines(lines, [$"{prefix}:"], contentWidth, TooltipReminderBrush, 13, Typeface.Default);
+        AddWrappedLines(lines, diffLines, contentWidth, brush, 13, Typeface.Default);
+    }
+
+    private static IReadOnlyList<string> BaselineStatLines(Node baselineNode)
+    {
+        if (baselineNode.Stats.Count > 0)
+        {
+            return baselineNode.Stats;
+        }
+
+        return ["No stats"];
     }
 
     private List<TooltipLine> BuildItemTooltipLines(ItemViewModel item, double contentWidth)
@@ -460,9 +529,10 @@ public sealed partial class PassiveTreeView
         return formattedText;
     }
 
-    private readonly record struct TooltipLine(FormattedText Text, bool IsGap = false)
+    private readonly record struct TooltipLine(FormattedText Text, bool IsGap = false, bool IsSeparator = false)
     {
         public static TooltipLine Gap { get; } = new(CreateText(string.Empty, 1, Brushes.Transparent), IsGap: true);
+        public static TooltipLine Separator { get; } = new(CreateText(string.Empty, 1, Brushes.Transparent), IsSeparator: true);
     }
 
     private readonly record struct WrappedTextLine(string Text, IReadOnlyList<TextSpan> Underlines);
