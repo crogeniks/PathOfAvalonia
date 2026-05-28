@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives.PopupPositioning;
@@ -852,7 +853,11 @@ public sealed class PassiveTreeView : Control
     {
         var lines = new List<TooltipLine>();
 
-        AddWrappedLines(lines, PassiveEffectLines(node), contentWidth, TooltipStatBrush, 14, Typeface.Default);
+        var passiveLines = PassiveEffectLines(node).ToArray();
+        var statLinkSpans = passiveLines.SequenceEqual(node.Stats) && node.StatLinkSpans.Count == node.Stats.Count
+            ? node.StatLinkSpans
+            : null;
+        AddWrappedLines(lines, passiveLines, contentWidth, TooltipStatBrush, 14, Typeface.Default, linkSpans: statLinkSpans);
         AddWeaponSetTooltipLine(lines, node, contentWidth);
         AddAllocationPreviewLines(lines, node, contentWidth);
         AddWrappedLines(lines, node.FlavourText, contentWidth, TooltipFlavourBrush, 14,
@@ -923,20 +928,26 @@ public sealed class PassiveTreeView : Control
         IBrush brush,
         double size,
         Typeface typeface,
-        bool gapBefore = false)
+        bool gapBefore = false,
+        IReadOnlyList<IReadOnlyList<TextSpan>>? linkSpans = null)
     {
         var added = false;
+        var sourceIndex = 0;
         foreach (var raw in source)
         {
-            foreach (var line in WrapText(raw, maxWidth, size, typeface, brush))
+            var rawLinkSpans = linkSpans is not null && sourceIndex < linkSpans.Count
+                ? linkSpans[sourceIndex]
+                : null;
+            foreach (var line in WrapText(raw, maxWidth, size, typeface, brush, rawLinkSpans))
             {
                 if (!added && gapBefore)
                 {
                     lines.Add(TooltipLine.Gap);
                 }
-                lines.Add(new TooltipLine(CreateText(line, size, brush, typeface)));
+                lines.Add(new TooltipLine(CreateText(line.Text, size, brush, typeface, line.Underlines)));
                 added = true;
             }
+            sourceIndex++;
         }
     }
 
@@ -955,37 +966,89 @@ public sealed class PassiveTreeView : Control
                 {
                     lines.Add(TooltipLine.Gap);
                 }
-                lines.Add(new TooltipLine(CreateText(line, 14, raw.Brush)));
+                lines.Add(new TooltipLine(CreateText(line.Text, 14, raw.Brush)));
                 added = true;
             }
         }
     }
 
-    private static IEnumerable<string> WrapText(string text, double maxWidth, double size, Typeface typeface, IBrush brush)
+    private static IEnumerable<WrappedTextLine> WrapText(
+        string text,
+        double maxWidth,
+        double size,
+        Typeface typeface,
+        IBrush brush,
+        IReadOnlyList<TextSpan>? underlines = null)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
             yield break;
         }
 
-        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var current = string.Empty;
-        foreach (var word in words)
+        var currentStart = 0;
+        var index = 0;
+        while (index < text.Length)
         {
+            while (index < text.Length && text[index] == ' ')
+            {
+                index++;
+            }
+            if (index >= text.Length)
+            {
+                break;
+            }
+
+            var wordStart = index;
+            while (index < text.Length && text[index] != ' ')
+            {
+                index++;
+            }
+
+            var word = text[wordStart..index];
             var candidate = current.Length == 0 ? word : $"{current} {word}";
             if (CreateText(candidate, size, brush, typeface).Width <= maxWidth || current.Length == 0)
             {
+                if (current.Length == 0)
+                {
+                    currentStart = wordStart;
+                }
                 current = candidate;
                 continue;
             }
 
-            yield return current;
+            yield return new WrappedTextLine(current, ClipTextSpans(underlines, currentStart, current.Length));
             current = word;
+            currentStart = wordStart;
         }
         if (current.Length > 0)
         {
-            yield return current;
+            yield return new WrappedTextLine(current, ClipTextSpans(underlines, currentStart, current.Length));
         }
+    }
+
+    private static IReadOnlyList<TextSpan> ClipTextSpans(IReadOnlyList<TextSpan>? spans, int lineStart, int lineLength)
+    {
+        if (spans is null || spans.Count == 0)
+        {
+            return Array.Empty<TextSpan>();
+        }
+
+        var lineEnd = lineStart + lineLength;
+        var result = new List<TextSpan>();
+        foreach (var span in spans)
+        {
+            var spanStart = span.Start;
+            var spanEnd = span.Start + span.Length;
+            var start = Math.Max(spanStart, lineStart);
+            var end = Math.Min(spanEnd, lineEnd);
+            if (end > start)
+            {
+                result.Add(new TextSpan(start - lineStart, end - start));
+            }
+        }
+
+        return result;
     }
 
     private static List<FormattedText> CreateWrappedText(
@@ -998,14 +1061,30 @@ public sealed class PassiveTreeView : Control
         var lines = new List<FormattedText>();
         foreach (var line in WrapText(text, maxWidth, size, typeface, brush))
         {
-            lines.Add(CreateText(line, size, brush, typeface));
+            lines.Add(CreateText(line.Text, size, brush, typeface));
         }
         return lines;
     }
 
-    private static FormattedText CreateText(string text, double size, IBrush brush, Typeface? typeface = null) =>
-        new(text, System.Globalization.CultureInfo.CurrentCulture,
+    private static FormattedText CreateText(
+        string text,
+        double size,
+        IBrush brush,
+        Typeface? typeface = null,
+        IReadOnlyList<TextSpan>? underlines = null)
+    {
+        var formattedText = new FormattedText(text, System.Globalization.CultureInfo.CurrentCulture,
             FlowDirection.LeftToRight, typeface ?? Typeface.Default, size, brush);
+        foreach (var underline in underlines ?? [])
+        {
+            if (underline.Start >= 0 && underline.Length > 0 && underline.Start + underline.Length <= text.Length)
+            {
+                formattedText.SetTextDecorations(TextDecorations.Underline, underline.Start, underline.Length);
+            }
+        }
+
+        return formattedText;
+    }
 
     private void DrawNode(DrawingContext ctx, Node n, bool alloc, bool hover, bool useClusterSocketFrame)
     {
@@ -1631,4 +1710,6 @@ public sealed class PassiveTreeView : Control
     {
         public static TooltipLine Gap { get; } = new(CreateText(string.Empty, 1, Brushes.Transparent), IsGap: true);
     }
+
+    private readonly record struct WrappedTextLine(string Text, IReadOnlyList<TextSpan> Underlines);
 }
