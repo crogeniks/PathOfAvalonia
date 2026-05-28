@@ -20,19 +20,22 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly IUserSettingsService _settings;
     private readonly IBuildPlannerExportService _buildPlannerExportService;
     private readonly IStorageProviderAccessor _storageProviderAccessor;
+    private readonly IGameAssetLayoutRegistry _assetLayouts;
 
     public ShellViewModel(
         GameRegistry games,
         IGameAssetService assets,
         IUserSettingsService settings,
         IBuildPlannerExportService buildPlannerExportService,
-        IStorageProviderAccessor storageProviderAccessor)
+        IStorageProviderAccessor storageProviderAccessor,
+        IGameAssetLayoutRegistry assetLayouts)
     {
         _games = games;
         _assets = assets;
         _settings = settings;
         _buildPlannerExportService = buildPlannerExportService;
         _storageProviderAccessor = storageProviderAccessor;
+        _assetLayouts = assetLayouts;
         Games = _games.Games.Select(g => new GameChoiceViewModel(g, settings.LastGameId == g.Id)).ToArray();
 
         if (settings.LastGameId is { } lastGame && _games.TryGet(lastGame, out var game))
@@ -114,7 +117,7 @@ public sealed partial class ShellViewModel : ObservableObject
         ActiveWorkspace = new GameWorkspaceViewModel(
             workspace,
             treePanel,
-            new TreeImageAssetResolver(game, _assets, treeVersion),
+            new TreeImageAssetResolver(game, _assets, _assetLayouts, treeVersion),
             _assets,
             OpenWorkspace,
             BackToLandingCommand);

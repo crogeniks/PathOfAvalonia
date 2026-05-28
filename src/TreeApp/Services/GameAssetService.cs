@@ -22,20 +22,19 @@ public interface ITreeImageAssetResolver
     Bitmap? LoadBackground(string treeVersion);
 }
 
-public sealed class GameAssetService : IGameAssetService
+public sealed class GameAssetService(IGameAssetLayoutRegistry layouts) : IGameAssetService
 {
     public TreeModel LoadTree(GameDefinition game, string? version = null)
     {
         version ??= game.DefaultTreeVersion;
-        using var stream = OpenAsset(game, GameAssetPaths.For(game).TreeDataPath(version));
+        using var stream = OpenAsset(game, layouts.Get(game.Id).TreeDataPath(version));
         return game.TreeLoader.Load(stream, version, game.Id);
     }
 
     public SpriteMap LoadSprites(GameDefinition game, string? version = null)
     {
         version ??= game.DefaultTreeVersion;
-        var layout = GameAssetPaths.For(game);
-        var spritePaths = layout.SpriteDataPaths(version);
+        var spritePaths = layouts.Get(game.Id).SpriteDataPaths(version);
         if (spritePaths.Kind == SpriteDataKind.Poe2GggAssets)
         {
             using var skills = OpenAsset(game, spritePaths.Paths[0]);
@@ -64,7 +63,7 @@ public sealed class GameAssetService : IGameAssetService
     {
         try
         {
-            var path = GameAssetPaths.For(game).ResolveBitmapPath(relativePath, version ?? game.DefaultTreeVersion);
+            var path = layouts.Get(game.Id).ResolveBitmapPath(relativePath, version ?? game.DefaultTreeVersion);
             using var stream = OpenAsset(game, path);
             return new Bitmap(stream);
         }
@@ -91,6 +90,7 @@ public sealed class GameAssetService : IGameAssetService
 public sealed class TreeImageAssetResolver(
     GameDefinition game,
     IGameAssetService assets,
+    IGameAssetLayoutRegistry layouts,
     string? version = null) : ITreeImageAssetResolver
 {
     private readonly string _version = version ?? game.DefaultTreeVersion;
@@ -99,79 +99,8 @@ public sealed class TreeImageAssetResolver(
         => assets.LoadBitmap(game, relativePath, _version);
 
     public Bitmap? LoadBackground(string treeVersion) =>
-        LoadBitmap(GameAssetPaths.For(game).BackgroundPath(version ?? treeVersion));
+        LoadBitmap(layouts.Get(game.Id).BackgroundPath(version ?? treeVersion));
 
     public Bitmap? LoadJewelRadiusBitmap(string relativePath) =>
         LoadBitmap($"JewelRadius/{relativePath}") ?? assets.LoadSharedBitmap($"JewelRadius/{relativePath}");
-}
-
-internal enum SpriteDataKind
-{
-    Json,
-    Poe1GggTree,
-    Poe2GggAssets,
-}
-
-internal sealed record SpriteDataPaths(SpriteDataKind Kind, string[] Paths, string? AssetPrefix = null);
-
-internal abstract class GameAssetPaths
-{
-    public static GameAssetPaths For(GameDefinition game) =>
-        game.Id switch
-        {
-            GameId.PathOfExile1 => Poe1GameAssetPaths.Instance,
-            GameId.PathOfExile2 => Poe2GameAssetPaths.Instance,
-            _ => throw new NotSupportedException($"Unsupported game: {game.Id}"),
-        };
-
-    public abstract string TreeDataPath(string version);
-    public abstract SpriteDataPaths SpriteDataPaths(string version);
-    public abstract string BackgroundPath(string version);
-    public virtual string ResolveBitmapPath(string relativePath, string version) => relativePath;
-
-    protected static string VersionFolder(string version) => version.Replace('.', '_');
-    protected static string VersionFileSuffix(string version) => version.Replace('.', '_');
-}
-
-internal sealed class Poe1GameAssetPaths : GameAssetPaths
-{
-    public static Poe1GameAssetPaths Instance { get; } = new();
-
-    public override string TreeDataPath(string version) =>
-        IsGggTreeVersion(version) ? $"{VersionFolder(version)}/data.json" : $"tree_{VersionFileSuffix(version)}.json";
-
-    public override SpriteDataPaths SpriteDataPaths(string version) =>
-        IsGggTreeVersion(version)
-            ? new SpriteDataPaths(SpriteDataKind.Poe1GggTree, [TreeDataPath(version)], $"{VersionFolder(version)}/assets")
-            : new SpriteDataPaths(SpriteDataKind.Json, [$"sprites_{VersionFileSuffix(version)}.json"]);
-
-    public override string BackgroundPath(string version) =>
-        IsGggTreeVersion(version) ? $"{VersionFolder(version)}/assets/background-3.png" : $"background_{VersionFileSuffix(version)}.png";
-
-    private static bool IsGggTreeVersion(string version) => version == "3.28.0";
-}
-
-internal sealed class Poe2GameAssetPaths : GameAssetPaths
-{
-    public static Poe2GameAssetPaths Instance { get; } = new();
-
-    public override string TreeDataPath(string version) => $"{VersionFolder(version)}/data.json";
-
-    public override SpriteDataPaths SpriteDataPaths(string version)
-    {
-        var prefix = $"{VersionFolder(version)}/assets";
-        return new SpriteDataPaths(
-            SpriteDataKind.Poe2GggAssets,
-            [$"{prefix}/skills.json", $"{prefix}/frame.json", $"{prefix}/jewel.json"]);
-    }
-
-    public override string BackgroundPath(string version) => "assets/background.webp";
-
-    public override string ResolveBitmapPath(string relativePath, string version)
-    {
-        var folder = VersionFolder(version);
-        return relativePath.StartsWith($"{folder}/", StringComparison.Ordinal)
-            ? relativePath
-            : $"{folder}/{relativePath}";
-    }
 }
