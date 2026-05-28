@@ -12,7 +12,6 @@
   </Folder>
   <Folder Name="/Tools/">
     <File Path="tools\lua_to_json.lua" />
-    <File Path="tools\pob-headless\pathofavalonia_export.lua" />
     <Project Path="tools/poe2-assets/generate-poe2-sprites.csproj" />
   </Folder>
 </Solution>

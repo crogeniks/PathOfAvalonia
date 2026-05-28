@@ -9,12 +9,7 @@ namespace PathOfAvalonia.TreeApp.Services;
 public interface IUserSettingsService
 {
     GameId? LastGameId { get; set; }
-    string? Poe1PobPath { get; set; }
-    string? Poe2PobPath { get; set; }
     string? Poe2BuildPlannerDirectory { get; set; }
-    string? LuaExecutablePath { get; set; }
-    bool EnablePobBackend { get; set; }
-    int PobBackendTimeoutSeconds { get; set; }
     void Save();
 }
 
@@ -29,12 +24,7 @@ public sealed class UserSettingsService : IUserSettingsService
     }
 
     public GameId? LastGameId { get; set; }
-    public string? Poe1PobPath { get; set; }
-    public string? Poe2PobPath { get; set; }
     public string? Poe2BuildPlannerDirectory { get; set; }
-    public string? LuaExecutablePath { get; set; }
-    public bool EnablePobBackend { get; set; } = false;
-    public int PobBackendTimeoutSeconds { get; set; } = 120;
 
     public void Save()
     {
@@ -42,12 +32,7 @@ public sealed class UserSettingsService : IUserSettingsService
         var dto = new SettingsDto
         {
             LastGameId = LastGameId?.ToString(),
-            Poe1PobPath = Poe1PobPath,
-            Poe2PobPath = Poe2PobPath,
             Poe2BuildPlannerDirectory = Poe2BuildPlannerDirectory,
-            LuaExecutablePath = LuaExecutablePath,
-            EnablePobBackend = EnablePobBackend,
-            PobBackendTimeoutSeconds = PobBackendTimeoutSeconds,
         };
         File.WriteAllText(_path, JsonSerializer.Serialize(dto, JsonOpts));
     }
@@ -65,20 +50,11 @@ public sealed class UserSettingsService : IUserSettingsService
             {
                 LastGameId = gameId;
             }
-            Poe1PobPath = dto?.Poe1PobPath;
-            Poe2PobPath = dto?.Poe2PobPath;
             Poe2BuildPlannerDirectory = dto?.Poe2BuildPlannerDirectory;
-            LuaExecutablePath = dto?.LuaExecutablePath;
-            EnablePobBackend = dto?.EnablePobBackend ?? true;
-            PobBackendTimeoutSeconds = dto?.PobBackendTimeoutSeconds is > 0
-                ? dto.PobBackendTimeoutSeconds.Value
-                : 120;
         }
         catch
         {
             LastGameId = null;
-            EnablePobBackend = true;
-            PobBackendTimeoutSeconds = 120;
         }
     }
 
@@ -101,11 +77,6 @@ public sealed class UserSettingsService : IUserSettingsService
     private sealed class SettingsDto
     {
         [JsonPropertyName("lastGameId")] public string? LastGameId { get; set; }
-        [JsonPropertyName("poe1PobPath")] public string? Poe1PobPath { get; set; }
-        [JsonPropertyName("poe2PobPath")] public string? Poe2PobPath { get; set; }
         [JsonPropertyName("poe2BuildPlannerDirectory")] public string? Poe2BuildPlannerDirectory { get; set; }
-        [JsonPropertyName("luaExecutablePath")] public string? LuaExecutablePath { get; set; }
-        [JsonPropertyName("enablePobBackend")] public bool? EnablePobBackend { get; set; }
-        [JsonPropertyName("pobBackendTimeoutSeconds")] public int? PobBackendTimeoutSeconds { get; set; }
     }
 }

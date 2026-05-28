@@ -33,8 +33,7 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
         ITreeImageAssetResolver imageResolver,
         IGameAssetService assets,
         Action<GameDefinition, string> switchTreeVersion,
-        IRelayCommand backToLandingCommand,
-        IRelayCommand openBackendSettingsCommand)
+        IRelayCommand backToLandingCommand)
     {
         Workspace = workspace;
         TreePanel = treePanel;
@@ -42,7 +41,6 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
         _assets = assets;
         _switchTreeVersion = switchTreeVersion;
         BackToLandingCommand = backToLandingCommand;
-        OpenBackendSettingsCommand = openBackendSettingsCommand;
         SelectedTreeVersion = workspace.Tree.Version;
         TreeVersionOptions = workspace.Game.TreeVersions;
         DiffTreeVersionOptions = [NoDiffVersion, .. workspace.Game.TreeVersions.Where(version => version != workspace.Tree.Version)];
@@ -55,7 +53,6 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
     public MainWindowViewModel TreePanel { get; }
     public ITreeImageAssetResolver ImageResolver { get; }
     public IRelayCommand BackToLandingCommand { get; }
-    public IRelayCommand OpenBackendSettingsCommand { get; }
     public string GameName => Workspace.Game.DisplayName;
     public string TreeVersion => Workspace.Tree.Version;
     public bool HasTreeVersionOptions => TreeVersionOptions.Count > 1;

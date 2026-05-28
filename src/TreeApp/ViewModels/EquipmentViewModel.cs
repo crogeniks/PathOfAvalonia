@@ -203,7 +203,6 @@ public sealed class ImportedBuildMetricsViewModel
     {
         SourceText = metrics.Source switch
         {
-            ImportedMetricSource.PobBackend => "DPS source: PoB backend",
             ImportedMetricSource.SavedXmlSnapshot => "DPS source: Saved snapshot",
             _ => "DPS source: Unavailable",
         };

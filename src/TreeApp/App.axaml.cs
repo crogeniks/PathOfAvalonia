@@ -28,9 +28,6 @@ public partial class App : Application
         sc.AddSingleton<ITreeAssetService, TreeAssetService>();
         sc.AddSingleton<ISpritesAssetService, SpritesAssetService>();
         sc.AddSingleton<IImportService, ImportService>();
-        sc.AddSingleton<IPobBackendLocator, PobBackendLocator>();
-        sc.AddSingleton<IProcessRunner, ProcessRunner>();
-        sc.AddSingleton<IPobCalculationService, PobCalculationService>();
         sc.AddSingleton<IBuildPlannerExportService, BuildPlannerExportService>();
         sc.AddSingleton<IStorageProviderAccessor, StorageProviderAccessor>();
 

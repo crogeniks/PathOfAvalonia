@@ -4,15 +4,11 @@
              x:Class="PathOfAvalonia.TreeApp.Views.LandingView"
              x:DataType="vm:ShellViewModel">
     <Grid Background="#101018" RowDefinitions="Auto,*">
-        <Grid Margin="32,28,32,18" ColumnDefinitions="*,Auto">
+        <Grid Margin="32,28,32,18">
             <StackPanel Spacing="4">
             <TextBlock Text="PathOfAvalonia" Foreground="#F0F0F4" FontSize="28" FontWeight="SemiBold"/>
             <TextBlock Text="{Binding StatusMessage}" Foreground="#E0A060"/>
             </StackPanel>
-            <Button Grid.Column="1"
-                    Content="Backend Settings"
-                    Command="{Binding OpenBackendSettingsCommand}"
-                    VerticalAlignment="Top"/>
         </Grid>
         <ItemsControl Grid.Row="1" ItemsSource="{Binding Games}" Margin="32,0,32,32">
             <ItemsControl.ItemsPanel>
