@@ -23,7 +23,7 @@ public interface IBuildPlannerExportService
 
 public sealed record BuildPlannerExportFileResult(string Name, int SkippedNodeCount);
 
-public sealed class BuildPlannerExportService(IUserSettingsService settings) : IBuildPlannerExportService
+public sealed class BuildPlannerExportService(IUserSettingsService settings, IUserPathService paths) : IBuildPlannerExportService
 {
     private static readonly FilePickerFileType BuildFileType = new("Path of Exile 2 Build")
     {
@@ -39,7 +39,7 @@ public sealed class BuildPlannerExportService(IUserSettingsService settings) : I
         CancellationToken cancellationToken)
     {
         var export = Poe2BuildPlannerExporter.Export(build, tree, classes);
-        var startPath = ResolveBuildPlannerDirectory(settings);
+        var startPath = ResolveBuildPlannerDirectory(settings, paths);
         IStorageFolder? startFolder = null;
         try
         {
@@ -85,23 +85,14 @@ public sealed class BuildPlannerExportService(IUserSettingsService settings) : I
         return new BuildPlannerExportFileResult(file.Name, export.SkippedNodeIds.Count);
     }
 
-    private static string ResolveBuildPlannerDirectory(IUserSettingsService settings)
+    private static string ResolveBuildPlannerDirectory(IUserSettingsService settings, IUserPathService paths)
     {
         if (!string.IsNullOrWhiteSpace(settings.Poe2BuildPlannerDirectory))
         {
             return settings.Poe2BuildPlannerDirectory;
         }
 
-        if (OperatingSystem.IsWindows())
-        {
-            return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "My Games",
-                "Path of Exile 2",
-                "BuildPlanner");
-        }
-
-        return "/home/deck/.local/share/Steam/steamapps/compatdata/2315204395/pfx/drive_c/users/steamuser/Documents/My Games/Path of Exile 2/BuildPlanner";
+        return paths.DefaultPoe2BuildPlannerDirectory;
     }
 
     private static string BuildName(ImportedBuild build)

@@ -110,5 +110,9 @@ public sealed class ShellViewModelTests
 
         public Stream OpenAsset(GameDefinition game, string relativePath) =>
             throw new NotSupportedException();
+
+        public Bitmap? LoadBitmap(GameDefinition game, string relativePath, string? version = null) => null;
+
+        public Bitmap? LoadSharedBitmap(string relativePath) => null;
     }
 }

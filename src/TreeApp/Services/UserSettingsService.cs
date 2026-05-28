@@ -18,8 +18,13 @@ public sealed class UserSettingsService : IUserSettingsService
     private readonly string _path;
 
     public UserSettingsService()
+        : this(new UserPathService())
     {
-        _path = Path.Combine(ConfigRoot(), "PathOfAvalonia", "settings.json");
+    }
+
+    public UserSettingsService(IUserPathService paths)
+    {
+        _path = Path.Combine(paths.ConfigRoot, "PathOfAvalonia", "settings.json");
         Load();
     }
 
@@ -56,16 +61,6 @@ public sealed class UserSettingsService : IUserSettingsService
         {
             LastGameId = null;
         }
-    }
-
-    private static string ConfigRoot()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        }
-        return Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
-               ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
     }
 
     private static readonly JsonSerializerOptions JsonOpts = new()
