@@ -20,7 +20,7 @@ public static class Poe2BuildPlannerExporter
         }
 
         var skipped = new List<int>();
-        var passives = new List<object>();
+        var passives = new List<BuildPassive>();
         var seen = new HashSet<int>();
         foreach (var nodeId in build.NodeHashes.Concat(build.ClusterNodeHashes))
         {
@@ -37,12 +37,6 @@ public static class Poe2BuildPlannerExporter
 
             var additionalText = AttributeOverrideText(build.AttributeOverrides.GetValueOrDefault(nodeId));
             var weaponSet = WeaponSetIndex(build.AllocationSets.GetValueOrDefault(nodeId));
-            if (additionalText is null && weaponSet is null)
-            {
-                passives.Add(node.BuildPlannerId);
-                continue;
-            }
-
             passives.Add(new BuildPassive(node.BuildPlannerId, weaponSet, additionalText));
         }
 
@@ -121,7 +115,7 @@ public static class Poe2BuildPlannerExporter
             _ => null,
         };
 
-    private static IReadOnlyList<object>? BuildSkills(ImportedBuild build)
+    private static IReadOnlyList<BuildSkill>? BuildSkills(ImportedBuild build)
     {
         var activeSet = build.Skills.SkillSets.FirstOrDefault(set => set.Index == build.Skills.ActiveSkillSetIndex)
             ?? build.Skills.SkillSets.FirstOrDefault();
@@ -130,7 +124,7 @@ public static class Poe2BuildPlannerExporter
             return null;
         }
 
-        var skills = new List<object>();
+        var skills = new List<BuildSkill>();
         foreach (var group in activeSet.Groups.Where(group => group.Enabled))
         {
             var enabledGems = group.Gems
@@ -151,16 +145,15 @@ public static class Poe2BuildPlannerExporter
                 mainSkill = skillGems[0];
             }
 
+            var supportIds = new HashSet<string>(StringComparer.Ordinal);
             var supports = enabledGems
-                .Where(pair => IsSupportGem(pair.Gem.GemId))
-                .Select(pair => pair.Gem.GemId!)
-                .Distinct(StringComparer.Ordinal)
-                .Cast<object>()
+                .Where(pair => IsSupportGem(pair.Gem.GemId) && supportIds.Add(pair.Gem.GemId!))
+                .Select(pair => new BuildSkillReference(pair.Gem.GemId!, DefaultLevelInterval()))
                 .ToArray();
 
             skills.Add(new BuildSkill(
                 mainSkill.Gem.GemId!,
-                BuildGemAdditionalText(mainSkill.Gem),
+                DefaultLevelInterval(),
                 supports.Length == 0 ? null : supports));
         }
 
@@ -181,7 +174,8 @@ public static class Poe2BuildPlannerExporter
             slots.Add(new BuildInventorySlot(
                 inventoryId,
                 IsUnique(item) && !string.IsNullOrWhiteSpace(item.Name) ? item.Name : null,
-                BuildItemAdditionalText(item)));
+                IsUnique(item) ? null : BuildItemAdditionalText(item),
+                DefaultLevelInterval()));
         }
 
         return slots.Count == 0 ? null : slots;
@@ -195,31 +189,57 @@ public static class Poe2BuildPlannerExporter
     private static bool IsSupportGem(string? gemId) =>
         gemId is not null && gemId.Contains("/SupportGem", StringComparison.Ordinal);
 
-    private static string? BuildGemAdditionalText(ImportedGem gem)
-    {
-        var parts = new List<string>();
-        if (gem.Level is { } level)
-        {
-            parts.Add($"Level {level}");
-        }
-        if (gem.Quality is { } quality)
-        {
-            parts.Add($"Quality {quality}");
-        }
-
-        return parts.Count == 0 ? null : string.Join(", ", parts);
-    }
+    private static int[] DefaultLevelInterval() => [1, 100];
 
     private static string? BuildItemAdditionalText(ImportedItem item)
     {
-        var lines = item.RawText
+        var modIndex = 1;
+        var textLines = new List<string>();
+        if (!string.IsNullOrWhiteSpace(item.BaseType))
+        {
+            textLines.Add(item.BaseType);
+        }
+
+        foreach (var line in item.RawText
+            .Replace("\r\n", "\n")
             .Split('\n')
-            .Select(line => line.TrimEnd('\r'))
-            .Where(line => !line.StartsWith("Item Class:", StringComparison.OrdinalIgnoreCase))
-            .ToArray();
-        var text = string.Join('\n', lines).Trim();
+            .Select(line => line.Trim()))
+        {
+            if (SkipItemLine(line, item))
+            {
+                continue;
+            }
+
+            textLines.Add($"{modIndex++}. {line}");
+        }
+
+        var text = string.Join('\n', textLines).Trim();
         return string.IsNullOrWhiteSpace(text) ? null : text;
     }
+
+    private static bool SkipItemLine(string line, ImportedItem item)
+    {
+        return string.IsNullOrWhiteSpace(line)
+            || line == "--------"
+            || line.StartsWith("Rarity:", StringComparison.OrdinalIgnoreCase)
+            || line.StartsWith("Item Class:", StringComparison.OrdinalIgnoreCase)
+            || line.StartsWith("Unique ID:", StringComparison.OrdinalIgnoreCase)
+            || line.StartsWith("LevelReq:", StringComparison.OrdinalIgnoreCase)
+            || line.StartsWith("Requires Level", StringComparison.OrdinalIgnoreCase)
+            || line.StartsWith("Str:", StringComparison.OrdinalIgnoreCase)
+            || line.StartsWith("Dex:", StringComparison.OrdinalIgnoreCase)
+            || line.StartsWith("Int:", StringComparison.OrdinalIgnoreCase)
+            || line.StartsWith("Requires Class ", StringComparison.OrdinalIgnoreCase)
+            || line.StartsWith("Source:", StringComparison.OrdinalIgnoreCase)
+            || line.StartsWith("Note:", StringComparison.OrdinalIgnoreCase)
+            || line.StartsWith("Sockets:", StringComparison.OrdinalIgnoreCase)
+            || line.StartsWith("Rune:", StringComparison.OrdinalIgnoreCase)
+            || line.StartsWith("Implicits:", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("BasePercentile: ", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(line, item.Name, StringComparison.Ordinal)
+            || string.Equals(line, item.BaseType, StringComparison.Ordinal);
+    }
+
 
     private static bool IsUnique(ImportedItem item) =>
         string.Equals(item.Rarity, "Unique", StringComparison.OrdinalIgnoreCase);
@@ -244,6 +264,8 @@ public static class Poe2BuildPlannerExporter
             "Flask 3" => "Flask3",
             "Flask 4" => "Flask4",
             "Flask 5" => "Flask5",
+            "Charm 1" => "Charm1",
+            "Charm 2" => "Charm2",
             _ => null,
         };
 
@@ -252,8 +274,8 @@ public static class Poe2BuildPlannerExporter
         [property: JsonPropertyName("author")] string? Author,
         [property: JsonPropertyName("description")] string? Description,
         [property: JsonPropertyName("ascendancy")] string? Ascendancy,
-        [property: JsonPropertyName("passives")] IReadOnlyList<object>? Passives,
-        [property: JsonPropertyName("skills")] IReadOnlyList<object>? Skills,
+        [property: JsonPropertyName("passives")] IReadOnlyList<BuildPassive>? Passives,
+        [property: JsonPropertyName("skills")] IReadOnlyList<BuildSkill>? Skills,
         [property: JsonPropertyName("inventory_slots")] IReadOnlyList<BuildInventorySlot>? InventorySlots);
 
     private sealed record BuildPassive(
@@ -263,13 +285,18 @@ public static class Poe2BuildPlannerExporter
 
     private sealed record BuildSkill(
         [property: JsonPropertyName("id")] string Id,
-        [property: JsonPropertyName("additional_text")] string? AdditionalText,
-        [property: JsonPropertyName("support_skills")] IReadOnlyList<object>? SupportSkills);
+        [property: JsonPropertyName("level_interval")] int[] LevelInterval,
+        [property: JsonPropertyName("support_skills")] IReadOnlyList<BuildSkillReference>? SupportSkills);
+
+    private sealed record BuildSkillReference(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("level_interval")] int[] LevelInterval);
 
     private sealed record BuildInventorySlot(
         [property: JsonPropertyName("inventory_id")] string InventoryId,
         [property: JsonPropertyName("unique_name")] string? UniqueName,
-        [property: JsonPropertyName("additional_text")] string? AdditionalText);
+        [property: JsonPropertyName("additional_text")] string? AdditionalText,
+        [property: JsonPropertyName("level_interval")] int[] LevelInterval);
 }
 
 public sealed record Poe2BuildPlannerExportResult(string Json, IReadOnlyList<int> SkippedNodeIds);

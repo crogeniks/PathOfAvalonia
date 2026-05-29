@@ -37,7 +37,7 @@ public sealed class Poe2BuildPlannerExporterTests
                     "Rare",
                     "Dire Shell",
                     "Expert Hexer's Robe",
-                    "Rarity: Rare\nDire Shell\nExpert Hexer's Robe")
+                    "Rarity: Rare\nDire Shell\nExpert Hexer's Robe\n--------\nLevelReq: 70\n--------\n+50 to maximum Life\n+35% to Cold Resistance")
                 {
                     Id = 1,
                 },
@@ -104,19 +104,25 @@ public sealed class Poe2BuildPlannerExporterTests
 
         Assert.Equal("Titan Warrior", root.GetProperty("name").GetString());
         Assert.Equal("Warrior1", root.GetProperty("ascendancy").GetString());
-        Assert.Equal("melee17", passives[0].GetString());
+        Assert.Equal("melee17", passives[0].GetProperty("id").GetString());
         Assert.Equal("strength89", passives[1].GetProperty("id").GetString());
         Assert.Contains("Strength +5", passives[1].GetProperty("additional_text").GetString());
         Assert.Equal("melee18", passives[2].GetProperty("id").GetString());
         Assert.Equal(2, passives[2].GetProperty("weapon_set").GetInt32());
         var skill = root.GetProperty("skills")[0];
         Assert.Equal("Metadata/Items/Gems/SkillGemEarthquake", skill.GetProperty("id").GetString());
-        Assert.Equal("Level 20, Quality 20", skill.GetProperty("additional_text").GetString());
-        Assert.Equal("Metadata/Items/Gems/SupportGemFastForward", skill.GetProperty("support_skills")[0].GetString());
-        Assert.Equal("Metadata/Items/Gems/SupportGemAftershock", skill.GetProperty("support_skills")[1].GetString());
+        Assert.Equal(1, skill.GetProperty("level_interval")[0].GetInt32());
+        Assert.Equal(100, skill.GetProperty("level_interval")[1].GetInt32());
+        Assert.Equal("Metadata/Items/Gems/SupportGemFastForward", skill.GetProperty("support_skills")[0].GetProperty("id").GetString());
+        Assert.Equal(1, skill.GetProperty("support_skills")[0].GetProperty("level_interval")[0].GetInt32());
+        Assert.Equal("Metadata/Items/Gems/SupportGemAftershock", skill.GetProperty("support_skills")[1].GetProperty("id").GetString());
         var inventorySlots = root.GetProperty("inventory_slots");
         Assert.Equal("BodyArmour1", inventorySlots[0].GetProperty("inventory_id").GetString());
         Assert.Contains("Expert Hexer's Robe", inventorySlots[0].GetProperty("additional_text").GetString());
+        Assert.Contains("1. +50 to maximum Life", inventorySlots[0].GetProperty("additional_text").GetString());
+        Assert.Equal(1, inventorySlots[0].GetProperty("level_interval")[0].GetInt32());
+        Assert.False(inventorySlots[0].TryGetProperty("slot_x", out _));
+        Assert.False(inventorySlots[0].TryGetProperty("slot_y", out _));
         Assert.Equal("Ring1", inventorySlots[1].GetProperty("inventory_id").GetString());
         Assert.Equal("Kalandra's Touch", inventorySlots[1].GetProperty("unique_name").GetString());
         Assert.Equal([99], result.SkippedNodeIds);
