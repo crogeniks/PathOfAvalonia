@@ -64,7 +64,7 @@ public sealed partial class PassiveTreeView : Control
     private static readonly IBrush BgBrush = new SolidColorBrush(Color.FromRgb(0x10, 0x10, 0x18));
     private static readonly IBrush NormalBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x60));
     private static readonly IBrush AllocatedBrush = new SolidColorBrush(Color.FromRgb(0xff, 0xc8, 0x4a));
-    private static readonly IBrush WeaponSet1Brush = new SolidColorBrush(Color.FromRgb(0x35, 0xD4, 0xFF));
+    private static readonly IBrush WeaponSet1Brush = new SolidColorBrush(Color.FromRgb(0xE8, 0x3A, 0x3A));
     private static readonly IBrush WeaponSet2Brush = new SolidColorBrush(Color.FromRgb(0x66, 0xE3, 0x78));
     private static readonly IBrush TooltipFillBrush = new SolidColorBrush(Color.FromArgb(0xEE, 0x06, 0x08, 0x0B));
     private static readonly IBrush TooltipHeaderBrush = new SolidColorBrush(Color.FromArgb(0xEE, 0x39, 0x2B, 0x16));
@@ -73,7 +73,7 @@ public sealed partial class PassiveTreeView : Control
     private static readonly IBrush TooltipStatBrush = new SolidColorBrush(Color.FromRgb(0x8D, 0x98, 0xFF));
     private static readonly IBrush TooltipReminderBrush = new SolidColorBrush(Color.FromRgb(0xA6, 0xB1, 0xA4));
     private static readonly IBrush TooltipFlavourBrush = new SolidColorBrush(Color.FromRgb(0xD2, 0x84, 0x2E));
-    private static readonly IBrush ConnectorBrush = new SolidColorBrush(Color.FromRgb(0x40, 0x40, 0x48));
+    private static readonly IBrush ConnectorBrush = new SolidColorBrush(Color.FromArgb(0x55, 0x40, 0x40, 0x48));
     private static readonly IBrush HoverPathBrush = new SolidColorBrush(Color.FromArgb(0x80, 0xff, 0xc8, 0x4a));
     private static readonly IBrush Poe2NormalFrameBrush = new SolidColorBrush(Color.FromArgb(0xE0, 0x4E, 0x46, 0x35));
     private static readonly IBrush Poe2NotableFrameBrush = new SolidColorBrush(Color.FromArgb(0xF0, 0x8C, 0x75, 0x42));
@@ -309,7 +309,7 @@ public sealed partial class PassiveTreeView : Control
 
             if (TryGetJewelRadiusBitmap("ShadedOuterRing.png") is { } outerRing)
             {
-                DrawBitmapCentered(ctx, outerRing, centre, outer);
+                DrawRadiusBitmap(ctx, visual, outerRing, centre, outer);
             }
             else
             {
@@ -320,12 +320,16 @@ public sealed partial class PassiveTreeView : Control
             {
                 if (TryGetJewelRadiusBitmap("ShadedInnerRing.png") is { } innerRing)
                 {
-                    DrawBitmapCentered(ctx, innerRing, centre, inner);
+                    DrawRadiusBitmap(ctx, visual, innerRing, centre, inner);
                 }
                 else
                 {
                     ctx.DrawEllipse(null, pen, centre, inner, inner);
                 }
+            }
+            else if (visual.Style == JewelRadiusVisualStyle.OracleKeystoneCentered)
+            {
+                ctx.DrawEllipse(new SolidColorBrush(Color.FromArgb(0x06, 0x66, 0xFF, 0xCC)), null, centre, outer, outer);
             }
             else
             {
@@ -381,11 +385,26 @@ public sealed partial class PassiveTreeView : Control
         ctx.DrawImage(bitmap, dst);
     }
 
+    private static void DrawRadiusBitmap(DrawingContext ctx, JewelRadiusVisual visual, Bitmap bitmap, Point centre, double radius)
+    {
+        if (visual.Style != JewelRadiusVisualStyle.OracleKeystoneCentered)
+        {
+            DrawBitmapCentered(ctx, bitmap, centre, radius);
+            return;
+        }
+
+        using (ctx.PushOpacity(0.32))
+        {
+            DrawBitmapCentered(ctx, bitmap, centre, radius);
+        }
+    }
+
     private static IBrush RadiusBrush(JewelRadiusVisual visual) =>
         visual.Style switch
         {
             JewelRadiusVisualStyle.Annulus => new SolidColorBrush(Color.FromArgb(0xB0, 0xD3, 0x54, 0x00)),
             JewelRadiusVisualStyle.KeystoneCentered => new SolidColorBrush(Color.FromArgb(0xB0, 0xC1, 0x00, 0xFF)),
+            JewelRadiusVisualStyle.OracleKeystoneCentered => new SolidColorBrush(Color.FromArgb(0x55, 0xA8, 0x78, 0xD8)),
             _ => new SolidColorBrush(Color.FromArgb(0xB0, 0x66, 0xFF, 0xCC)),
         };
 

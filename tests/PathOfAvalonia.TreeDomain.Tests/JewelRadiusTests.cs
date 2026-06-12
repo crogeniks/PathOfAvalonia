@@ -205,6 +205,45 @@ public sealed class JewelRadiusTests
     }
 
     [Fact]
+    public void OracleKeystoneAllocationCreatesRadiusVisualsAroundAllocatedKeystones()
+    {
+        var spec = LoadPoe2Spec();
+        var oracle = OracleKeystoneAllocationNode(spec.Tree);
+        var (keystone, _) = FindPoe2KeystoneAndDetachedTargetInMediumRadius(spec.Tree);
+
+        spec.ApplyImport(Poe2OracleImport([oracle.Id, keystone.Id]));
+
+        var visual = Assert.Single(spec.ActiveJewelRadii);
+        Assert.Equal(oracle.Id, visual.SourceNodeId);
+        Assert.Equal(keystone.X, visual.X);
+        Assert.Equal(keystone.Y, visual.Y);
+        Assert.Equal(JewelRadiusVisualStyle.OracleKeystoneCentered, visual.Style);
+    }
+
+    [Fact]
+    public void OracleKeystoneAllocationAllowsOnlyNonKeystonePassivesInMediumRadius()
+    {
+        var spec = LoadPoe2Spec();
+        var oracle = OracleKeystoneAllocationNode(spec.Tree);
+        var (keystone, target) = FindPoe2KeystoneAndDetachedTargetInMediumRadius(spec.Tree);
+
+        spec.ApplyImport(Poe2OracleImport([oracle.Id, keystone.Id]));
+
+        Assert.True(spec.IsAllocatedByRadiusJewel(target.Id));
+        spec.Toggle(target.Id);
+        Assert.Contains(target.Id, spec.AllocatedNodes);
+
+        var otherKeystoneInRadius = spec.Tree.Nodes.Values.FirstOrDefault(node =>
+            node.Id != keystone.Id &&
+            node.Type == NodeType.Keystone &&
+            DistanceSquared(node, keystone) <= 1380 * 1380);
+        if (otherKeystoneInRadius is not null)
+        {
+            Assert.False(spec.IsAllocatedByRadiusJewel(otherKeystoneInRadius.Id));
+        }
+    }
+
+    [Fact]
     public void RequiredJewelRadiusAssetsExist()
     {
         foreach (var file in new[] { "ring.png", "small_ring.png", "ShadedOuterRing.png", "ShadedInnerRing.png" })
@@ -279,8 +318,58 @@ public sealed class JewelRadiusTests
         throw new InvalidOperationException("No strength passive was found in a small jewel radius.");
     }
 
+    private static Node OracleKeystoneAllocationNode(TreeModel tree) =>
+        Assert.Single(tree.Nodes.Values.Where(node =>
+            node.AscendancyName == "Oracle" &&
+            node.Stats.Any(stat => stat.Contains("Non-Keystone Passive Skills in Medium Radius of allocated Keystone Passive Skills can be allocated without being connected to your tree", StringComparison.OrdinalIgnoreCase))));
+
+    private static (Node Keystone, Node Target) FindPoe2KeystoneAndDetachedTargetInMediumRadius(TreeModel tree)
+    {
+        var mediumRadius = JewelRadiusTable.For(GameId.PathOfExile2, tree.Version)[2].Outer;
+        foreach (var keystone in tree.Nodes.Values.Where(node => node.Type == NodeType.Keystone))
+        {
+            var target = tree.Nodes.Values.FirstOrDefault(node =>
+                node.Type is NodeType.Normal or NodeType.Notable &&
+                node.AscendancyName is null &&
+                node.LinkedNodes.All(linked => linked.Id != keystone.Id) &&
+                DistanceSquared(node, keystone) <= mediumRadius * mediumRadius);
+            if (target is not null)
+            {
+                return (keystone, target);
+            }
+        }
+
+        throw new InvalidOperationException("No PoE2 passive was found in medium radius of a keystone.");
+    }
+
+    private static ImportedBuild Poe2OracleImport(IReadOnlyList<int> allocated) =>
+        new(
+            ClassId: 4,
+            AscendClassId: 1,
+            SecondaryAscendClassId: 0,
+            NodeHashes: allocated,
+            ClusterNodeHashes: [],
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: "0.5.0",
+            Source: "test")
+        {
+            ClassInternalId = "Druid",
+            AscendancyInternalId = "Druid1",
+        };
+
+    private static PassiveSpec LoadPoe2Spec() => new(LoadPoe2Tree());
+
+    private static TreeModel LoadPoe2Tree()
+    {
+        using var stream = File.OpenRead(Poe2Asset("0_5_0", "data.json"));
+        return TreeLoader.LoadPoe2FromJson(stream, "0.5.0");
+    }
+
     private static string Poe1Asset(params string[] parts) =>
         Path.GetFullPath(Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE1", .. parts]));
+
+    private static string Poe2Asset(params string[] parts) =>
+        Path.GetFullPath(Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE2", .. parts]));
 
     private static string Poe1JewelAsset(string fileName) =>
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE1", "JewelRadius", fileName));

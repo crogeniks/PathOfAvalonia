@@ -9,4 +9,5 @@ public enum RadiusJewelKind
     ImpossibleEscapeLike,
     FromNothingLike,
     Timeless,
+    OracleKeystoneAllocation,
 }

@@ -1,3 +1,4 @@
+using PathOfAvalonia.TreeDomain.Import;
 using PathOfAvalonia.TreeDomain.Jewels;
 
 namespace PathOfAvalonia.TreeDomain;
@@ -73,7 +74,58 @@ public sealed partial class PassiveSpec
                 VisualStyle(effect, band),
                 effect.Conqueror));
         }
+
+        AddOracleKeystoneAllocationRadii();
     }
+
+    private void AddOracleKeystoneAllocationRadii()
+    {
+        if (Tree.GameId != GameId.PathOfExile2)
+        {
+            return;
+        }
+        var radiusIndex = _jewelRadiusTable.NormalRadiusIndex("Medium");
+        if (radiusIndex is not { } mediumRadiusIndex || !_jewelRadiusTable.TryGet(mediumRadiusIndex, out var band))
+        {
+            return;
+        }
+
+        foreach (var oracleNode in Tree.Nodes.Values.Where(IsAllocatedOracleKeystoneAllocationNode))
+        {
+            var item = new ImportedItem(
+                string.Empty,
+                "Ascendancy",
+                oracleNode.Name,
+                "Oracle Ascendancy Passive",
+                string.Join('\n', oracleNode.Stats));
+            foreach (var keystone in Tree.Nodes.Values.Where(node => node.Type == NodeType.Keystone && _allocated.Contains(node.Id)))
+            {
+                _activeRadiusEffects.Add(new RadiusJewelEffect(
+                    oracleNode.Id,
+                    item,
+                    RadiusJewelKind.OracleKeystoneAllocation,
+                    mediumRadiusIndex,
+                    keystone.Id,
+                    Conqueror: null,
+                    NodeTransforms: [],
+                    AllowsUnconnectedAllocation: true));
+                _activeJewelRadii.Add(new JewelRadiusVisual(
+                    oracleNode.Id,
+                    keystone.X,
+                    keystone.Y,
+                    band.Inner,
+                    band.Outer,
+                    JewelRadiusVisualStyle.OracleKeystoneCentered,
+                    Conqueror: null));
+            }
+        }
+    }
+
+    private bool IsAllocatedOracleKeystoneAllocationNode(Node node) =>
+        _allocated.Contains(node.Id)
+        && CanAllocateNodeRules(node)
+        && node.AscendancyName == "Oracle"
+        && node.Stats.Any(stat => stat.Contains("Non-Keystone Passive Skills in Medium Radius of allocated Keystone Passive Skills can be allocated without being connected to your tree", StringComparison.OrdinalIgnoreCase));
 
     private static JewelRadiusVisualStyle VisualStyle(RadiusJewelEffect effect, JewelRadiusBand band)
     {
@@ -90,6 +142,12 @@ public sealed partial class PassiveSpec
 
     private bool EffectAffectsNode(RadiusJewelEffect effect, int nodeId)
     {
+        if (effect.Kind == RadiusJewelKind.OracleKeystoneAllocation
+            && Tree.Nodes.TryGetValue(nodeId, out var node)
+            && node.Type == NodeType.Keystone)
+        {
+            return false;
+        }
         var sourceId = effect.AlternateCenterNodeId ?? effect.SocketNodeId;
         var memberships = effect.AlternateCenterNodeId is not null ? _keystoneRadiusMembership : _socketRadiusMembership;
         return memberships.TryGetValue(sourceId, out var membership)

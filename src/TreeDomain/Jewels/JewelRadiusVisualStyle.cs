@@ -6,4 +6,5 @@ public enum JewelRadiusVisualStyle
     Annulus,
     Timeless,
     KeystoneCentered,
+    OracleKeystoneCentered,
 }
