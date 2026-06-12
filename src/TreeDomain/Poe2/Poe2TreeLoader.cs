@@ -120,7 +120,7 @@ public sealed class Poe2TreeLoader : ITreeLoader
                 continue;
             }
 
-            if (TryBuildArc(pair, from, to, edge, out var arc))
+            if (TryBuildArc(pair, from, to, edge, groupPositions, out var arc))
             {
                 connectors.Add(arc);
             }
@@ -338,29 +338,49 @@ public sealed class Poe2TreeLoader : ITreeLoader
         }
     }
 
-    private static bool TryBuildArc((int, int) pair, Node from, Node to, Poe2GggEdgeDto edge, out ArcConnector connector)
+    private static bool TryBuildArc(
+        (int, int) pair,
+        Node from,
+        Node to,
+        Poe2GggEdgeDto edge,
+        IReadOnlyDictionary<int, GroupPosition> groupPositions,
+        out ArcConnector connector)
     {
         connector = null!;
-        if (edge.OrbitX is null || edge.OrbitY is null)
+
+        if (edge.OrbitX is not null && edge.OrbitY is not null)
+        {
+            return TryBuildArc(pair, from, to, edge.OrbitX.Value, edge.OrbitY.Value, out connector);
+        }
+
+        if (from.GroupId != to.GroupId
+            || from.Orbit != to.Orbit
+            || !groupPositions.TryGetValue(from.GroupId, out var group))
         {
             return false;
         }
 
-        var radius = Radius(edge.OrbitX.Value, edge.OrbitY.Value, from.X, from.Y);
+        return TryBuildArc(pair, from, to, group.X, group.Y, out connector);
+    }
+
+    private static bool TryBuildArc((int, int) pair, Node from, Node to, double cx, double cy, out ArcConnector connector)
+    {
+        connector = null!;
+        var radius = Radius(cx, cy, from.X, from.Y);
         if (radius <= 0)
         {
             return false;
         }
 
-        var startAngle = TreeAngle(edge.OrbitX.Value, edge.OrbitY.Value, from.X, from.Y);
-        var endAngle = TreeAngle(edge.OrbitX.Value, edge.OrbitY.Value, to.X, to.Y);
+        var startAngle = TreeAngle(cx, cy, from.X, from.Y);
+        var endAngle = TreeAngle(cx, cy, to.X, to.Y);
         var sweep = NormalizeSweep(endAngle - startAngle);
         if (Math.Abs(sweep) < 0.0001)
         {
             return false;
         }
 
-        connector = new ArcConnector(pair.Item1, pair.Item2, edge.OrbitX.Value, edge.OrbitY.Value, radius, startAngle, sweep);
+        connector = new ArcConnector(pair.Item1, pair.Item2, cx, cy, radius, startAngle, sweep);
         return true;
     }
 

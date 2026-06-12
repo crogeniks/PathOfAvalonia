@@ -165,6 +165,36 @@ public sealed class Poe2TreeLoaderTests
     }
 
     [Fact]
+    public void ForthcomingAndPreservationUseSeparateOrbitArcs()
+    {
+        var tree = LoadTree("0.5.0");
+
+        var outer = AssertArc(tree, 55568, 44690);
+        var inner = AssertArc(tree, 32951, 39280);
+
+        Assert.Equal(tree.Groups[1071].X, outer.Cx);
+        Assert.Equal(tree.Groups[1071].Y, outer.Cy);
+        Assert.Equal(tree.Groups[1071].X, inner.Cx);
+        Assert.Equal(tree.Groups[1071].Y, inner.Cy);
+        Assert.NotEqual(outer.Radius, inner.Radius);
+    }
+
+    [Fact]
+    public void TurnTheClockForwardClusterUsesOrbitArcs()
+    {
+        var tree = LoadTree("0.5.0");
+
+        var left = AssertArc(tree, 26135, 2335);
+        var right = AssertArc(tree, 51565, 2335);
+
+        Assert.Equal(tree.Groups[1191].X, left.Cx);
+        Assert.Equal(tree.Groups[1191].Y, left.Cy);
+        Assert.Equal(tree.Groups[1191].X, right.Cx);
+        Assert.Equal(tree.Groups[1191].Y, right.Cy);
+        Assert.Equal(left.Radius, right.Radius, precision: 1);
+    }
+
+    [Fact]
     public void PassiveSpecCanSelectSorceressDiscipleOfVarashta()
     {
         var tree = LoadTree();
@@ -201,6 +231,13 @@ public sealed class Poe2TreeLoaderTests
             "data.json"));
         using var stream = File.OpenRead(path);
         return TreeLoader.LoadPoe2FromJson(stream, version);
+    }
+
+    private static ArcConnector AssertArc(TreeModel tree, int a, int b)
+    {
+        var connector = Assert.Single(tree.Connectors.Where(c =>
+            (c.FromId == a && c.ToId == b) || (c.FromId == b && c.ToId == a)));
+        return Assert.IsType<ArcConnector>(connector);
     }
 
     private static bool NeedsDrawableConnector(Node from, Node to)
