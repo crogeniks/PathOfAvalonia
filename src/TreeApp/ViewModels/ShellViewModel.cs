@@ -19,6 +19,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly IGameAssetService _assets;
     private readonly IUserSettingsService _settings;
     private readonly IBuildPlannerExportService _buildPlannerExportService;
+    private readonly IBuildPlannerImportService _buildPlannerImportService;
     private readonly IStorageProviderAccessor _storageProviderAccessor;
     private readonly IGameAssetLayoutRegistry _assetLayouts;
 
@@ -27,6 +28,7 @@ public sealed partial class ShellViewModel : ObservableObject
         IGameAssetService assets,
         IUserSettingsService settings,
         IBuildPlannerExportService buildPlannerExportService,
+        IBuildPlannerImportService buildPlannerImportService,
         IStorageProviderAccessor storageProviderAccessor,
         IGameAssetLayoutRegistry assetLayouts)
     {
@@ -34,6 +36,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _assets = assets;
         _settings = settings;
         _buildPlannerExportService = buildPlannerExportService;
+        _buildPlannerImportService = buildPlannerImportService;
         _storageProviderAccessor = storageProviderAccessor;
         _assetLayouts = assetLayouts;
         Games = _games.Games.Select(g => new GameChoiceViewModel(g, settings.LastGameId == g.Id)).ToArray();
@@ -103,6 +106,7 @@ public sealed partial class ShellViewModel : ObservableObject
             game.ImportStrategy,
             equipment,
             _buildPlannerExportService,
+            _buildPlannerImportService,
             _storageProviderAccessor);
         var workspace = new GameWorkspace
         {

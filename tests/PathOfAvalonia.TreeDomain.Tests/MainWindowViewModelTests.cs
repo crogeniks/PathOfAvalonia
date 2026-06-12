@@ -2,6 +2,7 @@ using PathOfAvalonia.TreeApp.Services;
 using PathOfAvalonia.TreeApp.ViewModels;
 using PathOfAvalonia.TreeDomain;
 using PathOfAvalonia.TreeDomain.Import;
+using Avalonia.Platform.Storage;
 using Moq;
 using Xunit;
 
@@ -287,6 +288,49 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("Spark", Assert.Single(equipment.SkillGroups).Header);
     }
 
+    [Fact]
+    public void ImportBuildPlannerCommandAppliesImportedBuild()
+    {
+        var node = ImportableNodeIds()[0];
+        var build = new ImportedBuild(
+            ClassId: 0,
+            AscendClassId: 0,
+            SecondaryAscendClassId: 0,
+            NodeHashes: [node],
+            ClusterNodeHashes: [],
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: null,
+            Source: "build-planner")
+        {
+            Items = [ImportedItem("Planner Ring")],
+            Skills = new ImportedSkills(
+                [new ImportedSkillSet(0, 1, "Build Planner", [new ImportedSkillGroup(0, "Spark", null, null, true, false, 1, 0, 0, [])])],
+                0,
+                0),
+        };
+        var importService = new Mock<IBuildPlannerImportService>();
+        importService
+            .Setup(service => service.ImportAsync(It.IsAny<IStorageProvider>(), It.IsAny<TreeModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BuildPlannerImportFileResult("test.build", build, 0));
+        var storageAccessor = new StorageProviderAccessor { StorageProvider = Mock.Of<IStorageProvider>() };
+        var spec = LoadSpec();
+        var vm = new MainWindowViewModel(
+            spec,
+            new StubImportStrategy(build),
+            new EquipmentViewModel(),
+            Mock.Of<IBuildPlannerExportService>(),
+            importService.Object,
+            storageAccessor);
+
+        vm.ImportBuildPlannerCommand.Execute(null);
+
+        Assert.Contains(node, spec.AllocatedNodes);
+        Assert.Contains("build-planner", vm.ImportStatus);
+        Assert.Same(build, vm.CurrentImportedBuild);
+        Assert.Single(vm.Equipment.Groups);
+        Assert.Single(vm.Equipment.SkillGroups);
+    }
+
     private static MainWindowViewModel CreateViewModel(
         PassiveSpec spec,
         IImportStrategy importStrategy,
@@ -296,6 +340,7 @@ public sealed class MainWindowViewModelTests
             importStrategy,
             equipment,
             Mock.Of<IBuildPlannerExportService>(),
+            Mock.Of<IBuildPlannerImportService>(),
             Mock.Of<IStorageProviderAccessor>());
 
     private static PassiveSpec LoadSpec() => new(LoadTree());

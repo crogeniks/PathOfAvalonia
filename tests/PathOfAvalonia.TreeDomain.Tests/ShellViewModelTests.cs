@@ -48,6 +48,7 @@ public sealed class ShellViewModelTests
             new StubAssets(),
             settings,
             Mock.Of<IBuildPlannerExportService>(),
+            Mock.Of<IBuildPlannerImportService>(),
             Mock.Of<IStorageProviderAccessor>(),
             new GameAssetLayoutRegistry([new Poe1GameAssetLayout(), new Poe2GameAssetLayout()]));
 

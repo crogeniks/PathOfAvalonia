@@ -27,11 +27,14 @@ public partial class App : Application
         sc.AddSingleton<IUserPathService, UserPathService>();
         sc.AddSingleton<IBuildPlannerPathService, BuildPlannerPathService>();
         sc.AddSingleton<ITextFileSaveService, TextFileSaveService>();
+        sc.AddSingleton<ITextFileOpenService, TextFileOpenService>();
+        sc.AddSingleton<IBuildNamePrefixPromptService, BuildNamePrefixPromptService>();
         sc.AddSingleton<IGameAssetLayout, Poe1GameAssetLayout>();
         sc.AddSingleton<IGameAssetLayout, Poe2GameAssetLayout>();
         sc.AddSingleton<IGameAssetLayoutRegistry, GameAssetLayoutRegistry>();
         sc.AddSingleton<IGameAssetService, GameAssetService>();
         sc.AddSingleton<IBuildPlannerExportService, BuildPlannerExportService>();
+        sc.AddSingleton<IBuildPlannerImportService, BuildPlannerImportService>();
         sc.AddSingleton<IStorageProviderAccessor, StorageProviderAccessor>();
 
         // Singletons resolved from asset services at first request.

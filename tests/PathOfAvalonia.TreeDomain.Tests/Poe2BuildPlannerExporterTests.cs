@@ -128,6 +128,67 @@ public sealed class Poe2BuildPlannerExporterTests
         Assert.Equal([99], result.SkippedNodeIds);
     }
 
+    [Fact]
+    public void ExportFilesUsesPassiveTreeVariantsAsOutputSource()
+    {
+        var tree = CreateTree();
+        var build = new ImportedBuild(
+            ClassId: 2,
+            AscendClassId: 1,
+            SecondaryAscendClassId: 0,
+            NodeHashes: [10],
+            ClusterNodeHashes: [],
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: "0.5.0",
+            Source: "test")
+        {
+            PassiveTreeVariants =
+            [
+                PassiveVariant(0, "Bossing", [10]),
+                PassiveVariant(1, "Mapping", [11]),
+            ],
+            ItemSetVariants =
+            [
+                new ImportedItemSetVariant(
+                    0,
+                    1,
+                    "Bossing",
+                    [new ImportedItem("Ring 1", "Unique", "Kalandra's Touch", "Ring", "Rarity: Unique\nKalandra's Touch\nRing")]),
+                new ImportedItemSetVariant(
+                    1,
+                    2,
+                    "Unused Gear",
+                    [new ImportedItem("Ring 1", "Unique", "Ignored Ring", "Ring", "Rarity: Unique\nIgnored Ring\nRing")]),
+            ],
+            Skills = new ImportedSkills(
+                [
+                    SkillSet(0, 1, "Bossing", "Earthquake", "Metadata/Items/Gems/SkillGemEarthquake"),
+                    SkillSet(1, 2, "Mapping", "Spark", "Metadata/Items/Gems/SkillGemSpark"),
+                    SkillSet(2, 3, "Unused Gems", "Frostbolt", "Metadata/Items/Gems/SkillGemFrostbolt"),
+                ],
+                0,
+                0),
+        };
+
+        var files = Poe2BuildPlannerExporter.ExportFiles(build, tree, tree.Classes, "League Starter");
+
+        Assert.Equal(["League Starter - Bossing", "League Starter - Mapping"], files.Select(file => file.Name));
+
+        using var bossingDocument = JsonDocument.Parse(files[0].Export.Json);
+        var bossingRoot = bossingDocument.RootElement;
+        Assert.Equal("League Starter - Bossing", bossingRoot.GetProperty("name").GetString());
+        Assert.Equal("melee17", bossingRoot.GetProperty("passives")[0].GetProperty("id").GetString());
+        Assert.Equal("Kalandra's Touch", bossingRoot.GetProperty("inventory_slots")[0].GetProperty("unique_name").GetString());
+        Assert.Equal("Metadata/Items/Gems/SkillGemEarthquake", bossingRoot.GetProperty("skills")[0].GetProperty("id").GetString());
+
+        using var mappingDocument = JsonDocument.Parse(files[1].Export.Json);
+        var mappingRoot = mappingDocument.RootElement;
+        Assert.Equal("League Starter - Mapping", mappingRoot.GetProperty("name").GetString());
+        Assert.Equal("strength89", mappingRoot.GetProperty("passives")[0].GetProperty("id").GetString());
+        Assert.False(mappingRoot.TryGetProperty("inventory_slots", out _));
+        Assert.Equal("Metadata/Items/Gems/SkillGemSpark", mappingRoot.GetProperty("skills")[0].GetProperty("id").GetString());
+    }
+
     private static TreeModel CreateTree()
     {
         var classes = new ClassCatalog
@@ -179,6 +240,42 @@ public sealed class Poe2BuildPlannerExporterTests
         Orbit = 0,
         OrbitIndex = 0,
     };
+
+    private static ImportedPassiveTreeVariant PassiveVariant(int index, string name, IReadOnlyList<int> nodeIds) =>
+        new(
+            index,
+            name,
+            2,
+            1,
+            0,
+            nodeIds,
+            [],
+            new Dictionary<int, int>(),
+            "0.5.0",
+            2,
+            "Warrior",
+            "Warrior1",
+            new Dictionary<int, AttributeNodeOverride>(),
+            []);
+
+    private static ImportedSkillSet SkillSet(int index, int id, string name, string skillName, string gemId) =>
+        new(
+            index,
+            id,
+            name,
+            [
+                new ImportedSkillGroup(
+                    0,
+                    skillName,
+                    null,
+                    null,
+                    true,
+                    false,
+                    1,
+                    0,
+                    0,
+                    [Gem(skillName, gemId, 20, 20)])
+            ]);
 
     private static ImportedGem Gem(string name, string gemId, int? level, int? quality) => new(
         name,

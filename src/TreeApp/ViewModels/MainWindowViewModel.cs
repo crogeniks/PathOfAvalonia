@@ -16,6 +16,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly PassiveSpec _spec;
     private readonly IImportStrategy _importStrategy;
     private readonly IBuildPlannerExportService _buildPlannerExportService;
+    private readonly IBuildPlannerImportService _buildPlannerImportService;
     private readonly IStorageProviderAccessor _storageProviderAccessor;
     private bool _syncingClass;
     private bool _syncingAscendancy;
@@ -41,6 +42,7 @@ public partial class MainWindowViewModel : ObservableObject
     public bool IsImportSupported => _importStrategy.IsSupported;
     public bool IsImportUnsupported => !_importStrategy.IsSupported;
     public bool SupportsBuildPlannerExport => _spec.Tree.GameId == GameId.PathOfExile2;
+    public bool SupportsBuildPlannerImport => _spec.Tree.GameId == GameId.PathOfExile2;
     public bool CanExportBuildPlanner => _spec.Tree.GameId == GameId.PathOfExile2 && _lastImportedBuild is not null;
     public ImportedBuild? CurrentImportedBuild => _lastImportedBuild;
     public string UnsupportedImportStatus => "Build import is not available for this game yet.";
@@ -77,11 +79,13 @@ public partial class MainWindowViewModel : ObservableObject
         IImportStrategy importStrategy,
         EquipmentViewModel equipment,
         IBuildPlannerExportService buildPlannerExportService,
+        IBuildPlannerImportService buildPlannerImportService,
         IStorageProviderAccessor storageProviderAccessor)
     {
         _spec = spec;
         _importStrategy = importStrategy;
         _buildPlannerExportService = buildPlannerExportService;
+        _buildPlannerImportService = buildPlannerImportService;
         _storageProviderAccessor = storageProviderAccessor;
         Equipment = equipment;
         TreeViewModel = new PassiveTreeViewModel(spec);
@@ -228,26 +232,7 @@ public partial class MainWindowViewModel : ObservableObject
         try
         {
             var build = _importStrategy.Import(text);
-            _syncingVariants = true;
-            _lastImportedBuild = build;
-            OnExportStateChanged();
-            PassiveTreeVariantOptions = build.PassiveTreeVariants
-                .Select(variant => new ImportedVariantOptionViewModel(variant.Index, variant.DisplayName))
-                .ToArray();
-            ItemSetVariantOptions = build.ItemSetVariants
-                .Select(variant => new ImportedVariantOptionViewModel(variant.Index, variant.DisplayName))
-                .ToArray();
-            HasPassiveTreeVariants = PassiveTreeVariantOptions.Count > 1;
-            HasItemSetVariants = ItemSetVariantOptions.Count > 1;
-            SelectedPassiveTreeVariantIndex = build.ActivePassiveTreeVariantIndex;
-            SelectedItemSetVariantIndex = build.ActiveItemSetVariantIndex;
-            _syncingVariants = false;
-
-            var result = _spec.ApplyImport(build);
-            _lastImportResult = result;
-            Equipment.LoadBuild(build);
-            ImportStatus = BuildImportStatus(result);
-            ImportStatusIsError = false;
+            ApplyImportedBuild(build);
         }
         catch (Exception ex)
         {
@@ -255,6 +240,30 @@ public partial class MainWindowViewModel : ObservableObject
             ImportStatus = $"Import failed: {ex.Message}";
             ImportStatusIsError = true;
         }
+    }
+
+    private void ApplyImportedBuild(ImportedBuild build)
+    {
+        _syncingVariants = true;
+        _lastImportedBuild = build;
+        OnExportStateChanged();
+        PassiveTreeVariantOptions = build.PassiveTreeVariants
+            .Select(variant => new ImportedVariantOptionViewModel(variant.Index, variant.DisplayName))
+            .ToArray();
+        ItemSetVariantOptions = build.ItemSetVariants
+            .Select(variant => new ImportedVariantOptionViewModel(variant.Index, variant.DisplayName))
+            .ToArray();
+        HasPassiveTreeVariants = PassiveTreeVariantOptions.Count > 1;
+        HasItemSetVariants = ItemSetVariantOptions.Count > 1;
+        SelectedPassiveTreeVariantIndex = build.ActivePassiveTreeVariantIndex;
+        SelectedItemSetVariantIndex = build.ActiveItemSetVariantIndex;
+        _syncingVariants = false;
+
+        var result = _spec.ApplyImport(build);
+        _lastImportResult = result;
+        Equipment.LoadBuild(build);
+        ImportStatus = BuildImportStatus(result);
+        ImportStatusIsError = false;
     }
 
     private static string BuildImportStatus(ImportResult result)
@@ -347,14 +356,48 @@ public partial class MainWindowViewModel : ObservableObject
                 return;
             }
 
+            var exported = result.FileCount == 1
+                ? result.Name
+                : $"{result.FileCount} build files to {result.Name}";
             ImportStatus = result.SkippedNodeCount == 0
-                ? $"Exported {result.Name}"
-                : $"Exported {result.Name}; skipped {result.SkippedNodeCount} node(s) without Build Planner ids";
+                ? $"Exported {exported}"
+                : $"Exported {exported}; skipped {result.SkippedNodeCount} node(s) without Build Planner ids";
             ImportStatusIsError = false;
         }
         catch (Exception ex)
         {
             ImportStatus = $"Export failed: {ex.Message}";
+            ImportStatusIsError = true;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportBuildPlanner()
+    {
+        var storageProvider = _storageProviderAccessor.StorageProvider;
+        if (storageProvider is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var result = await _buildPlannerImportService.ImportAsync(storageProvider, _spec.Tree, default);
+            if (result is null)
+            {
+                return;
+            }
+
+            ApplyImportedBuild(result.Build);
+            if (result.SkippedPassiveCount > 0)
+            {
+                ImportStatus += $"; skipped {result.SkippedPassiveCount} unknown Build Planner passive id(s)";
+            }
+        }
+        catch (Exception ex)
+        {
+            ResetVariantState();
+            ImportStatus = $"Build Planner import failed: {ex.Message}";
             ImportStatusIsError = true;
         }
     }

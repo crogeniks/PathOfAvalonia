@@ -14,6 +14,47 @@ public static class Poe2BuildPlannerExporter
 
     public static Poe2BuildPlannerExportResult Export(ImportedBuild build, TreeModel tree, ClassCatalog classes)
     {
+        return Export(build, tree, classes, BuildName(build), BuildSkills(build), BuildInventorySlots(build));
+    }
+
+    public static IReadOnlyList<Poe2BuildPlannerExportFile> ExportFiles(
+        ImportedBuild build,
+        TreeModel tree,
+        ClassCatalog classes,
+        string buildNamePrefix = "")
+    {
+        buildNamePrefix = buildNamePrefix.Trim();
+        if (build.PassiveTreeVariants.Count == 0)
+        {
+            var name = PrefixedName(BuildName(build), buildNamePrefix);
+            var export = Export(build, tree, classes, name, BuildSkills(build), BuildInventorySlots(build));
+            return [new Poe2BuildPlannerExportFile(name, export)];
+        }
+
+        return build.PassiveTreeVariants
+            .Select(variant =>
+            {
+                var name = PrefixedName(variant.DisplayName, buildNamePrefix);
+                var variantBuild = build.WithPassiveTreeVariant(variant.Index);
+                var skills = BuildSkills(MatchingSkillSet(build, variant.DisplayName));
+                var inventorySlots = BuildInventorySlots(MatchingItems(build, variant.DisplayName));
+                var export = Export(variantBuild, tree, classes, name, skills, inventorySlots);
+                return new Poe2BuildPlannerExportFile(name, export);
+            })
+            .ToArray();
+    }
+
+    private static string PrefixedName(string name, string prefix) =>
+        string.IsNullOrWhiteSpace(prefix) ? name : $"{prefix} - {name}";
+
+    private static Poe2BuildPlannerExportResult Export(
+        ImportedBuild build,
+        TreeModel tree,
+        ClassCatalog classes,
+        string name,
+        IReadOnlyList<BuildSkill>? skills,
+        IReadOnlyList<BuildInventorySlot>? inventorySlots)
+    {
         if (tree.GameId != GameId.PathOfExile2)
         {
             throw new NotSupportedException("Build Planner export is only supported for Path of Exile 2.");
@@ -41,13 +82,13 @@ public static class Poe2BuildPlannerExporter
         }
 
         var dto = new BuildFile(
-            Name: BuildName(build),
+            Name: name,
             Author: "PathOfAvalonia",
             Description: BuildDescription(build, skipped.Count),
             Ascendancy: ResolveAscendancy(build, classes),
             Passives: passives.Count == 0 ? null : passives,
-            Skills: BuildSkills(build),
-            InventorySlots: BuildInventorySlots(build));
+            Skills: skills,
+            InventorySlots: inventorySlots);
 
         return new Poe2BuildPlannerExportResult(JsonSerializer.Serialize(dto, JsonOptions), skipped);
     }
@@ -115,10 +156,44 @@ public static class Poe2BuildPlannerExporter
             _ => null,
         };
 
+    private static ImportedSkillSet? MatchingSkillSet(ImportedBuild build, string passiveTreeName)
+    {
+        if (build.Skills.SkillSets.Count == 0)
+        {
+            return null;
+        }
+
+        if (build.Skills.SkillSets.Count == 1)
+        {
+            return build.Skills.SkillSets[0];
+        }
+
+        return build.Skills.SkillSets.FirstOrDefault(set => VariantNamesMatch(set.DisplayName, passiveTreeName));
+    }
+
+    private static IReadOnlyList<ImportedItem> MatchingItems(ImportedBuild build, string passiveTreeName)
+    {
+        if (build.ItemSetVariants.Count == 0)
+        {
+            return build.Items;
+        }
+
+        return build.ItemSetVariants.FirstOrDefault(set => VariantNamesMatch(set.DisplayName, passiveTreeName))?.Items
+            ?? [];
+    }
+
+    private static bool VariantNamesMatch(string left, string right) =>
+        string.Equals(left.Trim(), right.Trim(), StringComparison.OrdinalIgnoreCase);
+
     private static IReadOnlyList<BuildSkill>? BuildSkills(ImportedBuild build)
     {
         var activeSet = build.Skills.SkillSets.FirstOrDefault(set => set.Index == build.Skills.ActiveSkillSetIndex)
             ?? build.Skills.SkillSets.FirstOrDefault();
+        return BuildSkills(activeSet);
+    }
+
+    private static IReadOnlyList<BuildSkill>? BuildSkills(ImportedSkillSet? activeSet)
+    {
         if (activeSet is null)
         {
             return null;
@@ -160,10 +235,13 @@ public static class Poe2BuildPlannerExporter
         return skills.Count == 0 ? null : skills;
     }
 
-    private static IReadOnlyList<BuildInventorySlot>? BuildInventorySlots(ImportedBuild build)
+    private static IReadOnlyList<BuildInventorySlot>? BuildInventorySlots(ImportedBuild build) =>
+        BuildInventorySlots(build.Items);
+
+    private static IReadOnlyList<BuildInventorySlot>? BuildInventorySlots(IReadOnlyList<ImportedItem> items)
     {
         var slots = new List<BuildInventorySlot>();
-        foreach (var item in build.Items)
+        foreach (var item in items)
         {
             var inventoryId = InventoryId(item.Slot);
             if (inventoryId is null)
@@ -300,3 +378,5 @@ public static class Poe2BuildPlannerExporter
 }
 
 public sealed record Poe2BuildPlannerExportResult(string Json, IReadOnlyList<int> SkippedNodeIds);
+
+public sealed record Poe2BuildPlannerExportFile(string Name, Poe2BuildPlannerExportResult Export);
