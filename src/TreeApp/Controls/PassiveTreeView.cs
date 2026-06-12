@@ -48,6 +48,10 @@ public sealed partial class PassiveTreeView : Control
     // PoB draws each sprite at (atlas_px * SpriteDisplayScale) tree-units per half-dimension
     // (`DrawAsset` in PassiveTreeView.lua uses data.width * scale * 1.33, rect spans 2x).
     private const double SpriteDisplayScale = 1.33;
+    private const double Poe2MasteryEffectDisplayScale = 1.85;
+    private const double Poe2MasteryEffectVisibleRadiusTree = 280;
+    private const double Poe2MasteryEffectDisabledOpacity = 0.38;
+    private const double Poe2MasteryEffectActiveOpacity = 0.72;
 
     // Hit-test radii (tree-units) per node type. From PoB's nodeOverlay.artWidth * 1.33
     // (PassiveTree.lua:387–438). Squared here to skip the sqrt in the loop.
@@ -171,6 +175,7 @@ public sealed partial class PassiveTreeView : Control
         DrawActiveJewelRadii(ctx, visibleTree);
 
         DrawClusterBackgroundDiscs(ctx, visibleTree);
+        DrawPoe2MasteryEffects(ctx, visibleTree);
 
         // Draw connectors: base tree first, then cluster subgraph connectors.
         var allocated = _vm.AllocatedNodes;

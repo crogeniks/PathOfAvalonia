@@ -33,17 +33,28 @@ public sealed class SpriteMap
         return new SpriteMap { Atlases = ConvertAtlases(dto.Atlases) };
     }
 
-    public static SpriteMap LoadPoe2FromGggAssets(Stream skillsStream, Stream framesStream, Stream jewelsStream)
+    public static SpriteMap LoadPoe2FromGggAssets(
+        Stream skillsStream,
+        Stream framesStream,
+        Stream jewelsStream,
+        Stream? masteryEffectDisabledStream = null,
+        Stream? masteryEffectActiveStream = null)
     {
-        return new SpriteMap
+        var atlases = new Dictionary<string, SpriteAtlas>(StringComparer.Ordinal)
         {
-            Atlases = new Dictionary<string, SpriteAtlas>(StringComparer.Ordinal)
-            {
-                ["poe2NodeIcons"] = LoadGggAtlas(skillsStream, "assets/skills.webp"),
-                ["poe2Frames"] = LoadGggAtlas(framesStream, "assets/frame.webp"),
-                ["poe2Jewels"] = LoadGggAtlas(jewelsStream, "assets/jewel.webp"),
-            },
+            ["poe2NodeIcons"] = LoadGggAtlas(skillsStream, "assets/skills.webp"),
+            ["poe2Frames"] = LoadGggAtlas(framesStream, "assets/frame.webp"),
+            ["poe2Jewels"] = LoadGggAtlas(jewelsStream, "assets/jewel.webp"),
         };
+        if (masteryEffectDisabledStream is not null)
+        {
+            atlases["poe2MasteryEffectDisabled"] = LoadGggAtlas(masteryEffectDisabledStream, "assets/mastery-effect-disabled.webp");
+        }
+        if (masteryEffectActiveStream is not null)
+        {
+            atlases["poe2MasteryEffectActive"] = LoadGggAtlas(masteryEffectActiveStream, "assets/mastery-effect-active.webp");
+        }
+        return new SpriteMap { Atlases = atlases };
     }
 
     public static SpriteMap LoadPoe1FromGggTree(Stream stream, string assetPrefix, string zoom = "0.3835")

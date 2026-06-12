@@ -74,7 +74,9 @@ public sealed class Poe2TreeLoader : ITreeLoader
                     null,
                     null,
                     null,
-                    IconPathIsAssetPath: true),
+                    IconPathIsAssetPath: true,
+                    string.IsNullOrWhiteSpace(nd.ActiveEffectImage) ? null : nd.ActiveEffectImage,
+                    ActiveEffectSourceNodeIds(nd)),
                 Stats = stats.Lines,
                 StatLinkSpans = stats.LinkSpans,
                 AscendancyName = ascendancyName,
@@ -289,9 +291,11 @@ public sealed class Poe2TreeLoader : ITreeLoader
             return NodeType.Keystone;
         }
 
-        if (IsGggMasteryMarker(nd))
+        if (IsGggDecorativeMasteryMarker(nd))
         {
-            return NodeType.Proxy;
+            return string.IsNullOrWhiteSpace(nd.ActiveEffectImage)
+                ? NodeType.Proxy
+                : NodeType.Mastery;
         }
 
         if (nd.IsJewelSocket)
@@ -302,9 +306,37 @@ public sealed class Poe2TreeLoader : ITreeLoader
         return nd.IsNotable ? NodeType.Notable : NodeType.Normal;
     }
 
-    private static bool IsGggMasteryMarker(Poe2GggNodeDto nd) =>
-        nd.Name?.EndsWith("Mastery", StringComparison.OrdinalIgnoreCase) == true
+    private static bool IsGggDecorativeMasteryMarker(Poe2GggNodeDto nd) =>
+        (nd.IsMastery || nd.Name?.EndsWith("Mastery", StringComparison.OrdinalIgnoreCase) == true)
         && (nd.Stats is null || nd.Stats.Length == 0);
+
+    private static IReadOnlyList<int> ActiveEffectSourceNodeIds(Poe2GggNodeDto nd)
+    {
+        if (string.IsNullOrWhiteSpace(nd.ActiveEffectImage))
+        {
+            return Array.Empty<int>();
+        }
+
+        var result = new HashSet<int>();
+        AddNodeIds(nd.In);
+        AddNodeIds(nd.Out);
+        foreach (var nodeId in nd.UnlockConstraint?.Nodes ?? [])
+        {
+            result.Add(nodeId);
+        }
+        return result.ToArray();
+
+        void AddNodeIds(IEnumerable<string>? nodeIds)
+        {
+            foreach (var nodeId in nodeIds ?? [])
+            {
+                if (int.TryParse(nodeId, out var parsed))
+                {
+                    result.Add(parsed);
+                }
+            }
+        }
+    }
 
     private static bool TryBuildArc((int, int) pair, Node from, Node to, Poe2GggEdgeDto edge, out ArcConnector connector)
     {

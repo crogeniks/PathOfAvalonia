@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -103,6 +104,46 @@ public sealed partial class PassiveTreeView
         drewAny |= drewFrame;
 
         return drewAny;
+    }
+
+    private void DrawPoe2MasteryEffects(DrawingContext ctx, Rect visibleTree)
+    {
+        foreach (var node in DrawableBaseNodes())
+        {
+            if (node.Visual?.ActiveEffectImage is null
+                || !CircleIntersects(visibleTree, node.X, node.Y, Poe2MasteryEffectVisibleRadiusTree))
+            {
+                continue;
+            }
+
+            var active = _vm.AllocatedNodes.Contains(node.Id)
+                || node.Visual.ActiveEffectSourceNodeIds?.Any(_vm.AllocatedNodes.Contains) == true;
+            _ = DrawPoe2MasteryEffect(ctx, node.Visual, active, TreeToScreen(node.X, node.Y));
+        }
+    }
+
+    private bool DrawPoe2MasteryEffect(DrawingContext ctx, NodeVisual visual, bool active, Point screen)
+    {
+        if (string.IsNullOrWhiteSpace(visual.ActiveEffectImage))
+        {
+            return false;
+        }
+
+        var atlasKey = active ? "poe2MasteryEffectActive" : "poe2MasteryEffectDisabled";
+        if (!TryGetSprite(atlasKey, visual.ActiveEffectImage, out var bitmap, out var spriteRect))
+        {
+            return false;
+        }
+
+        var opacity = active ? Poe2MasteryEffectActiveOpacity : Poe2MasteryEffectDisabledOpacity;
+        var halfW = spriteRect.W * Poe2MasteryEffectDisplayScale * _scale * 0.5;
+        var halfH = spriteRect.H * Poe2MasteryEffectDisplayScale * _scale * 0.5;
+        var dst = new Rect(screen.X - halfW, screen.Y - halfH, halfW * 2, halfH * 2);
+        using (ctx.PushOpacity(opacity))
+        {
+            DrawSpriteImage(ctx, bitmap, spriteRect, dst);
+        }
+        return true;
     }
 
     private bool DrawPoe2FrameSprite(DrawingContext ctx, NodeVisual visual, Node node, bool allocated, bool hover, Point screen)

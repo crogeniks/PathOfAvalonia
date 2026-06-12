@@ -43,4 +43,6 @@ public sealed record NodeVisual(
     string? HoverFrame,
     string? UnallocatedFrame,
     string? ConnectionArt,
-    bool IconPathIsAssetPath);
+    bool IconPathIsAssetPath,
+    string? ActiveEffectImage = null,
+    IReadOnlyList<int>? ActiveEffectSourceNodeIds = null);

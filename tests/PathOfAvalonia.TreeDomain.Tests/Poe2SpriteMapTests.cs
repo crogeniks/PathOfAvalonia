@@ -12,11 +12,15 @@ public sealed class Poe2SpriteMapTests
         using var skills = File.OpenRead(Path.Combine(root, "assets", "skills.json"));
         using var frames = File.OpenRead(Path.Combine(root, "assets", "frame.json"));
         using var jewels = File.OpenRead(Path.Combine(root, "assets", "jewel.json"));
-        var sprites = SpriteMap.LoadPoe2FromGggAssets(skills, frames, jewels);
+        using var masteryEffectDisabled = File.OpenRead(Path.Combine(root, "assets", "mastery-effect-disabled.json"));
+        using var masteryEffectActive = File.OpenRead(Path.Combine(root, "assets", "mastery-effect-active.json"));
+        var sprites = SpriteMap.LoadPoe2FromGggAssets(skills, frames, jewels, masteryEffectDisabled, masteryEffectActive);
 
         Assert.True(sprites.Atlases["poe2NodeIcons"].Coords.Count > 0);
         Assert.True(sprites.Atlases["poe2Frames"].Coords.Count > 0);
         Assert.True(sprites.Atlases["poe2Jewels"].Coords.Count > 0);
+        Assert.True(sprites.Atlases["poe2MasteryEffectDisabled"].Coords.Count > 0);
+        Assert.True(sprites.Atlases["poe2MasteryEffectActive"].Coords.Count > 0);
         Assert.NotEqual(
             sprites.Atlases["poe2NodeIcons"].Coords["Art/2DArt/SkillIcons/passives/2handeddamage.png"],
             sprites.Atlases["poe2NodeIcons"].Coords["Art/2DArt/SkillIcons/passives/KeystoneWhispersOfDoom.png"]);
@@ -49,6 +53,9 @@ public sealed class Poe2SpriteMapTests
         {
             Assert.NotNull(sprites.Lookup("poe2Jewels", key));
         }
+        const string masteryEffect = "Art/2DArt/UIImages/InGame/PassiveMastery/MasteryBackgroundGraphic/MasteryBowPattern.png";
+        Assert.NotNull(sprites.Lookup("poe2MasteryEffectDisabled", masteryEffect));
+        Assert.NotNull(sprites.Lookup("poe2MasteryEffectActive", masteryEffect));
         foreach (var atlas in sprites.Atlases.Values)
         {
             var atlasPath = Path.GetFullPath(Path.Combine(root, atlas.File));

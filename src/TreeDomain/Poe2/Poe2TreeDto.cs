@@ -56,12 +56,20 @@ public sealed class Poe2GggNodeDto
     [JsonPropertyName("isKeystone")] public bool IsKeystone { get; set; }
     [JsonPropertyName("isOnlyImage")] public bool IsOnlyImage { get; set; }
     [JsonPropertyName("isJewelSocket")] public bool IsJewelSocket { get; set; }
+    [JsonPropertyName("isMastery")] public bool IsMastery { get; set; }
     [JsonPropertyName("isAscendancyStart")] public bool IsAscendancyStart { get; set; }
     [JsonPropertyName("isAttribute")] public bool IsAttribute { get; set; }
     [JsonPropertyName("ascendancyId")] public string? AscendancyId { get; set; }
+    [JsonPropertyName("activeEffectImage")] public string? ActiveEffectImage { get; set; }
+    [JsonPropertyName("unlockConstraint")] public Poe2GggUnlockConstraintDto? UnlockConstraint { get; set; }
     [JsonPropertyName("stats")] public string[]? Stats { get; set; }
     [JsonPropertyName("classStartIndex")] public int[]? ClassStartIndex { get; set; }
     [JsonPropertyName("grantedSkill")] public JsonElement? GrantedSkill { get; set; }
+}
+
+public sealed class Poe2GggUnlockConstraintDto
+{
+    [JsonPropertyName("nodes")] public int[]? Nodes { get; set; }
 }
 
 public sealed class Poe2GggEdgeDto

@@ -14,7 +14,13 @@ public sealed class Poe2GameAssetLayout : GameAssetLayoutBase
         var prefix = $"{VersionFolder(version)}/assets";
         return new SpriteDataPaths(
             SpriteDataKind.Poe2GggAssets,
-            [$"{prefix}/skills.json", $"{prefix}/frame.json", $"{prefix}/jewel.json"]);
+            [
+                $"{prefix}/skills.json",
+                $"{prefix}/frame.json",
+                $"{prefix}/jewel.json",
+                $"{prefix}/mastery-effect-disabled.json",
+                $"{prefix}/mastery-effect-active.json",
+            ]);
     }
 
     public override string BackgroundPath(string version) => "assets/background.webp";

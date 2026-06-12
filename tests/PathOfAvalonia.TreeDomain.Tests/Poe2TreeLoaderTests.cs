@@ -65,14 +65,19 @@ public sealed class Poe2TreeLoaderTests
     }
 
     [Fact]
-    public void StatlessMasteryMarkersAreHiddenProxyNodes()
+    public void StatlessMasteryMarkersWithEffectsAreVisibleButNotAllocatable()
     {
         var tree = LoadTree();
         var mastery = Assert.Single(tree.Nodes.Values.Where(n => n.Name == "Bow Mastery"));
         var spec = new PassiveSpec(tree, tree.Classes, GameFeatureFlags.Poe2Milestone2);
         var allocatedBefore = spec.AllocatedNodes.Count;
 
-        Assert.Equal(NodeType.Proxy, mastery.Type);
+        Assert.Equal(NodeType.Mastery, mastery.Type);
+        Assert.Equal(
+            "Art/2DArt/UIImages/InGame/PassiveMastery/MasteryBackgroundGraphic/MasteryBowPattern.png",
+            mastery.Visual?.ActiveEffectImage);
+        Assert.Contains(17894, mastery.Visual?.ActiveEffectSourceNodeIds ?? []);
+        Assert.Contains(5571, mastery.Visual?.ActiveEffectSourceNodeIds ?? []);
         Assert.DoesNotContain(tree.Connectors, c => c.FromId == mastery.Id || c.ToId == mastery.Id);
 
         spec.Toggle(mastery.Id);

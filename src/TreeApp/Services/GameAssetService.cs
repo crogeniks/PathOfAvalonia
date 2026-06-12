@@ -40,7 +40,9 @@ public sealed class GameAssetService(IGameAssetLayoutRegistry layouts) : IGameAs
             using var skills = OpenAsset(game, spritePaths.Paths[0]);
             using var frames = OpenAsset(game, spritePaths.Paths[1]);
             using var jewels = OpenAsset(game, spritePaths.Paths[2]);
-            return SpriteMap.LoadPoe2FromGggAssets(skills, frames, jewels);
+            using var masteryEffectDisabled = OpenAsset(game, spritePaths.Paths[3]);
+            using var masteryEffectActive = OpenAsset(game, spritePaths.Paths[4]);
+            return SpriteMap.LoadPoe2FromGggAssets(skills, frames, jewels, masteryEffectDisabled, masteryEffectActive);
         }
 
         if (spritePaths.Kind == SpriteDataKind.Poe1GggTree)
