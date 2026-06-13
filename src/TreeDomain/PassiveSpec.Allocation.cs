@@ -316,6 +316,11 @@ public sealed partial class PassiveSpec
             return false;
         }
 
+        if (node.RequiredAllocatedNodeId is { } requiredNodeId && !_allocated.Contains(requiredNodeId))
+        {
+            return false;
+        }
+
         if (node.AscendancyName is not { } ascendancyName)
         {
             return true;

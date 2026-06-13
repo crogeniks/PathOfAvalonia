@@ -78,6 +78,7 @@ public sealed partial class PassiveTreeView : Control
     private static readonly IBrush TooltipReminderBrush = new SolidColorBrush(Color.FromRgb(0xA6, 0xB1, 0xA4));
     private static readonly IBrush TooltipFlavourBrush = new SolidColorBrush(Color.FromRgb(0xD2, 0x84, 0x2E));
     private static readonly IBrush ConnectorBrush = new SolidColorBrush(Color.FromArgb(0x55, 0x40, 0x40, 0x48));
+    private static readonly IBrush RequiredPathConnectorBrush = new SolidColorBrush(Color.FromArgb(0x8A, 0x4D, 0xA9, 0xD8));
     private static readonly IBrush HoverPathBrush = new SolidColorBrush(Color.FromArgb(0x80, 0xff, 0xc8, 0x4a));
     private static readonly IBrush Poe2NormalFrameBrush = new SolidColorBrush(Color.FromArgb(0xE0, 0x4E, 0x46, 0x35));
     private static readonly IBrush Poe2NotableFrameBrush = new SolidColorBrush(Color.FromArgb(0xF0, 0x8C, 0x75, 0x42));
@@ -181,6 +182,7 @@ public sealed partial class PassiveTreeView : Control
         var allocated = _vm.AllocatedNodes;
         var connThick = Math.Max(0.5, ConnectorThicknessTree * _scale);
         var connPen = new Pen(ConnectorBrush, connThick);
+        var requiredPathConnPen = new Pen(RequiredPathConnectorBrush, connThick);
         var connActivePen = new Pen(AllocatedBrush, connThick);
         var connWeaponSet1Pen = new Pen(WeaponSet1Brush, connThick);
         var connWeaponSet2Pen = new Pen(WeaponSet2Brush, connThick);
@@ -233,7 +235,7 @@ public sealed partial class PassiveTreeView : Control
             }
             else
             {
-                pen = connPen;
+                pen = c.RequiredAllocatedNodeId is null ? connPen : requiredPathConnPen;
             }
 
             switch (c)

@@ -195,6 +195,19 @@ public sealed class Poe2TreeLoaderTests
     }
 
     [Fact]
+    public void OracleUnseenPathBranchIsMarkedAsRequiredPath()
+    {
+        var tree = LoadTree("0.5.0");
+
+        Assert.Equal(5571, tree.Nodes[47190].RequiredAllocatedNodeId);
+        Assert.Equal(5571, tree.Nodes[32905].RequiredAllocatedNodeId);
+
+        Assert.Equal(5571, AssertConnector(tree, 5571, 47190).RequiredAllocatedNodeId);
+        Assert.Equal(5571, AssertConnector(tree, 47190, 32905).RequiredAllocatedNodeId);
+        Assert.Null(AssertConnector(tree, 42761, 11335).RequiredAllocatedNodeId);
+    }
+
+    [Fact]
     public void PassiveSpecCanSelectSorceressDiscipleOfVarashta()
     {
         var tree = LoadTree();
@@ -238,6 +251,12 @@ public sealed class Poe2TreeLoaderTests
         var connector = Assert.Single(tree.Connectors.Where(c =>
             (c.FromId == a && c.ToId == b) || (c.FromId == b && c.ToId == a)));
         return Assert.IsType<ArcConnector>(connector);
+    }
+
+    private static Connector AssertConnector(TreeModel tree, int a, int b)
+    {
+        return Assert.Single(tree.Connectors.Where(c =>
+            (c.FromId == a && c.ToId == b) || (c.FromId == b && c.ToId == a)));
     }
 
     private static bool NeedsDrawableConnector(Node from, Node to)

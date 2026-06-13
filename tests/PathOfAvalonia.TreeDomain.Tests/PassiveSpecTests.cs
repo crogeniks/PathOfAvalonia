@@ -149,6 +149,43 @@ public sealed class PassiveSpecTests
         Assert.True(path.IsEmpty);
     }
 
+    [Fact]
+    public void Poe2OracleUnseenPathNodesRequireTheUnseenPath()
+    {
+        var spec = LoadPoe2Spec();
+        spec.SetClass(4);
+        spec.SetAscendancy(1);
+
+        spec.Toggle(47190);
+        Assert.DoesNotContain(47190, spec.AllocatedNodes);
+        Assert.True(spec.HoverPathTo(47190).IsEmpty);
+
+        spec.AllocateMany([11335, 5571]);
+        spec.Toggle(47190);
+
+        Assert.Contains(5571, spec.AllocatedNodes);
+        Assert.Contains(47190, spec.AllocatedNodes);
+    }
+
+    [Fact]
+    public void Poe2ImportPrunesOracleUnseenPathNodesWithoutRequirement()
+    {
+        var spec = LoadPoe2Spec();
+        var build = Build([47190, 32905])
+            with
+            {
+                ClassInternalId = "Druid",
+                AscendancyInternalId = "Druid1",
+            };
+
+        var result = spec.ApplyImport(build);
+
+        Assert.DoesNotContain(47190, spec.AllocatedNodes);
+        Assert.DoesNotContain(32905, spec.AllocatedNodes);
+        Assert.Equal(0, result.Applied);
+        Assert.Equal(2, result.Skipped);
+    }
+
     private static PassiveSpec LoadSpec() => new(LoadTree());
 
     private static PassiveSpec LoadPoe2Spec() => new(LoadPoe2Tree());

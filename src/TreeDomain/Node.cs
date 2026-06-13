@@ -21,6 +21,7 @@ public sealed class Node
     public string? AscendancyName { get; init; }
     public int? ClassStartIndex { get; init; }
     public IReadOnlyList<int> ClassStartIndexes { get; init; } = Array.Empty<int>();
+    public int? RequiredAllocatedNodeId { get; init; }
     public required int GroupId { get; init; }
     public required int Orbit { get; init; }
     public required int OrbitIndex { get; init; }

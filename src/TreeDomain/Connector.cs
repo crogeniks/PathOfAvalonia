@@ -1,6 +1,9 @@
 namespace PathOfAvalonia.TreeDomain;
 
-public abstract record Connector(int FromId, int ToId);
+public abstract record Connector(int FromId, int ToId)
+{
+    public int? RequiredAllocatedNodeId { get; init; }
+}
 
 public sealed record LineConnector(
     int FromId, int ToId,

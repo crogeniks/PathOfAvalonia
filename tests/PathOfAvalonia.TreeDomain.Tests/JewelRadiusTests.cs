@@ -209,9 +209,10 @@ public sealed class JewelRadiusTests
     {
         var spec = LoadPoe2Spec();
         var oracle = OracleKeystoneAllocationNode(spec.Tree);
+        var unseenPath = TheUnseenPathNode(spec.Tree);
         var (keystone, _) = FindPoe2KeystoneAndDetachedTargetInMediumRadius(spec.Tree);
 
-        spec.ApplyImport(Poe2OracleImport([oracle.Id, keystone.Id]));
+        spec.ApplyImport(Poe2OracleImport([11335, unseenPath.Id, 47190, oracle.Id, keystone.Id]));
 
         var visual = Assert.Single(spec.ActiveJewelRadii);
         Assert.Equal(oracle.Id, visual.SourceNodeId);
@@ -225,9 +226,10 @@ public sealed class JewelRadiusTests
     {
         var spec = LoadPoe2Spec();
         var oracle = OracleKeystoneAllocationNode(spec.Tree);
+        var unseenPath = TheUnseenPathNode(spec.Tree);
         var (keystone, target) = FindPoe2KeystoneAndDetachedTargetInMediumRadius(spec.Tree);
 
-        spec.ApplyImport(Poe2OracleImport([oracle.Id, keystone.Id]));
+        spec.ApplyImport(Poe2OracleImport([11335, unseenPath.Id, 47190, oracle.Id, keystone.Id]));
 
         Assert.True(spec.IsAllocatedByRadiusJewel(target.Id));
         spec.Toggle(target.Id);
@@ -322,6 +324,11 @@ public sealed class JewelRadiusTests
         Assert.Single(tree.Nodes.Values.Where(node =>
             node.AscendancyName == "Oracle" &&
             node.Stats.Any(stat => stat.Contains("Non-Keystone Passive Skills in Medium Radius of allocated Keystone Passive Skills can be allocated without being connected to your tree", StringComparison.OrdinalIgnoreCase))));
+
+    private static Node TheUnseenPathNode(TreeModel tree) =>
+        Assert.Single(tree.Nodes.Values.Where(node =>
+            node.AscendancyName == "Oracle" &&
+            node.Name == "The Unseen Path"));
 
     private static (Node Keystone, Node Target) FindPoe2KeystoneAndDetachedTargetInMediumRadius(TreeModel tree)
     {

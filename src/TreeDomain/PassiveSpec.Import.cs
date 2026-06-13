@@ -131,6 +131,9 @@ public sealed partial class PassiveSpec
                 clusterSkipped++;
             }
         }
+        var prunedRequiredAllocations = PruneInvalidRequiredAllocations();
+        applied = Math.Max(0, applied - prunedRequiredAllocations);
+        skipped += prunedRequiredAllocations;
         var fallbackApplied = AllocateUniqueClusterFallbacks();
         applied += fallbackApplied;
         skipped = Math.Max(0, skipped - fallbackApplied);
@@ -165,6 +168,31 @@ public sealed partial class PassiveSpec
             && set != PassiveAllocationSet.Normal)
         {
             _allocationSets[mappedId] = set;
+        }
+    }
+
+    private int PruneInvalidRequiredAllocations()
+    {
+        var pruned = 0;
+        while (true)
+        {
+            var invalid = _allocated
+                .Where(id => Tree.Nodes.TryGetValue(id, out var node)
+                    && node.RequiredAllocatedNodeId is { } requiredNodeId
+                    && !_allocated.Contains(requiredNodeId))
+                .ToArray();
+            if (invalid.Length == 0)
+            {
+                return pruned;
+            }
+
+            foreach (var id in invalid)
+            {
+                _allocated.Remove(id);
+                _masterySelections.Remove(id);
+                _allocationSets.Remove(id);
+            }
+            pruned += invalid.Length;
         }
     }
 

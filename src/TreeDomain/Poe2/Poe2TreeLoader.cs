@@ -35,6 +35,7 @@ public sealed class Poe2TreeLoader : ITreeLoader
     {
         var classInfo = BuildClassCatalog(dto.Classes);
         var ascendancyNameById = BuildAscendancyNameById(dto.Classes);
+        var requiredNodeIds = BuildRequiredNodeIds(dto, ascendancyNameById);
         var groupPositions = dto.Groups
             .Where(pair => int.TryParse(pair.Key, out _))
             .ToDictionary(
@@ -82,6 +83,7 @@ public sealed class Poe2TreeLoader : ITreeLoader
                 AscendancyName = ascendancyName,
                 ClassStartIndex = classStartIndex,
                 ClassStartIndexes = classStartIndexes,
+                RequiredAllocatedNodeId = requiredNodeIds.TryGetValue(id, out var requiredNodeId) ? requiredNodeId : null,
                 GroupId = nd.Group.Value,
                 Orbit = nd.Orbit.Value,
                 OrbitIndex = nd.OrbitIndex.Value,
@@ -122,11 +124,13 @@ public sealed class Poe2TreeLoader : ITreeLoader
 
             if (TryBuildArc(pair, from, to, edge, groupPositions, out var arc))
             {
-                connectors.Add(arc);
+                connectors.Add(WithRequiredNode(arc, ConnectorRequiredNodeId(from, to)));
             }
             else
             {
-                connectors.Add(new LineConnector(pair.Item1, pair.Item2, from.X, from.Y, to.X, to.Y));
+                connectors.Add(WithRequiredNode(
+                    new LineConnector(pair.Item1, pair.Item2, from.X, from.Y, to.X, to.Y),
+                    ConnectorRequiredNodeId(from, to)));
             }
         }
 
@@ -183,6 +187,61 @@ public sealed class Poe2TreeLoader : ITreeLoader
         }
 
         return (new ClassCatalog { Classes = result }, sourceToCatalogIndex);
+    }
+
+    private static Dictionary<int, int> BuildRequiredNodeIds(
+        Poe2GggTreeDto dto,
+        IReadOnlyDictionary<string, string> ascendancyNameById)
+    {
+        var result = new Dictionary<int, int>();
+        foreach (var (key, nd) in dto.Nodes)
+        {
+            if (!int.TryParse(key, out var requiredId)
+                || !string.Equals(nd.Name, "The Unseen Path", StringComparison.Ordinal)
+                || ResolveAscendancyName(nd.AscendancyId, ascendancyNameById) != "Oracle")
+            {
+                continue;
+            }
+
+            var queue = new Queue<int>();
+            foreach (var next in ReadLinkedNodeIds(nd.Out))
+            {
+                queue.Enqueue(next);
+            }
+
+            while (queue.Count > 0)
+            {
+                var id = queue.Dequeue();
+                if (id == requiredId || !result.TryAdd(id, requiredId))
+                {
+                    continue;
+                }
+                if (!dto.Nodes.TryGetValue(id.ToString(), out var linked)
+                    || ResolveAscendancyName(linked.AscendancyId, ascendancyNameById) != "Oracle")
+                {
+                    result.Remove(id);
+                    continue;
+                }
+
+                foreach (var next in ReadLinkedNodeIds(linked.Out))
+                {
+                    queue.Enqueue(next);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static IEnumerable<int> ReadLinkedNodeIds(IEnumerable<string>? nodeIds)
+    {
+        foreach (var nodeId in nodeIds ?? [])
+        {
+            if (int.TryParse(nodeId, out var parsed))
+            {
+                yield return parsed;
+            }
+        }
     }
 
     private static Dictionary<string, string> BuildAscendancyNameById(IEnumerable<Poe2GggClassDto> classes)
@@ -361,6 +420,31 @@ public sealed class Poe2TreeLoader : ITreeLoader
         }
 
         return TryBuildArc(pair, from, to, group.X, group.Y, out connector);
+    }
+
+    private static int? ConnectorRequiredNodeId(Node from, Node to)
+    {
+        if (from.RequiredAllocatedNodeId is { } fromRequired
+            && (to.RequiredAllocatedNodeId == fromRequired || to.Id == fromRequired))
+        {
+            return fromRequired;
+        }
+
+        if (to.RequiredAllocatedNodeId is { } toRequired
+            && from.Id == toRequired)
+        {
+            return toRequired;
+        }
+
+        return null;
+    }
+
+    private static T WithRequiredNode<T>(T connector, int? requiredNodeId)
+        where T : Connector
+    {
+        return requiredNodeId is null
+            ? connector
+            : connector with { RequiredAllocatedNodeId = requiredNodeId };
     }
 
     private static bool TryBuildArc((int, int) pair, Node from, Node to, double cx, double cy, out ArcConnector connector)
