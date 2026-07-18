@@ -114,9 +114,16 @@ public sealed class Poe2BuildImporterTests
         var xml = """
             <PathOfBuilding2>
               <Tree activeSpec="2">
-                <Spec title="Bossing" classId="1" ascendClassId="2" nodes="10,70000" masteryEffects="{10,42}" />
+                <Spec title="^3Bossing^8 Setup" classId="1" ascendClassId="2" nodes="10,70000" masteryEffects="{10,42}" />
                 <Spec classId="3" ascendClassId="1" nodes="20,80000" masteryEffects="{20,84}" />
               </Tree>
+              <Skills>
+                <SkillSet title="^2Main^8 Skills">
+                  <Skill label="^1Fire^8 Spell">
+                    <Gem nameSpec="^3Fireball^8" />
+                  </Skill>
+                </SkillSet>
+              </Skills>
             </PathOfBuilding2>
             """;
 
@@ -125,9 +132,13 @@ public sealed class Poe2BuildImporterTests
         Assert.Equal(new[] { 20 }, build.NodeHashes);
         Assert.Equal(new[] { 80000 }, build.ClusterNodeHashes);
         Assert.Equal(2, build.PassiveTreeVariants.Count);
-        Assert.Equal("Bossing", build.PassiveTreeVariants[0].DisplayName);
+        Assert.Equal("Bossing Setup", build.PassiveTreeVariants[0].DisplayName);
         Assert.Equal("Tree 2", build.PassiveTreeVariants[1].DisplayName);
         Assert.Equal(1, build.ActivePassiveTreeVariantIndex);
+        var skillSet = Assert.Single(build.Skills.SkillSets);
+        Assert.Equal("Main Skills", skillSet.DisplayName);
+        Assert.Equal("Fire Spell", Assert.Single(skillSet.Groups).Label);
+        Assert.Equal("Fireball", Assert.Single(skillSet.Groups[0].Gems).NameSpec);
     }
 
     [Fact]

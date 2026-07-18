@@ -64,11 +64,11 @@ internal static class PobXmlHelpers
         var title = ((string?)element.Attribute("title"))?.Trim();
         if (!string.IsNullOrEmpty(title))
         {
-            return title;
+            return PobText.StripColorCodes(title);
         }
 
         var name = ((string?)element.Attribute("name"))?.Trim();
-        return !string.IsNullOrEmpty(name) ? name : $"{prefix} {index + 1}";
+        return !string.IsNullOrEmpty(name) ? PobText.StripColorCodes(name) : $"{prefix} {index + 1}";
     }
 
     public static int OneBasedToZero(int value) => value > 0 ? value - 1 : 0;

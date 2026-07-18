@@ -7,6 +7,7 @@ public static class PobXmlBuildParser
 
     public static ImportedBuild Parse(string xml, string source)
     {
+        xml = PobText.StripColorCodes(xml);
         var items = PobItemSetParser.Parse(xml);
         var skills = PobSkillsParser.Parse(xml);
         var metrics = PobMetricsParser.Parse(xml);

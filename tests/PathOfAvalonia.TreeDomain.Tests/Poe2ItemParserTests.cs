@@ -45,4 +45,25 @@ public sealed class Poe2ItemParserTests
         Assert.Contains(vm.Body, line => line.Text == "Custom line");
         Assert.Contains(vm.StatusFlags, line => line.Text == "Desecrated");
     }
+
+    [Fact]
+    public void ItemTextStripsPobColorCodesFromParsedAndDisplayedText()
+    {
+        var item = RawItemParser.Parse("Body Armour", """
+            Rarity: Rare
+            ^6Dire Shell
+            ^5Expert Hexer's Robe
+            --------
+            ^1Adds ^8fire resistance
+            ^3Corrupted
+            """);
+
+        var vm = ItemViewModel.FromImported(item);
+
+        Assert.Equal("Dire Shell", item.Name);
+        Assert.Equal("Expert Hexer's Robe", item.BaseType);
+        Assert.Contains(vm.Body, line => line.Text == "Adds fire resistance");
+        Assert.Contains(vm.StatusFlags, line => line.Text == "Corrupted");
+        Assert.All(vm.Body.Concat(vm.StatusFlags), line => Assert.DoesNotContain("^", line.Text));
+    }
 }

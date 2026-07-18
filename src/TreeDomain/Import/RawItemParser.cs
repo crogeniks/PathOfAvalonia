@@ -4,6 +4,7 @@ public static class RawItemParser
 {
     public static ImportedItem Parse(string slot, string rawText)
     {
+        rawText = PobText.StripColorCodes(rawText);
         var lines = rawText.Replace("\r\n", "\n").Split('\n');
         var rarity = "Normal";
         var name = string.Empty;

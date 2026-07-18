@@ -4,7 +4,7 @@ internal static class ItemText
 {
     public static string StripTags(string text)
     {
-        var span = text.AsSpan();
+        var span = PobText.StripColorCodes(text).AsSpan();
         while (span.StartsWith("{", StringComparison.Ordinal))
         {
             var close = span.IndexOf('}');
@@ -20,4 +20,5 @@ internal static class ItemText
         }
         return span.ToString();
     }
+
 }

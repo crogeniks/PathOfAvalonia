@@ -113,13 +113,13 @@ internal static class PobItemSetParser
         var title = ((string?)element.Attribute("title"))?.Trim();
         if (!string.IsNullOrEmpty(title))
         {
-            return title;
+            return PobText.StripColorCodes(title);
         }
 
         var name = ((string?)element.Attribute("name"))?.Trim();
         if (!string.IsNullOrEmpty(name))
         {
-            return name;
+            return PobText.StripColorCodes(name);
         }
 
         return id > 0 ? $"Item Set {id}" : $"Item Set {index + 1}";
