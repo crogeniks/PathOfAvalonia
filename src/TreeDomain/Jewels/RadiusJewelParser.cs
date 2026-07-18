@@ -12,6 +12,14 @@ public static partial class RadiusJewelParser
         JewelRadiusTable table,
         IReadOnlyDictionary<string, int> keystoneNodeIdsByName)
     {
+        // PoB keeps every Forbidden Flesh/Flame outcome in the raw item text.
+        // Some outcome names include "Templar", which must not make the generic
+        // timeless-jewel text heuristic classify this jewel as a Timeless Jewel.
+        if (SocketedJewelVisualClassifier.IsForbiddenJewel(item))
+        {
+            return null;
+        }
+
         var text = Normalize(item.RawText);
         var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var radiusIndex = ParseRadiusIndex(lines, table, tree.GameId);

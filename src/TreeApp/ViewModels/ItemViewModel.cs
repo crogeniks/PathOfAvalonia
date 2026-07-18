@@ -115,6 +115,13 @@ public sealed class ItemViewModel
                 continue;
             }
 
+            if (line.StartsWith("Variant:", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("Selected Variant:", StringComparison.OrdinalIgnoreCase)
+                || !ItemVariant.IsActive(line, item.SelectedVariant))
+            {
+                continue;
+            }
+
             if (line.Contains("BasePercentile: ", StringComparison.OrdinalIgnoreCase)
                 || line.StartsWith("LevelReq:", StringComparison.OrdinalIgnoreCase)
                 || line.StartsWith("Str:", StringComparison.OrdinalIgnoreCase)

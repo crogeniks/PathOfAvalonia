@@ -10,6 +10,8 @@ public sealed record ImportedItem(
     public int Id { get; init; }
     public IReadOnlyList<ImportedItemSocket> Sockets { get; init; } = [];
     public IReadOnlyList<string> Runes { get; init; } = [];
+    public IReadOnlyList<string> Variants { get; init; } = [];
+    public int? SelectedVariant { get; init; }
 }
 
 public sealed record ImportedSocketedJewel(int SocketNodeId, int ItemId);

@@ -28,6 +28,10 @@ public sealed partial class PassiveSpec
     // are deferred until the domain gets its own tests.
     public void Toggle(int id)
     {
+        if (_forbiddenJewelAllocatedNodes.Contains(id))
+        {
+            return;
+        }
         if (_classStartNodeByIndex.TryGetValue(_selectedClassIndex, out var startId) && startId == id)
         {
             return;
@@ -192,7 +196,7 @@ public sealed partial class PassiveSpec
     public HoverPath HoverPathTo(int targetId)
     {
         if (!TryGetNode(targetId, out var target)
-            || _allocated.Contains(targetId)
+            || IsAllocated(targetId)
             || !CanAllocateNodeRules(target!)
             || target!.Type is NodeType.Proxy or NodeType.ClassStart or NodeType.AscendancyStart)
         {

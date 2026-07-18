@@ -10,6 +10,8 @@ public static class RawItemParser
         var baseType = string.Empty;
         var sockets = new List<ImportedItemSocket>();
         var runes = new List<string>();
+        var variants = new List<string>();
+        int? selectedVariant = null;
         var i = 0;
 
         while (i < lines.Length && string.IsNullOrWhiteSpace(lines[i]))
@@ -66,12 +68,25 @@ public static class RawItemParser
             {
                 runes.Add(ItemText.StripTags(line[5..].Trim()));
             }
+            else if (line.StartsWith("Variant:", StringComparison.OrdinalIgnoreCase))
+            {
+                variants.Add(line[8..].Trim());
+            }
+            else if (line.StartsWith("Selected Variant:", StringComparison.OrdinalIgnoreCase)
+                && int.TryParse(line[17..].Trim(), out var selected))
+            {
+                selectedVariant = selected;
+            }
         }
+
+        selectedVariant ??= variants.Count > 0 ? variants.Count : null;
 
         return new ImportedItem(slot, rarity, name, baseType, rawText.Trim())
         {
             Sockets = sockets,
             Runes = runes,
+            Variants = variants,
+            SelectedVariant = selectedVariant,
         };
     }
 

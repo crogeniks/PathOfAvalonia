@@ -9,6 +9,25 @@ namespace PathOfAvalonia.TreeDomain.Tests;
 public sealed class JewelRadiusTests
 {
     [Fact]
+    public void ForbiddenJewelVariantsDoNotCreateTimelessVisuals()
+    {
+        var spec = LoadPoe1Spec();
+        var item = RawItemParser.Parse(string.Empty, """
+            Rarity: Unique
+            Forbidden Flesh
+            Cobalt Jewel
+            --------
+            {variant:1}Allocates Sanctuary if you have the matching modifier on Forbidden Flame
+            Variant: Templar - Sanctuary
+            Selected Variant: 1
+            """) with { Id = 1 };
+
+        spec.ApplyImport(BuildImport([55190], [new ImportedSocketedJewel(55190, 1)], item));
+
+        Assert.Empty(spec.ActiveJewelRadii);
+    }
+
+    [Fact]
     public void RadiusTablesMatchPobValues()
     {
         var poe1 = JewelRadiusTable.For(GameId.PathOfExile1, "3.28");

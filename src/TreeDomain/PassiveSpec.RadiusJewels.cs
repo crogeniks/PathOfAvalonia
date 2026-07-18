@@ -38,6 +38,7 @@ public sealed partial class PassiveSpec
 
     private void RebuildActiveRadiusEffects()
     {
+        RebuildForbiddenJewelAllocations();
         _activeRadiusEffects.Clear();
         _activeJewelRadii.Clear();
         if (!Features.SupportsPassiveTreeJewels)

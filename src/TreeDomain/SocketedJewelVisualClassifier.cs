@@ -93,8 +93,25 @@ public static class SocketedJewelVisualClassifier
             : SocketedJewelVisualKind.Unknown;
     }
 
-    public static string? OverlayKey(ImportedItem item, bool isExpansionSocket) =>
-        OverlayKey(item.BaseType, item.Name, item.RawText, isExpansionSocket);
+    public static string? OverlayKey(ImportedItem item, bool isExpansionSocket)
+    {
+        // These bases are intrinsic to the unique jewels. Prefer them over a
+        // malformed or abbreviated imported base type so they never render as a
+        // Viridian (green) socket.
+        if (item.Name.Equals("Forbidden Flesh", StringComparison.OrdinalIgnoreCase))
+        {
+            return OverlayKey(SocketedJewelVisualKind.Cobalt, isExpansionSocket);
+        }
+        if (item.Name.Equals("Forbidden Flame", StringComparison.OrdinalIgnoreCase))
+        {
+            return OverlayKey(SocketedJewelVisualKind.Crimson, isExpansionSocket);
+        }
+        return OverlayKey(item.BaseType, item.Name, item.RawText, isExpansionSocket);
+    }
+
+    public static bool IsForbiddenJewel(ImportedItem item) =>
+        item.Name.Equals("Forbidden Flesh", StringComparison.OrdinalIgnoreCase)
+        || item.Name.Equals("Forbidden Flame", StringComparison.OrdinalIgnoreCase);
 
     public static string? OverlayKey(string baseType, string name, string rawText, bool isExpansionSocket) =>
         OverlayKey(Classify(baseType, name, rawText), isExpansionSocket);

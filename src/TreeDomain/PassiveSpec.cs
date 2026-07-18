@@ -86,8 +86,10 @@ public sealed partial class PassiveSpec
         RebuildActiveRadiusEffects();
     }
 
-    public IReadOnlySet<int> AllocatedNodes => _allocated;
-    public bool IsAllocated(int id) => _allocated.Contains(id);
+    public IReadOnlySet<int> AllocatedNodes => _forbiddenJewelAllocatedNodes.Count == 0
+        ? _allocated
+        : new HashSet<int>(_allocated.Concat(_forbiddenJewelAllocatedNodes));
+    public bool IsAllocated(int id) => _allocated.Contains(id) || _forbiddenJewelAllocatedNodes.Contains(id);
     public PassiveAllocationSet AllocationSetOf(int nodeId) =>
         _allocationSets.GetValueOrDefault(nodeId, PassiveAllocationSet.Normal);
 
