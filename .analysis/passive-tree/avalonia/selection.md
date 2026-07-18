@@ -277,7 +277,9 @@ public sealed class PassiveSpec {
     public bool CanAllocate(int nodeId, out string? reason) { ... }
     public void Allocate(int nodeId, IReadOnlyList<int>? altPath = null);
     public void Deallocate(int nodeId);
-    public void SelectMasteryEffect(int nodeId, int effectId);
+    // Allocates a new mastery or replaces an allocated mastery effect. Returns
+    // false for an invalid, unreachable, or already-used effect.
+    public bool AllocateMastery(int nodeId, int effectId);
 
     public void SelectClass(int classId);
     public void SelectAscendancy(int ascId);

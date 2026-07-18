@@ -2,8 +2,8 @@ namespace PathOfAvalonia.TreeDomain;
 
 public sealed partial class PassiveSpec
 {
-    // Effect chosen on an allocated mastery node, if any. Null for non-masteries,
-    // unallocated masteries, or masteries allocated without a picked effect.
+    // Effect chosen on an allocated mastery node, if any. Null for non-masteries
+    // and unallocated masteries.
     public MasteryEffect? SelectedMasteryEffect(int nodeId)
     {
         if (!_masterySelections.TryGetValue(nodeId, out var effectId))
@@ -22,6 +22,44 @@ public sealed partial class PassiveSpec
             }
         }
         return null;
+    }
+
+    // Allocates a mastery as one atomic operation with its chosen effect. A mastery
+    // effect is globally unique within a passive spec, matching Path of Building.
+    // Calling this for an already allocated mastery replaces its effect.
+    public bool AllocateMastery(int nodeId, int effectId)
+    {
+        if (!Features.SupportsMasterySelections
+            || !TryGetNode(nodeId, out var node)
+            || node is not { Type: NodeType.Mastery, MasteryEffects: { } effects }
+            || !effects.Any(effect => effect.Id == effectId)
+            || _masterySelections.Any(selection => selection.Key != nodeId && selection.Value == effectId))
+        {
+            return false;
+        }
+
+        if (_allocated.Contains(nodeId))
+        {
+            if (_masterySelections.GetValueOrDefault(nodeId) == effectId)
+            {
+                return false;
+            }
+            _masterySelections[nodeId] = effectId;
+            RebuildActiveRadiusEffects();
+            SpecChanged?.Invoke();
+            return true;
+        }
+
+        if (!CanAllocate(nodeId))
+        {
+            return false;
+        }
+
+        _masterySelections[nodeId] = effectId;
+        _allocated.Add(nodeId);
+        RebuildActiveRadiusEffects();
+        SpecChanged?.Invoke();
+        return true;
     }
 
     // PoC-level toggle. Full reachability / dependency rules (selection.md §2–4)
@@ -43,6 +81,12 @@ public sealed partial class PassiveSpec
         if (_allocated.Contains(id))
         {
             DeallocateWithDependents(id);
+            return;
+        }
+        // PoE1 masteries require AllocateMastery so that an effect choice and the
+        // allocation are committed together. PoE2 masteries are not allocatable.
+        if (TryGetNode(id, out var target) && target?.Type == NodeType.Mastery)
+        {
             return;
         }
         // Reject IDs that don't belong to either the base tree or an active cluster subgraph.
@@ -177,7 +221,11 @@ public sealed partial class PassiveSpec
         var changed = false;
         foreach (var id in ids)
         {
-            if (TryGetNode(id, out var node) && node is not null && CanAllocateNodeRules(node) && _allocated.Add(id))
+            if (TryGetNode(id, out var node)
+                && node is not null
+                && node.Type != NodeType.Mastery
+                && CanAllocateNodeRules(node)
+                && _allocated.Add(id))
             {
                 changed = true;
             }

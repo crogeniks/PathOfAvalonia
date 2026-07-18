@@ -7,6 +7,71 @@ namespace PathOfAvalonia.TreeDomain.Tests;
 public sealed class PassiveSpecTests
 {
     [Fact]
+    public void MasteryAllocationRequiresValidUniqueEffectAndSupportsReplacementAndDeallocation()
+    {
+        var spec = new PassiveSpec(CreateMasteryTestTree());
+
+        spec.Toggle(2);
+        spec.Toggle(3);
+        Assert.DoesNotContain(3, spec.AllocatedNodes);
+
+        Assert.False(spec.AllocateMastery(3, 999));
+        Assert.DoesNotContain(3, spec.AllocatedNodes);
+
+        Assert.True(spec.AllocateMastery(3, 101));
+        Assert.Contains(3, spec.AllocatedNodes);
+        Assert.Equal(101, spec.SelectedMasteryEffect(3)?.Id);
+
+        Assert.False(spec.AllocateMastery(4, 101));
+        Assert.DoesNotContain(4, spec.AllocatedNodes);
+        Assert.True(spec.AllocateMastery(3, 102));
+        Assert.Equal(102, spec.SelectedMasteryEffect(3)?.Id);
+        Assert.True(spec.AllocateMastery(4, 101));
+
+        spec.Toggle(3);
+        Assert.DoesNotContain(3, spec.AllocatedNodes);
+        Assert.Null(spec.SelectedMasteryEffect(3));
+        Assert.Contains(4, spec.AllocatedNodes);
+    }
+
+    [Fact]
+    public void ImportSkipsMasteriesWithoutValidUniqueEffectsAndReportsInvalidSelections()
+    {
+        var spec = new PassiveSpec(CreateMasteryTestTree());
+        var build = Build([2, 3, 4]) with
+        {
+            MasterySelections = new Dictionary<int, int>
+            {
+                [3] = 101,
+                [4] = 101,
+            },
+        };
+
+        var result = spec.ApplyImport(build);
+
+        Assert.Contains(3, spec.AllocatedNodes);
+        Assert.DoesNotContain(4, spec.AllocatedNodes);
+        Assert.Equal(101, spec.SelectedMasteryEffect(3)?.Id);
+        Assert.Equal(1, result.InvalidMasterySelections);
+        Assert.Equal(1, result.Skipped);
+    }
+
+    [Fact]
+    public void ImportReportsAnEffectThatDoesNotBelongToItsMastery()
+    {
+        var spec = new PassiveSpec(CreateMasteryTestTree());
+        var build = Build([2, 3]) with
+        {
+            MasterySelections = new Dictionary<int, int> { [3] = 999 },
+        };
+
+        var result = spec.ApplyImport(build);
+
+        Assert.DoesNotContain(3, spec.AllocatedNodes);
+        Assert.Equal(1, result.InvalidMasterySelections);
+        Assert.Equal(1, result.Skipped);
+    }
+    [Fact]
     public void ApplyImportStoresWeaponSetAllocationForAppliedNodes()
     {
         var spec = LoadPoe2Spec();
@@ -213,5 +278,50 @@ public sealed class PassiveSpecTests
         var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "assets", "PoE2", "0_5_0", "data.json"));
         using var stream = File.OpenRead(path);
         return TreeLoader.LoadPoe2FromJson(stream, "0.5.0");
+    }
+
+    private static TreeModel CreateMasteryTestTree()
+    {
+        var start = TestNode(1, NodeType.ClassStart, classStartIndex: 0);
+        var passive = TestNode(2, NodeType.Normal);
+        var firstMastery = TestNode(3, NodeType.Mastery, [new MasteryEffect(101, ["First"]), new MasteryEffect(102, ["Second"])]);
+        var secondMastery = TestNode(4, NodeType.Mastery, [new MasteryEffect(101, ["First"])]);
+        Link(start, passive);
+        Link(passive, firstMastery);
+        Link(passive, secondMastery);
+        return new TreeModel
+        {
+            GameId = GameId.PathOfExile1,
+            Version = "test",
+            Classes = ClassCatalog.CreatePoe1(),
+            Nodes = new Dictionary<int, Node> { [1] = start, [2] = passive, [3] = firstMastery, [4] = secondMastery },
+            ClusterNodeTemplates = new Dictionary<string, Node>(),
+            Connectors = [],
+            Bounds = new TreeBounds(0, 0, 1, 1),
+            Groups = new Dictionary<int, GroupPosition>(),
+            SkillsPerOrbit = [],
+            OrbitRadii = [],
+            OrbitAngles = [],
+        };
+    }
+
+    private static Node TestNode(int id, NodeType type, IReadOnlyList<MasteryEffect>? effects = null, int? classStartIndex = null) => new()
+    {
+        Id = id,
+        Name = $"Node {id}",
+        Type = type,
+        X = 0,
+        Y = 0,
+        GroupId = 0,
+        Orbit = 0,
+        OrbitIndex = 0,
+        ClassStartIndex = classStartIndex,
+        MasteryEffects = effects,
+    };
+
+    private static void Link(Node first, Node second)
+    {
+        first.LinkedNodes.Add(second);
+        second.LinkedNodes.Add(first);
     }
 }

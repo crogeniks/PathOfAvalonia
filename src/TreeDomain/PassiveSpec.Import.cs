@@ -85,13 +85,40 @@ public sealed partial class PassiveSpec
             }
         }
 
+        var validMasterySelections = new Dictionary<int, int>();
+        var invalidMasterySelections = 0;
+        var selectedMasteryEffects = new HashSet<int>();
+        foreach (var (nodeId, effectId) in build.MasterySelections)
+        {
+            if (!Features.SupportsMasterySelections
+                || !Tree.Nodes.TryGetValue(nodeId, out var mastery)
+                || mastery.Type != NodeType.Mastery
+                || mastery.MasteryEffects?.Any(effect => effect.Id == effectId) != true
+                || !build.NodeHashes.Contains(nodeId)
+                || !selectedMasteryEffects.Add(effectId))
+            {
+                invalidMasterySelections++;
+                continue;
+            }
+            validMasterySelections[nodeId] = effectId;
+        }
+
         foreach (var id in build.NodeHashes)
         {
             var mappedId = legacyClusterIdMap is not null && legacyClusterIdMap.TryGetValue(id, out var legacyMappedId)
                 ? legacyMappedId
                 : id;
-            if (Tree.Nodes.ContainsKey(mappedId) || _clusterNodes.ContainsKey(mappedId))
+            if (TryGetNode(mappedId, out var node) && node is not null)
             {
+                if (node.Type == NodeType.Mastery)
+                {
+                    if (!validMasterySelections.TryGetValue(id, out var effectId))
+                    {
+                        skipped++;
+                        continue;
+                    }
+                    _masterySelections[mappedId] = effectId;
+                }
                 _allocated.Add(mappedId);
                 StoreImportedAllocationSet(build, id, mappedId);
                 applied++;
@@ -99,13 +126,6 @@ public sealed partial class PassiveSpec
             else
             {
                 skipped++;
-            }
-        }
-        foreach (var (nodeId, effectId) in build.MasterySelections)
-        {
-            if (Features.SupportsMasterySelections && _allocated.Contains(nodeId))
-            {
-                _masterySelections[nodeId] = effectId;
             }
         }
         foreach (var id in build.ClusterNodeHashes)
@@ -156,6 +176,7 @@ public sealed partial class PassiveSpec
             UnsupportedClusterJewels = unsupportedClusterJewels,
             UnsupportedAttributeOverrides = unsupportedAttributeOverrides,
             UnsupportedSocketedJewels = unsupportedSocketedJewels,
+            InvalidMasterySelections = invalidMasterySelections,
             WeaponSet1Allocations = _allocationSets.Count(kv => kv.Value == PassiveAllocationSet.WeaponSet1),
             WeaponSet2Allocations = _allocationSets.Count(kv => kv.Value == PassiveAllocationSet.WeaponSet2),
         };
@@ -244,6 +265,7 @@ public sealed record ImportResult(int Applied, int Skipped, int ClusterSkipped, 
     public int UnsupportedClusterJewels { get; init; }
     public int UnsupportedAttributeOverrides { get; init; }
     public int UnsupportedSocketedJewels { get; init; }
+    public int InvalidMasterySelections { get; init; }
     public int WeaponSet1Allocations { get; init; }
     public int WeaponSet2Allocations { get; init; }
 }

@@ -17,6 +17,7 @@ public sealed partial class PassiveTreeView : Control
     private readonly SpriteMap _sprites;
     private readonly ITreeImageAssetResolver _assetResolver;
     private ContextMenu? _clusterMenu;
+    private ContextMenu? _masteryMenu;
     // One Bitmap per unique atlas filename (multiple atlas keys share a file).
     private readonly Dictionary<string, Bitmap> _atlasBitmaps = new();
     private readonly Dictionary<string, Bitmap?> _jewelRadiusBitmaps = new();

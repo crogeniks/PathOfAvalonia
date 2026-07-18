@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives.PopupPositioning;
 using Avalonia.Input;
+using Avalonia.Media;
 using PathOfAvalonia.TreeDomain;
 using PathOfAvalonia.TreeDomain.ClusterJewels;
 
@@ -108,6 +110,10 @@ public sealed partial class PassiveTreeView
             {
                 e.Handled = true;
             }
+            else if (hit is { } masteryId && ShowMasteryContextMenu(masteryId, p))
+            {
+                e.Handled = true;
+            }
         }
     }
 
@@ -162,6 +168,15 @@ public sealed partial class PassiveTreeView
             return;
         }
 
+        _vm.SetHover(id);
+        if (_vm.Tree.GameId == GameId.PathOfExile1
+            && !_vm.IsAllocated(id)
+            && _vm.HoverNode is { Type: NodeType.Mastery })
+        {
+            ShowMasteryContextMenu(id, e.GetPosition(this));
+            return;
+        }
+
         if (!_vm.IsAllocated(id) && !_vm.HoverPath.IsEmpty)
         {
             _vm.AllocatePath();
@@ -170,6 +185,64 @@ public sealed partial class PassiveTreeView
         {
             _vm.ToggleNode(id);
         }
+    }
+
+    private bool ShowMasteryContextMenu(int nodeId, Point pointerPosition)
+    {
+        _vm.SetHover(nodeId);
+        var mastery = _vm.HoverNodeId == nodeId ? _vm.HoverNode : null;
+        if (_vm.Tree.GameId != GameId.PathOfExile1
+            || mastery is not { Type: NodeType.Mastery, MasteryEffects: { Count: > 0 } effects })
+        {
+            return false;
+        }
+
+        var items = new List<MenuItem>(effects.Count);
+        foreach (var effect in effects)
+        {
+            var effectText = string.Join(" / ", effect.Stats);
+            var assignedElsewhere = _vm.Tree.Nodes.Values
+                .Where(node => node.Id != nodeId && node.Type == NodeType.Mastery)
+                .Any(node => _vm.SelectedMasteryEffect(node.Id)?.Id == effect.Id);
+            var item = new MenuItem
+            {
+                Header = new TextBlock
+                {
+                    Text = effectText,
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxWidth = 440,
+                },
+                IsEnabled = !assignedElsewhere,
+            };
+            ToolTip.SetTip(item, effectText);
+            if (!assignedElsewhere)
+            {
+                item.Click += (_, _) => _vm.AllocateMastery(nodeId, effect.Id);
+            }
+            items.Add(item);
+        }
+
+        _masteryMenu?.Close();
+        _masteryMenu = new ContextMenu
+        {
+            Placement = PlacementMode.Custom,
+            PlacementTarget = this,
+            CustomPopupPlacementCallback = placement =>
+            {
+                placement.AnchorRectangle = new Rect(pointerPosition, new Size(1, 1));
+                placement.Anchor = PopupAnchor.TopLeft;
+                placement.Gravity = PopupGravity.BottomRight;
+                placement.ConstraintAdjustment =
+                    PopupPositionerConstraintAdjustment.SlideX |
+                    PopupPositionerConstraintAdjustment.SlideY |
+                    PopupPositionerConstraintAdjustment.FlipX |
+                    PopupPositionerConstraintAdjustment.FlipY;
+            },
+            ItemsSource = items,
+        };
+        _masteryMenu.Closed += (_, _) => _masteryMenu = null;
+        _masteryMenu.Open(this);
+        return true;
     }
 
     private bool ShowClusterContextMenu(int socketId, Point pointerPosition)

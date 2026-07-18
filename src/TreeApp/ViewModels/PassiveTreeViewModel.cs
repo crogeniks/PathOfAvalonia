@@ -140,6 +140,8 @@ public sealed class PassiveTreeViewModel
 
     public void ToggleNode(int id) => _spec.Toggle(id);
 
+    public bool AllocateMastery(int nodeId, int effectId) => _spec.AllocateMastery(nodeId, effectId);
+
     // Allocates all nodes on the current hover path (the queued path-to-target).
     public void AllocatePath() => _spec.AllocateMany(_hoverPath.Nodes);
 
