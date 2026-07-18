@@ -53,10 +53,10 @@ public sealed partial class PassiveSpec
             _clusterNodes[n.Id] = n;
         }
 
-        // Wire socket ↔ entry node bidirectionally so the cluster is reachable from the tree.
+        // Keep the socket ↔ entry link as a per-spec overlay. TreeModel nodes can
+        // be shared by multiple specs and must not be mutated after loading.
         var entranceNode = subgraph.NodesById[subgraph.EntranceNodeId];
-        socket.LinkedNodes.Add(entranceNode);
-        entranceNode.LinkedNodes.Add(socket);
+        AddOverlayLink(socket.Id, entranceNode.Id);
 
         RebuildActiveRadiusEffects();
         SpecChanged?.Invoke();
@@ -87,11 +87,9 @@ public sealed partial class PassiveSpec
             _socketedJewels.Remove(childSocket);
         }
 
-        if (TryGetNode(socketId, out var oldSocket) && oldSocket is not null
-            && old.NodesById.TryGetValue(old.EntranceNodeId, out var entranceNode))
+        if (old.NodesById.ContainsKey(old.EntranceNodeId))
         {
-            oldSocket.LinkedNodes.Remove(entranceNode);
-            entranceNode.LinkedNodes.Remove(oldSocket);
+            RemoveOverlayLink(socketId, old.EntranceNodeId);
         }
 
         foreach (var n in old.Nodes)
@@ -105,6 +103,41 @@ public sealed partial class PassiveSpec
         _socketedJewels.Remove(socketId);
         RebuildActiveRadiusEffects();
         return true;
+    }
+
+    private void AddOverlayLink(int firstNodeId, int secondNodeId)
+    {
+        AddOneWayOverlayLink(firstNodeId, secondNodeId);
+        AddOneWayOverlayLink(secondNodeId, firstNodeId);
+    }
+
+    private void RemoveOverlayLink(int firstNodeId, int secondNodeId)
+    {
+        RemoveOneWayOverlayLink(firstNodeId, secondNodeId);
+        RemoveOneWayOverlayLink(secondNodeId, firstNodeId);
+    }
+
+    private void AddOneWayOverlayLink(int nodeId, int linkedNodeId)
+    {
+        if (!_overlayLinkedNodeIds.TryGetValue(nodeId, out var linkedNodeIds))
+        {
+            linkedNodeIds = [];
+            _overlayLinkedNodeIds[nodeId] = linkedNodeIds;
+        }
+        linkedNodeIds.Add(linkedNodeId);
+    }
+
+    private void RemoveOneWayOverlayLink(int nodeId, int linkedNodeId)
+    {
+        if (!_overlayLinkedNodeIds.TryGetValue(nodeId, out var linkedNodeIds))
+        {
+            return;
+        }
+        linkedNodeIds.Remove(linkedNodeId);
+        if (linkedNodeIds.Count == 0)
+        {
+            _overlayLinkedNodeIds.Remove(nodeId);
+        }
     }
 
     private bool RestoreImportedCluster(ImportedSocketedJewel socketedJewel, ImportedBuild build)

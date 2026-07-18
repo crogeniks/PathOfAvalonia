@@ -199,6 +199,26 @@ public sealed class ClusterJewelTests
     }
 
     [Fact]
+    public void ClusterLinksAreIsolatedBetweenSpecsSharingATree()
+    {
+        var tree = LoadTree();
+        var firstSpec = new PassiveSpec(tree);
+        var secondSpec = new PassiveSpec(tree);
+        var socket = tree.Nodes[55190];
+        var baseLinkedNodeIds = socket.LinkedNodes.Select(node => node.Id).ToArray();
+
+        firstSpec.SetClusterJewel(55190, new ClusterJewelSpec(55190, ClusterJewelSize.Large, 8, 2, Array.Empty<string>()));
+
+        var entranceId = firstSpec.ActiveSubgraphs[55190].EntranceNodeId;
+        Assert.Equal(baseLinkedNodeIds, socket.LinkedNodes.Select(node => node.Id));
+        Assert.Empty(secondSpec.ActiveSubgraphs);
+
+        firstSpec.AllocateMany([55190]);
+        Assert.Equal(new[] { entranceId }, firstSpec.HoverPathTo(entranceId).Nodes);
+        Assert.True(secondSpec.HoverPathTo(entranceId).IsEmpty);
+    }
+
+    [Fact]
     public void DeallocatingUnrelatedNodePreservesDetachedNonNormalClusterAllocations()
     {
         var spec = LoadSpec();

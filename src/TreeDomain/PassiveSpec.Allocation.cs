@@ -93,7 +93,7 @@ public sealed partial class PassiveSpec
             {
                 continue;
             }
-            foreach (var other in node.LinkedNodes)
+            foreach (var other in LinkedNodes(node))
             {
                 if (other.Id == id || !_allocated.Contains(other.Id))
                 {
@@ -142,7 +142,7 @@ public sealed partial class PassiveSpec
             {
                 continue;
             }
-            foreach (var other in node.LinkedNodes)
+            foreach (var other in LinkedNodes(node))
             {
                 if (!_allocated.Contains(other.Id) || !component.Add(other.Id))
                 {
@@ -231,7 +231,7 @@ public sealed partial class PassiveSpec
             {
                 continue;
             }
-            foreach (var other in node.LinkedNodes)
+            foreach (var other in LinkedNodes(node))
             {
                 if (!visited.Add(other.Id))
                 {
@@ -342,7 +342,7 @@ public sealed partial class PassiveSpec
         {
             return false;
         }
-        foreach (var linked in node.LinkedNodes)
+        foreach (var linked in LinkedNodes(node))
         {
             if (_allocated.Contains(linked.Id))
             {
@@ -371,7 +371,7 @@ public sealed partial class PassiveSpec
             {
                 continue;
             }
-            foreach (var other in node.LinkedNodes)
+            foreach (var other in LinkedNodes(node))
             {
                 if (!_allocated.Contains(other.Id) || !reachable.Add(other.Id))
                 {

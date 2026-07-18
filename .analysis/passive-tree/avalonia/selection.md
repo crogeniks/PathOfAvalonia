@@ -209,7 +209,7 @@ Rules:
 1. User equips a cluster jewel into a socket node.
 2. `BuildSubgraph(socket, item)` generates a subgraph: proxy group, entrance node linked to the parent socket, orbit of expansion nodes, final notables/smalls per jewel affixes.
 3. Subgraph node IDs are high-bit offset (≥ 65536) to avoid collision.
-4. Subgraph is stored on `Spec.Subgraphs[socketId]` — `TreeModel` is untouched.
+4. Subgraph is stored on `Spec.Subgraphs[socketId]` — `TreeModel` is untouched. The socket-to-entrance edge is held as a per-spec ID-based overlay link, alongside the generated subgraph, so shared tree instances remain immutable.
 
 Source: `PassiveSpec.lua:1829–2209`, `BuildClusterJewelGraphs :1667`.
 

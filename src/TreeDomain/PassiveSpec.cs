@@ -22,6 +22,10 @@ public sealed partial class PassiveSpec
     private readonly Dictionary<int, ClusterSubgraph> _activeSubgraphs = new();
     // Flat lookup for all currently-active cluster nodes by ID.
     private readonly Dictionary<int, Node> _clusterNodes = new();
+    // Per-spec edges which overlay the immutable base-tree graph. Cluster jewel
+    // entrance nodes connect to their socket through this table rather than
+    // mutating Node.LinkedNodes on a TreeModel node shared by other specs.
+    private readonly Dictionary<int, HashSet<int>> _overlayLinkedNodeIds = new();
     private readonly Dictionary<int, ImportedItem> _socketedJewels = new();
     private readonly JewelRadiusTable _jewelRadiusTable;
     private readonly IReadOnlyDictionary<int, RadiusMembership> _socketRadiusMembership;
@@ -109,5 +113,26 @@ public sealed partial class PassiveSpec
             return true;
         }
         return Tree.Nodes.TryGetValue(id, out node);
+    }
+
+    private IEnumerable<Node> LinkedNodes(Node node)
+    {
+        foreach (var linkedNode in node.LinkedNodes)
+        {
+            yield return linkedNode;
+        }
+
+        if (!_overlayLinkedNodeIds.TryGetValue(node.Id, out var overlayLinkedIds))
+        {
+            yield break;
+        }
+
+        foreach (var linkedNodeId in overlayLinkedIds)
+        {
+            if (TryGetNode(linkedNodeId, out var linkedNode) && linkedNode is not null)
+            {
+                yield return linkedNode;
+            }
+        }
     }
 }
