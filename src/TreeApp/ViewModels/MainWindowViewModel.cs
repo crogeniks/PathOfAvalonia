@@ -47,11 +47,11 @@ public partial class MainWindowViewModel : ObservableObject
     public ImportedBuild? CurrentImportedBuild => _lastImportedBuild;
     public string UnsupportedImportStatus => "Build import is not available for this game yet.";
     public string ImportPrompt => _spec.Tree.GameId == GameId.PathOfExile2
-        ? "Paste a Path of Building 2 build code"
-        : "Paste a PoE tree URL or a PoB build code:";
+        ? "Paste a Path of Building 2 build code or pobb.in URL"
+        : "Paste a PoE tree URL, PoB build code, or pobb.in URL:";
     public string ImportPlaceholder => _spec.Tree.GameId == GameId.PathOfExile2
-        ? "Paste a Path of Building 2 build code"
-        : "https://www.pathofexile.com/passive-skill-tree/... or PoB code";
+        ? "https://pobb.in/... or PoB2 code"
+        : "https://pobb.in/... or PoB code";
 
     [ObservableProperty] public partial int SelectedClassIndex { get; set; }
     [ObservableProperty] public partial int SelectedAscendancyIndex { get; set; }
@@ -222,7 +222,7 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void Import()
+    private async Task Import()
     {
         var text = _pastedBuildCode ?? ImportInput;
         if (string.IsNullOrWhiteSpace(text))
@@ -231,7 +231,7 @@ public partial class MainWindowViewModel : ObservableObject
         }
         try
         {
-            var build = _importStrategy.Import(text);
+            var build = await _importStrategy.ImportAsync(text);
             ApplyImportedBuild(build);
         }
         catch (Exception ex)

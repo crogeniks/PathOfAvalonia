@@ -2,9 +2,32 @@ namespace PathOfAvalonia.TreeDomain.Import;
 
 public static class Poe2BuildImporter
 {
+    public static async Task<ImportedBuild> ImportAsync(string text, CancellationToken cancellationToken = default)
+    {
+        var input = ImportInput.From(text);
+        if (PobbInBuildImporter.LooksLikeUrl(input.Text))
+        {
+            var code = await PobbInBuildImporter.FetchBuildCodeAsync(input.Text, cancellationToken).ConfigureAwait(false);
+            return Poe2BuildCodeDecoder.Decode(code, "pobb.in");
+        }
+
+        return DecodeInput(input);
+    }
+
     public static ImportedBuild Import(string text)
     {
         var input = ImportInput.From(text);
+        if (PobbInBuildImporter.LooksLikeUrl(input.Text))
+        {
+            var code = PobbInBuildImporter.FetchBuildCodeAsync(input.Text).GetAwaiter().GetResult();
+            return Poe2BuildCodeDecoder.Decode(code, "pobb.in");
+        }
+
+        return DecodeInput(input);
+    }
+
+    private static ImportedBuild DecodeInput(ImportInput input)
+    {
         if (input.Text.Contains("pathofexile.com", StringComparison.OrdinalIgnoreCase)
             && input.Text.Contains("passive-skill-tree", StringComparison.OrdinalIgnoreCase))
         {

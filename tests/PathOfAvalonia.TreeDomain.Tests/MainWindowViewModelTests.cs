@@ -437,6 +437,8 @@ public sealed class MainWindowViewModelTests
     {
         public bool IsSupported => true;
         public ImportedBuild Import(string text) => build;
+        public Task<ImportedBuild> ImportAsync(string text, CancellationToken cancellationToken = default) =>
+            Task.FromResult(build);
     }
 
 }

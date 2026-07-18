@@ -8,10 +8,12 @@ namespace PathOfAvalonia.TreeDomain.Import;
 // specs in the modern schema use the `nodes` attribute, older specs fall back to <URL>.
 public static class PobBuildCodeDecoder
 {
-    public static ImportedBuild Decode(string code)
+    public static ImportedBuild Decode(string code) => Decode(code, "pob-code");
+
+    public static ImportedBuild Decode(string code, string source)
     {
         var xml = DecodeToXml(code);
-        return PobXmlBuildParser.Parse(xml, "pob-code");
+        return PobXmlBuildParser.Parse(xml, source);
     }
 
     public static bool LooksLikeBuildCode(string text)

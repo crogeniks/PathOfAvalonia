@@ -4,10 +4,32 @@ namespace PathOfAvalonia.TreeDomain.Import;
 // with raw node IDs; the caller applies them to a PassiveSpec via ApplyImport().
 public static class BuildImporter
 {
+    public static async Task<ImportedBuild> ImportAsync(string text, CancellationToken cancellationToken = default)
+    {
+        var input = ImportInput.From(text);
+        if (PobbInBuildImporter.LooksLikeUrl(input.Text))
+        {
+            var code = await PobbInBuildImporter.FetchBuildCodeAsync(input.Text, cancellationToken).ConfigureAwait(false);
+            return PobBuildCodeDecoder.Decode(code, "pobb.in");
+        }
+
+        return DecodeInput(input);
+    }
+
     public static ImportedBuild Import(string text)
     {
         var input = ImportInput.From(text);
+        if (PobbInBuildImporter.LooksLikeUrl(input.Text))
+        {
+            var code = PobbInBuildImporter.FetchBuildCodeAsync(input.Text).GetAwaiter().GetResult();
+            return PobBuildCodeDecoder.Decode(code, "pobb.in");
+        }
 
+        return DecodeInput(input);
+    }
+
+    private static ImportedBuild DecodeInput(ImportInput input)
+    {
         if (PobTreeUrlDecoder.LooksLikeTreeUrl(input.Text))
         {
             return PobTreeUrlDecoder.Decode(input.Text);

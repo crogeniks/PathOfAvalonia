@@ -26,12 +26,15 @@ public interface IImportStrategy
 {
     bool IsSupported { get; }
     ImportedBuild Import(string text);
+    Task<ImportedBuild> ImportAsync(string text, CancellationToken cancellationToken = default);
 }
 
 public sealed class Poe1ImportStrategy : IImportStrategy
 {
     public bool IsSupported => true;
     public ImportedBuild Import(string text) => BuildImporter.Import(text);
+    public Task<ImportedBuild> ImportAsync(string text, CancellationToken cancellationToken = default) =>
+        BuildImporter.ImportAsync(text, cancellationToken);
 }
 
 public sealed class UnsupportedImportStrategy : IImportStrategy
@@ -39,10 +42,14 @@ public sealed class UnsupportedImportStrategy : IImportStrategy
     public bool IsSupported => false;
     public ImportedBuild Import(string text) =>
         throw new NotSupportedException("Build import is not available for Path of Exile 2 yet.");
+    public Task<ImportedBuild> ImportAsync(string text, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Build import is not available for Path of Exile 2 yet.");
 }
 
 public sealed class Poe2ImportStrategy : IImportStrategy
 {
     public bool IsSupported => true;
     public ImportedBuild Import(string text) => Poe2BuildImporter.Import(text);
+    public Task<ImportedBuild> ImportAsync(string text, CancellationToken cancellationToken = default) =>
+        Poe2BuildImporter.ImportAsync(text, cancellationToken);
 }
