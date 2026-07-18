@@ -47,6 +47,8 @@ public static class ClusterJewelResolver
         var notableNames = spec.NotableNames
             .OrderBy(name => ClusterJewelData.NotableSortOrder.TryGetValue(name, out var order) ? order : int.MaxValue)
             .ToList();
+        var smallPassiveStats = spec.SmallPassiveStats ?? Array.Empty<string>();
+        var smallPassiveIcon = ClusterSmallPassiveVisuals.IconFor(smallPassiveStats);
 
         var getJewels = new[] { 0, 2, 1 };
         if (spec.Size == ClusterJewelSize.Large && socketCount == 1)
@@ -176,8 +178,8 @@ public static class ClusterJewelResolver
                 clusterNodeIdBase + templateIndex,
                 "Cluster Passive",
                 NodeType.Normal,
-                null,
-                Array.Empty<string>(),
+                smallPassiveIcon,
+                smallPassiveStats,
                 Array.Empty<string>(),
                 Array.Empty<string>(),
                 null,

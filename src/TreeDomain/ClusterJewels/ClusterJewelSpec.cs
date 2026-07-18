@@ -6,4 +6,5 @@ public sealed record ClusterJewelSpec(
     int PassiveCount,
     int SocketCount,
     IReadOnlyList<string> NotableNames,
-    string? KeystoneName = null);
+    string? KeystoneName = null,
+    IReadOnlyList<string>? SmallPassiveStats = null);

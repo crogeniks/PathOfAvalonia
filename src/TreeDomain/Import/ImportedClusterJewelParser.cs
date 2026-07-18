@@ -8,7 +8,8 @@ public sealed record ImportedClusterJewel(
     int PassiveCount,
     int SocketCount,
     IReadOnlyList<string> NotableNames,
-    string? KeystoneName = null);
+    string? KeystoneName = null,
+    IReadOnlyList<string>? SmallPassiveStats = null);
 
 public static class ImportedClusterJewelParser
 {
@@ -26,6 +27,7 @@ public static class ImportedClusterJewelParser
         var socketCount = 0;
         var nothingnessCount = 0;
         var notables = new List<string>();
+        var smallPassiveStats = new List<string>();
 
         foreach (var raw in item.RawText.Split('\n'))
         {
@@ -72,6 +74,16 @@ public static class ImportedClusterJewelParser
                 continue;
             }
 
+            var smallPassiveMatch = Regex.Match(
+                line,
+                @"^Added Small Passive Skills?(?:\s+also)?\s+grant(?::|\s+)?\s*(?<stats>.+)$",
+                RegexOptions.IgnoreCase);
+            if (smallPassiveMatch.Success)
+            {
+                smallPassiveStats.Add(smallPassiveMatch.Groups["stats"].Value.Trim());
+                continue;
+            }
+
             var socketMatch = Regex.Match(
                 line,
                 @"^(?:(?<count>\d+) Added Passive Skills are Jewel Sockets|(?<single>1) Added Passive Skill is a Jewel Socket|Adds (?<adds>\d+) Jewel Socket Passive Skills?)$",
@@ -101,7 +113,7 @@ public static class ImportedClusterJewelParser
         passiveCount = passiveCountWasExplicit
             ? Math.Clamp(passiveCount, definition.MinNodes, definition.MaxNodes)
             : Math.Clamp(passiveCount, 0, definition.MaxNodes);
-        cluster = new ImportedClusterJewel(size, passiveCount, socketCount, notables);
+        cluster = new ImportedClusterJewel(size, passiveCount, socketCount, notables, SmallPassiveStats: smallPassiveStats);
         return true;
     }
 

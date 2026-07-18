@@ -132,6 +132,8 @@ public sealed class ClusterJewelTests
 
         var notable = Assert.Single(subgraph.Nodes.Where(node => node.Type == NodeType.Notable));
         Assert.Equal(ResolveOrbitIndex(tree, 50179, ClusterJewelSize.Medium, 9), notable.OrbitIndex);
+        Assert.Equal(tree.ClusterNodeTemplates["Eye to Eye"].Icon, notable.Icon);
+        Assert.Equal(tree.ClusterNodeTemplates["Eye to Eye"].Stats, notable.Stats);
 
         var smalls = subgraph.Nodes.Where(node => node.Type == NodeType.Normal).OrderBy(node => node.OrbitIndex).ToArray();
         Assert.Equal(
@@ -141,6 +143,31 @@ public sealed class ClusterJewelTests
                 ResolveOrbitIndex(tree, 50179, ClusterJewelSize.Medium, 3),
             }.OrderBy(value => value).ToArray(),
             smalls.Select(node => node.OrbitIndex).ToArray());
+    }
+
+    [Fact]
+    public void GeneratedSmallPassivesCarryTheirJewelEffectAndMatchingIcon()
+    {
+        var tree = LoadTree();
+        var subgraph = ClusterJewelResolver.Resolve(
+            tree,
+            tree.Nodes[33753],
+            new ClusterJewelSpec(
+                33753,
+                ClusterJewelSize.Medium,
+                4,
+                1,
+                Array.Empty<string>(),
+                SmallPassiveStats: ["12% increased Chaos Damage"]),
+            0x11000,
+            0x11010);
+
+        var smalls = subgraph.Nodes.Where(node => node.Type == NodeType.Normal).ToArray();
+        Assert.All(smalls, small =>
+        {
+            Assert.Equal(new[] { "12% increased Chaos Damage" }, small.Stats);
+            Assert.Equal("Art/2DArt/SkillIcons/passives/ChaosDamage.png", small.Icon);
+        });
     }
 
     [Fact]
@@ -226,6 +253,7 @@ public sealed class ClusterJewelTests
         Assert.Equal(
             new[] { "Misery Everlasting", "Unholy Grace", "Wicked Pall" },
             cluster.NotableNames);
+        Assert.Equal(new[] { "12% increased Chaos Damage" }, cluster.SmallPassiveStats);
     }
 
     [Fact]

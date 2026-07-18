@@ -128,7 +128,8 @@ public sealed partial class PassiveSpec
                 cluster.PassiveCount,
                 cluster.SocketCount,
                 cluster.NotableNames,
-                cluster.KeystoneName));
+                cluster.KeystoneName,
+                cluster.SmallPassiveStats));
         return true;
     }
 
