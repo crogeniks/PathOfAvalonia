@@ -297,6 +297,12 @@ The **`SpecChanged` event** is what the view subscribes to for re-render. Keep t
 
 ## 15. Source Map
 
+## 16. Tree Version Selection
+
+The workspace always exposes the PoE1 tree-version selector, including while only
+the current 3.28 tree is bundled. This keeps the selection path ready for 3.29;
+the diff selector remains hidden until there is a distinct baseline tree to compare.
+
 | Rule | File : lines |
 |---|---|
 | Alloc / Dealloc | `PassiveSpec.lua:763–812` |

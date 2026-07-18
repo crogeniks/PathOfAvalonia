@@ -55,7 +55,9 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
     public IRelayCommand BackToLandingCommand { get; }
     public string GameName => Workspace.Game.DisplayName;
     public string TreeVersion => Workspace.Tree.Version;
-    public bool HasTreeVersionOptions => TreeVersionOptions.Count > 1;
+    // Keep the current PoE1 tree visible even while it has only one version, so the
+    // version-selection affordance is already in place when the 3.29 tree arrives.
+    public bool HasTreeVersionOptions => Workspace.Game.Id == GameId.PathOfExile1 || TreeVersionOptions.Count > 1;
     public bool HasDiffVersionOptions => DiffTreeVersionOptions.Count > 1;
     public IReadOnlyList<string> TreeVersionOptions { get; }
     public IReadOnlyList<string> DiffTreeVersionOptions { get; }
