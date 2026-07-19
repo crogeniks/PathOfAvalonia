@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using PathOfAvalonia.TreeDomain;
@@ -8,8 +11,8 @@ namespace PathOfAvalonia.TreeApp.Services;
 
 public interface IGameAssetService
 {
-    TreeModel LoadTree(GameDefinition game, string? version = null);
-    SpriteMap LoadSprites(GameDefinition game, string? version = null);
+    Task<TreeModel> LoadTreeAsync(GameDefinition game, string? version = null);
+    Task<SpriteMap> LoadSpritesAsync(GameDefinition game, string? version = null);
     Stream OpenAsset(GameDefinition game, string relativePath);
     Bitmap? LoadBitmap(GameDefinition game, string relativePath, string? version = null);
     Bitmap? LoadSharedBitmap(string relativePath);
@@ -22,19 +25,42 @@ public interface ITreeImageAssetResolver
     Bitmap? LoadBackground(string treeVersion);
 }
 
-public sealed class GameAssetService(IGameAssetLayoutRegistry layouts) : IGameAssetService
+public readonly record struct GameAssetKey(GameId GameId, string Version);
+
+public sealed class GameAssetService(GameRegistry games, IGameAssetLayoutRegistry layouts) : IGameAssetService
 {
-    public TreeModel LoadTree(GameDefinition game, string? version = null)
+    private readonly ConcurrentDictionary<GameAssetKey, Lazy<Task<TreeModel>>> _trees = new();
+    private readonly ConcurrentDictionary<GameAssetKey, Lazy<Task<SpriteMap>>> _sprites = new();
+
+    public Task<TreeModel> LoadTreeAsync(GameDefinition game, string? version = null)
     {
-        version ??= game.DefaultTreeVersion;
-        using var stream = OpenAsset(game, layouts.Get(game.Id).TreeDataPath(version));
-        return game.TreeLoader.Load(stream, version, game.Id);
+        var key = new GameAssetKey(game.Id, version ?? game.DefaultTreeVersion);
+        return _trees.GetOrAdd(key, static (assetKey, state) =>
+            new Lazy<Task<TreeModel>>(
+                () => Task.Run(() => state.LoadTree(assetKey)),
+                LazyThreadSafetyMode.ExecutionAndPublication), this).Value;
     }
 
-    public SpriteMap LoadSprites(GameDefinition game, string? version = null)
+    public Task<SpriteMap> LoadSpritesAsync(GameDefinition game, string? version = null)
     {
-        version ??= game.DefaultTreeVersion;
-        var spritePaths = layouts.Get(game.Id).SpriteDataPaths(version);
+        var key = new GameAssetKey(game.Id, version ?? game.DefaultTreeVersion);
+        return _sprites.GetOrAdd(key, static (assetKey, state) =>
+            new Lazy<Task<SpriteMap>>(
+                () => Task.Run(() => state.LoadSprites(assetKey)),
+                LazyThreadSafetyMode.ExecutionAndPublication), this).Value;
+    }
+
+    private TreeModel LoadTree(GameAssetKey key)
+    {
+        var game = GameDefinitionFor(key.GameId);
+        using var stream = OpenAsset(game, layouts.Get(game.Id).TreeDataPath(key.Version));
+        return game.TreeLoader.Load(stream, key.Version, game.Id);
+    }
+
+    private SpriteMap LoadSprites(GameAssetKey key)
+    {
+        var game = GameDefinitionFor(key.GameId);
+        var spritePaths = layouts.Get(game.Id).SpriteDataPaths(key.Version);
         if (spritePaths.Kind == SpriteDataKind.Poe2GggAssets)
         {
             using var skills = OpenAsset(game, spritePaths.Paths[0]);
@@ -54,6 +80,8 @@ public sealed class GameAssetService(IGameAssetLayoutRegistry layouts) : IGameAs
         using var stream = OpenAsset(game, spritePaths.Paths[0]);
         return SpriteMap.LoadFromJson(stream);
     }
+
+    private GameDefinition GameDefinitionFor(GameId gameId) => games.Get(gameId);
 
     public Stream OpenAsset(GameDefinition game, string relativePath)
     {

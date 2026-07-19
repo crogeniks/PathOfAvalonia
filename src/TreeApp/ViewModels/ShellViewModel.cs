@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PathOfAvalonia.TreeApp.Services;
@@ -22,6 +23,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly IBuildPlannerImportService _buildPlannerImportService;
     private readonly IStorageProviderAccessor _storageProviderAccessor;
     private readonly IGameAssetLayoutRegistry _assetLayouts;
+    private int _workspaceLoadRequest;
 
     public ShellViewModel(
         GameRegistry games,
@@ -43,18 +45,12 @@ public sealed partial class ShellViewModel : ObservableObject
 
         if (settings.LastGameId is { } lastGame && _games.TryGet(lastGame, out var game))
         {
-            try
-            {
-                OpenWorkspace(game, game.DefaultTreeVersion);
-                return;
-            }
-            catch
-            {
-                StatusMessage = "Could not reopen last game.";
-            }
+            _ = OpenWorkspaceAsync(game, game.DefaultTreeVersion, "Could not reopen last game.");
         }
-
-        CurrentPage = ShellPage.Landing;
+        else
+        {
+            CurrentPage = ShellPage.Landing;
+        }
     }
 
     public IReadOnlyList<GameChoiceViewModel> Games { get; }
@@ -65,10 +61,10 @@ public sealed partial class ShellViewModel : ObservableObject
     [ObservableProperty] public partial bool IsConfirmingGameChange { get; set; }
 
     [RelayCommand]
-    private void SelectGame(GameId gameId)
+    private Task SelectGame(GameId gameId)
     {
         var game = _games.Get(gameId);
-        OpenWorkspace(game, game.DefaultTreeVersion);
+        return OpenWorkspaceAsync(game, game.DefaultTreeVersion, "Could not open the selected game.");
     }
 
     [RelayCommand]
@@ -95,47 +91,74 @@ public sealed partial class ShellViewModel : ObservableObject
         IsConfirmingGameChange = false;
     }
 
-    private void OpenWorkspace(GameDefinition game, string treeVersion)
+    private async Task OpenWorkspaceAsync(GameDefinition game, string treeVersion, string errorMessage)
     {
-        var tree = _assets.LoadTree(game, treeVersion);
-        var sprites = _assets.LoadSprites(game, treeVersion);
-        var spec = new PassiveSpec(tree, tree.Classes, game.FeatureFlags);
-        var equipment = new EquipmentViewModel();
-        var treePanel = new MainWindowViewModel(
-            spec,
-            game.ImportStrategy,
-            equipment,
-            _buildPlannerExportService,
-            _buildPlannerImportService,
-            _storageProviderAccessor);
-        var workspace = new GameWorkspace
+        var request = ++_workspaceLoadRequest;
+        StatusMessage = "Loading tree data…";
+        CurrentPage = ShellPage.Landing;
+        try
         {
-            Game = game,
-            Tree = tree,
-            Sprites = sprites,
-            Classes = tree.Classes,
-            Spec = spec,
-            TreeViewModel = treePanel.TreeViewModel,
-            Equipment = equipment,
-        };
-        ActiveWorkspace = new GameWorkspaceViewModel(
-            workspace,
-            treePanel,
-            new TreeImageAssetResolver(game, _assets, _assetLayouts, treeVersion),
-            _assets,
-            OpenWorkspace,
-            BackToLandingCommand);
-        CurrentPage = ShellPage.Workspace;
-        _settings.LastGameId = game.Id;
-        _settings.Save();
-        foreach (var choice in Games)
+            var treeTask = _assets.LoadTreeAsync(game, treeVersion);
+            var spritesTask = _assets.LoadSpritesAsync(game, treeVersion);
+            await Task.WhenAll(treeTask, spritesTask);
+            if (request != _workspaceLoadRequest)
+            {
+                return;
+            }
+
+            var tree = await treeTask;
+            var sprites = await spritesTask;
+            var spec = new PassiveSpec(tree, tree.Classes, game.FeatureFlags);
+            var equipment = new EquipmentViewModel();
+            var treePanel = new MainWindowViewModel(
+                spec,
+                game.ImportStrategy,
+                equipment,
+                _buildPlannerExportService,
+                _buildPlannerImportService,
+                _storageProviderAccessor);
+            var workspace = new GameWorkspace
+            {
+                Game = game,
+                Tree = tree,
+                Sprites = sprites,
+                Classes = tree.Classes,
+                Spec = spec,
+                TreeViewModel = treePanel.TreeViewModel,
+                Equipment = equipment,
+            };
+            ActiveWorkspace = new GameWorkspaceViewModel(
+                workspace,
+                treePanel,
+                new TreeImageAssetResolver(game, _assets, _assetLayouts, treeVersion),
+                _assets,
+                SwitchTreeVersionAsync,
+                BackToLandingCommand);
+            CurrentPage = ShellPage.Workspace;
+            StatusMessage = string.Empty;
+            _settings.LastGameId = game.Id;
+            _settings.Save();
+            foreach (var choice in Games)
+            {
+                choice.IsLastUsed = choice.Id == game.Id;
+            }
+        }
+        catch
         {
-            choice.IsLastUsed = choice.Id == game.Id;
+            if (request == _workspaceLoadRequest)
+            {
+                StatusMessage = errorMessage;
+                CurrentPage = ShellPage.Landing;
+            }
         }
     }
 
+    private Task SwitchTreeVersionAsync(GameDefinition game, string treeVersion) =>
+        OpenWorkspaceAsync(game, treeVersion, "Could not load the selected tree version.");
+
     private void ReturnToLanding()
     {
+        _workspaceLoadRequest++;
         ActiveWorkspace = null;
         CurrentPage = ShellPage.Landing;
     }

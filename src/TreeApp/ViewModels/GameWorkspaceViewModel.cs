@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PathOfAvalonia.TreeApp.Services;
@@ -23,7 +24,8 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
 {
     private const string NoDiffVersion = "None";
     private readonly IGameAssetService _assets;
-    private readonly Action<GameDefinition, string> _switchTreeVersion;
+    private readonly Func<GameDefinition, string, Task> _switchTreeVersion;
+    private int _diffLoadRequest;
     private readonly int _initialClassIndex;
     private readonly int _initialAllocatedCount;
 
@@ -32,7 +34,7 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
         MainWindowViewModel treePanel,
         ITreeImageAssetResolver imageResolver,
         IGameAssetService assets,
-        Action<GameDefinition, string> switchTreeVersion,
+        Func<GameDefinition, string, Task> switchTreeVersion,
         IRelayCommand backToLandingCommand)
     {
         Workspace = workspace;
@@ -83,21 +85,39 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
             return;
         }
 
-        _switchTreeVersion(Workspace.Game, value);
+        _ = _switchTreeVersion(Workspace.Game, value);
     }
 
-    partial void OnSelectedDiffTreeVersionChanged(string value)
+    async partial void OnSelectedDiffTreeVersionChanged(string value)
     {
         if (string.IsNullOrWhiteSpace(value) || value == NoDiffVersion || value == Workspace.Tree.Version)
         {
+            _diffLoadRequest++;
             TreePanel.TreeViewModel.SetDiff(TreeDiff.Empty);
             OnPropertyChanged(nameof(DiffSummary));
             return;
         }
 
-        var baseline = _assets.LoadTree(Workspace.Game, value);
-        TreePanel.TreeViewModel.SetDiff(TreeDiff.Compare(Workspace.Tree, baseline));
-        OnPropertyChanged(nameof(DiffSummary));
+        var request = ++_diffLoadRequest;
+        try
+        {
+            var baseline = await _assets.LoadTreeAsync(Workspace.Game, value);
+            if (request != _diffLoadRequest || SelectedDiffTreeVersion != value)
+            {
+                return;
+            }
+
+            TreePanel.TreeViewModel.SetDiff(TreeDiff.Compare(Workspace.Tree, baseline));
+            OnPropertyChanged(nameof(DiffSummary));
+        }
+        catch
+        {
+            if (request == _diffLoadRequest)
+            {
+                TreePanel.TreeViewModel.SetDiff(TreeDiff.Empty);
+                OnPropertyChanged(nameof(DiffSummary));
+            }
+        }
     }
 
 }

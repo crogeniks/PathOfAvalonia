@@ -213,6 +213,19 @@ All are simple RGB multiplications, implemented with `SetDrawColor` before the d
 - [ ] Build `SKVertices` helper for arbitrary quads (arc connectors).
 - [ ] Embed latest tree + `Assets/` as resources; older versions + CDN atlases cached on disk.
 
+## 10.1 Current application ownership
+
+`GameAssetService` is the application-level metadata registry. It keys each tree
+and `SpriteMap` by `(GameId, version)` and stores a `Lazy<Task<T>>` per key, so
+tree parsing and sprite-map conversion happen once on a background thread even
+when a workspace load and a diff request overlap. The resulting tree and sprite
+metadata is shared; it contains no Avalonia bitmap handles.
+
+`PassiveTreeView` owns its decoded `Bitmap` instances. It loads those only when
+attached to the visual tree, unsubscribes from `RedrawRequested`, and disposes
+all atlas, jewel-radius, and background bitmaps when detached. A later attach
+creates a fresh view-owned bitmap set from the shared metadata.
+
 ## 11. Source Map
 
 | Concern | File : lines |

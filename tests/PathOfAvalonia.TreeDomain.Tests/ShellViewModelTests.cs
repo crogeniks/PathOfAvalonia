@@ -1,4 +1,5 @@
 using System.IO;
+using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using Moq;
 using PathOfAvalonia.TreeApp.Services;
@@ -73,7 +74,7 @@ public sealed class ShellViewModelTests
 
     private sealed class StubAssets : IGameAssetService
     {
-        public TreeModel LoadTree(GameDefinition game, string? version = null)
+        public Task<TreeModel> LoadTreeAsync(GameDefinition game, string? version = null)
         {
             version ??= game.DefaultTreeVersion;
             var start = new Node
@@ -101,7 +102,7 @@ public sealed class ShellViewModelTests
             };
             start.LinkedNodes.Add(normal);
             normal.LinkedNodes.Add(start);
-            return new TreeModel
+            return Task.FromResult(new TreeModel
             {
                 GameId = game.Id,
                 Version = version,
@@ -122,13 +123,14 @@ public sealed class ShellViewModelTests
                 SkillsPerOrbit = [2],
                 OrbitRadii = [1],
                 OrbitAngles = [new[] { 0.0, 1.0 }],
-            };
+            });
         }
 
-        public SpriteMap LoadSprites(GameDefinition game, string? version = null) => new()
-        {
-            Atlases = new Dictionary<string, SpriteAtlas>(),
-        };
+        public Task<SpriteMap> LoadSpritesAsync(GameDefinition game, string? version = null) =>
+            Task.FromResult(new SpriteMap
+            {
+                Atlases = new Dictionary<string, SpriteAtlas>(),
+            });
 
         public Stream OpenAsset(GameDefinition game, string relativePath) =>
             throw new NotSupportedException();

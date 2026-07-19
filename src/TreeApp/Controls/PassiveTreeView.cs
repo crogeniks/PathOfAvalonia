@@ -39,7 +39,10 @@ public sealed partial class PassiveTreeView : Control
     private double _panStartOffX, _panStartOffY;
     private bool _panMoved;
 
-    private readonly Bitmap? _bgTile;
+    // Bitmaps are decoded per view and are owned exclusively by this control.
+    // Sprite metadata remains shared through the workspace asset registry.
+    private Bitmap? _bgTile;
+    private bool _isSubscribedToRedraw;
     private const double BgTileScreen = 98; // tile size in screen-px (matches PoB asset, no zoom scaling)
 
     // Tree-space sizes: scaled by _scale into screen-px each frame so they all
@@ -106,9 +109,50 @@ public sealed partial class PassiveTreeView : Control
         _assetResolver = assetResolver;
         ClipToBounds = true;
         Focusable = true;
-        _vm.RedrawRequested += InvalidateVisual;
-        _bgTile = _assetResolver.LoadBackground(_vm.Tree.Version);
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        if (!_isSubscribedToRedraw)
+        {
+            _vm.RedrawRequested += InvalidateVisual;
+            _isSubscribedToRedraw = true;
+        }
+
+        _bgTile ??= _assetResolver.LoadBackground(_vm.Tree.Version);
         LoadAtlasBitmaps();
+        InvalidateVisual();
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        if (_isSubscribedToRedraw)
+        {
+            _vm.RedrawRequested -= InvalidateVisual;
+            _isSubscribedToRedraw = false;
+        }
+
+        DisposeOwnedBitmaps();
+        base.OnDetachedFromVisualTree(e);
+    }
+
+    private void DisposeOwnedBitmaps()
+    {
+        foreach (var bitmap in _atlasBitmaps.Values)
+        {
+            bitmap.Dispose();
+        }
+        _atlasBitmaps.Clear();
+
+        foreach (var bitmap in _jewelRadiusBitmaps.Values)
+        {
+            bitmap?.Dispose();
+        }
+        _jewelRadiusBitmaps.Clear();
+
+        _bgTile?.Dispose();
+        _bgTile = null;
     }
 
     private void LoadAtlasBitmaps()

@@ -37,13 +37,6 @@ public partial class App : Application
         sc.AddSingleton<IBuildPlannerImportService, BuildPlannerImportService>();
         sc.AddSingleton<IStorageProviderAccessor, StorageProviderAccessor>();
 
-        // Singletons resolved from asset services at first request.
-        sc.AddSingleton(sp => sp.GetRequiredService<IGameAssetService>().LoadTree(sp.GetRequiredService<GameRegistry>().Get(GameId.PathOfExile1)));
-        sc.AddSingleton(sp => sp.GetRequiredService<IGameAssetService>().LoadSprites(sp.GetRequiredService<GameRegistry>().Get(GameId.PathOfExile1)));
-
-        // PassiveSpec constructor-injects TreeModel.
-        sc.AddSingleton<PassiveSpec>();
-
         sc.AddSingleton<EquipmentViewModel>();
         sc.AddSingleton<ShellViewModel>();
         sc.AddSingleton<MainWindow>();
