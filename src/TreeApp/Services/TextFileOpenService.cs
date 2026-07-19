@@ -30,7 +30,7 @@ public sealed class TextFileOpenService : ITextFileOpenService
         TextFileOpenRequest request,
         CancellationToken cancellationToken)
     {
-        var startFolder = await TryGetStartFolderAsync(storageProvider, request.SuggestedStartDirectory);
+        var startFolder = await StorageStartFolderResolver.TryGetAsync(storageProvider, request.SuggestedStartDirectory);
         var files = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = request.Title,
@@ -48,20 +48,5 @@ public sealed class TextFileOpenService : ITextFileOpenService
         using var reader = new StreamReader(stream);
         var contents = await reader.ReadToEndAsync(cancellationToken);
         return new TextFileOpenResult(file, contents);
-    }
-
-    private static async Task<IStorageFolder?> TryGetStartFolderAsync(
-        IStorageProvider storageProvider,
-        string startPath)
-    {
-        try
-        {
-            Directory.CreateDirectory(startPath);
-            return await storageProvider.TryGetFolderFromPathAsync(startPath);
-        }
-        catch
-        {
-            return null;
-        }
     }
 }

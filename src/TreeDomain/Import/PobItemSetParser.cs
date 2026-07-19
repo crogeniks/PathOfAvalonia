@@ -59,7 +59,7 @@ internal static class PobItemSetParser
             }
         }
 
-        result.Sort((a, b) => SlotIndex(a.Slot).CompareTo(SlotIndex(b.Slot)));
+        result.Sort((a, b) => BuildPlannerItemSlots.SortOrder(a.Slot).CompareTo(BuildPlannerItemSlots.SortOrder(b.Slot)));
         return new ImportedItemSetVariant(index, id, ItemSetDisplayName(setEl, id, index), result);
     }
 
@@ -125,25 +125,4 @@ internal static class PobItemSetParser
         return id > 0 ? $"Item Set {id}" : $"Item Set {index + 1}";
     }
 
-    private static int SlotIndex(string slot) => slot switch
-    {
-        "Weapon 1" => 0,
-        "Weapon 2" => 1,
-        "Weapon 1 Swap" => 2,
-        "Weapon 2 Swap" => 3,
-        "Helmet" => 4,
-        "Body Armour" => 5,
-        "Gloves" => 6,
-        "Boots" => 7,
-        "Amulet" => 8,
-        "Ring 1" => 9,
-        "Ring 2" => 10,
-        "Belt" => 11,
-        "Flask 1" => 12,
-        "Flask 2" => 13,
-        "Flask 3" => 14,
-        "Flask 4" => 15,
-        "Flask 5" => 16,
-        _ => 100,
-    };
 }

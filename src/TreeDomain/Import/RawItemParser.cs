@@ -4,9 +4,9 @@ public static class RawItemParser
 {
     public static ImportedItem Parse(string slot, string rawText)
     {
-        rawText = PobText.StripColorCodes(rawText);
-        var lines = rawText.Replace("\r\n", "\n").Split('\n');
-        var rarity = "Normal";
+        var text = ItemTextSections.Parse(rawText);
+        var lines = text.Lines;
+        var rarity = text.Rarity;
         var name = string.Empty;
         var baseType = string.Empty;
         var sockets = new List<ImportedItemSocket>();
@@ -15,49 +15,48 @@ public static class RawItemParser
         int? selectedVariant = null;
         var i = 0;
 
-        while (i < lines.Length && string.IsNullOrWhiteSpace(lines[i]))
+        while (i < lines.Count && string.IsNullOrWhiteSpace(lines[i].Raw))
         {
             i++;
         }
 
-        if (i < lines.Length)
+        if (i < lines.Count)
         {
-            var first = lines[i].Trim();
+            var first = lines[i].Text;
             if (first.StartsWith("Rarity:", StringComparison.OrdinalIgnoreCase))
             {
-                rarity = first[7..].Trim();
                 i++;
             }
         }
 
-        while (i < lines.Length && string.IsNullOrWhiteSpace(lines[i]))
+        while (i < lines.Count && string.IsNullOrWhiteSpace(lines[i].Raw))
         {
             i++;
         }
 
-        if (i < lines.Length && !lines[i].Trim().StartsWith("---", StringComparison.Ordinal))
+        if (i < lines.Count && !lines[i].Raw.StartsWith("---", StringComparison.Ordinal))
         {
-            name = ItemText.StripTags(lines[i++].Trim());
+            name = lines[i++].Text;
         }
 
-        while (i < lines.Length && string.IsNullOrWhiteSpace(lines[i]))
+        while (i < lines.Count && string.IsNullOrWhiteSpace(lines[i].Raw))
         {
             i++;
         }
 
         var ru = rarity.ToUpperInvariant();
-        if ((ru == "RARE" || ru == "UNIQUE") && i < lines.Length && !lines[i].Trim().StartsWith("---", StringComparison.Ordinal))
+        if ((ru == "RARE" || ru == "UNIQUE") && i < lines.Count && !lines[i].Raw.StartsWith("---", StringComparison.Ordinal))
         {
-            baseType = ItemText.StripTags(lines[i].Trim());
+            baseType = lines[i].Text;
         }
         else
         {
             baseType = name;
         }
 
-        foreach (var rawLine in lines)
+        foreach (var itemLine in lines)
         {
-            var line = rawLine.Trim();
+            var line = itemLine.Text;
             if (line.StartsWith("Sockets:", StringComparison.OrdinalIgnoreCase))
             {
                 foreach (var token in line[8..].Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -67,7 +66,7 @@ public static class RawItemParser
             }
             else if (line.StartsWith("Rune:", StringComparison.OrdinalIgnoreCase))
             {
-                runes.Add(ItemText.StripTags(line[5..].Trim()));
+                runes.Add(line[5..].Trim());
             }
             else if (line.StartsWith("Variant:", StringComparison.OrdinalIgnoreCase))
             {
@@ -82,12 +81,13 @@ public static class RawItemParser
 
         selectedVariant ??= variants.Count > 0 ? variants.Count : null;
 
-        return new ImportedItem(slot, rarity, name, baseType, rawText.Trim())
+        return new ImportedItem(slot, rarity, name, baseType, text.RawText)
         {
             Sockets = sockets,
             Runes = runes,
             Variants = variants,
             SelectedVariant = selectedVariant,
+            Text = text,
         };
     }
 

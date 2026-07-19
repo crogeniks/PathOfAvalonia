@@ -197,7 +197,7 @@ public sealed partial class PassiveSpec
 
             var currentSkillsPerOrbit = Tree.SkillsPerOrbit[definition.SizeIndex + 1];
             var legacySkillsPerOrbit = Tree.SkillsPerOrbit[proxyNode.Orbit];
-            var legacyProxyNodeIndex = TranslateClusterOrbitIndex(
+            var legacyProxyNodeIndex = ClusterOrbitIndexTranslator.Translate(
                 proxyNode.OrbitIndex,
                 legacySkillsPerOrbit,
                 definition.TotalIndices);
@@ -213,17 +213,17 @@ public sealed partial class PassiveSpec
                 }
 
                 var legacyNodeIndex = (nodeIndex + legacyProxyNodeIndex) % definition.TotalIndices;
-                var legacyOrbitIndex = TranslateClusterOrbitIndex(
+                var legacyOrbitIndex = ClusterOrbitIndexTranslator.Translate(
                     legacyNodeIndex,
                     definition.TotalIndices,
                     legacySkillsPerOrbit);
                 legacyNodeIdsByOrbit[legacyOrbitIndex] = node.Id;
 
-                var currentNodeIndex = TranslateClusterOrbitIndex(
+                var currentNodeIndex = ClusterOrbitIndexTranslator.Translate(
                     node.OrbitIndex,
                     currentSkillsPerOrbit,
                     definition.TotalIndices);
-                var currentLegacyOrbitIndex = TranslateClusterOrbitIndex(
+                var currentLegacyOrbitIndex = ClusterOrbitIndexTranslator.Translate(
                     currentNodeIndex,
                     definition.TotalIndices,
                     legacySkillsPerOrbit);
@@ -276,93 +276,6 @@ public sealed partial class PassiveSpec
             }
         }
         return null;
-    }
-
-    private static int TranslateClusterOrbitIndex(int sourceOrbitIndex, int sourceNodesPerOrbit, int destinationNodesPerOrbit)
-    {
-        if (sourceNodesPerOrbit == destinationNodesPerOrbit)
-        {
-            return sourceOrbitIndex;
-        }
-        if (sourceNodesPerOrbit == 12 && destinationNodesPerOrbit == 16)
-        {
-            return sourceOrbitIndex switch
-            {
-                0 => 0,
-                1 => 1,
-                2 => 3,
-                3 => 4,
-                4 => 5,
-                5 => 7,
-                6 => 8,
-                7 => 9,
-                8 => 11,
-                9 => 12,
-                10 => 13,
-                11 => 15,
-                _ => throw new ArgumentOutOfRangeException(nameof(sourceOrbitIndex)),
-            };
-        }
-        if (sourceNodesPerOrbit == 16 && destinationNodesPerOrbit == 12)
-        {
-            return sourceOrbitIndex switch
-            {
-                0 => 0,
-                1 => 1,
-                2 => 1,
-                3 => 2,
-                4 => 3,
-                5 => 4,
-                6 => 4,
-                7 => 5,
-                8 => 6,
-                9 => 7,
-                10 => 7,
-                11 => 8,
-                12 => 9,
-                13 => 10,
-                14 => 10,
-                15 => 11,
-                _ => throw new ArgumentOutOfRangeException(nameof(sourceOrbitIndex)),
-            };
-        }
-        if (sourceNodesPerOrbit == 6 && destinationNodesPerOrbit == 16)
-        {
-            return sourceOrbitIndex switch
-            {
-                0 => 0,
-                1 => 3,
-                2 => 5,
-                3 => 8,
-                4 => 11,
-                5 => 13,
-                _ => throw new ArgumentOutOfRangeException(nameof(sourceOrbitIndex)),
-            };
-        }
-        if (sourceNodesPerOrbit == 16 && destinationNodesPerOrbit == 6)
-        {
-            return sourceOrbitIndex switch
-            {
-                0 => 0,
-                1 => 0,
-                2 => 0,
-                3 => 1,
-                4 => 1,
-                5 => 2,
-                6 => 2,
-                7 => 2,
-                8 => 3,
-                9 => 3,
-                10 => 3,
-                11 => 4,
-                12 => 4,
-                13 => 5,
-                14 => 5,
-                15 => 5,
-                _ => throw new ArgumentOutOfRangeException(nameof(sourceOrbitIndex)),
-            };
-        }
-        return (int)Math.Floor(sourceOrbitIndex * destinationNodesPerOrbit / (double)sourceNodesPerOrbit);
     }
 
     private int ResolveClusterLineageIdBase(Node socket)

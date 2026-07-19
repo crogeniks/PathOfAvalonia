@@ -4,12 +4,6 @@ namespace PathOfAvalonia.TreeDomain.ClusterJewels;
 
 public static class ClusterJewelResolver
 {
-    private static readonly IReadOnlyDictionary<int, int> TemplateToOrbit16 = new Dictionary<int, int>
-    {
-        [0] = 0, [1] = 1, [2] = 3, [3] = 4, [4] = 5, [5] = 7,
-        [6] = 8, [7] = 9, [8] = 11, [9] = 12, [10] = 13, [11] = 15,
-    };
-
     public static ClusterSubgraph Resolve(TreeModel tree, Node socketNode, ClusterJewelSpec spec, int lineageIdBase, int clusterNodeIdBase)
     {
         if (socketNode.ExpansionSocket is not { } expansionSocket)
@@ -401,33 +395,7 @@ public static class ClusterJewelResolver
     private static int MapOrbitIndex(int templateIndex, int startOrbitIndex, int templateSlots, int skillsPerOrbit)
     {
         var corrected = (templateIndex + startOrbitIndex) % templateSlots;
-        return TranslateClusterOrbitIndex(corrected, templateSlots, skillsPerOrbit);
-    }
-
-    private static int TranslateClusterOrbitIndex(int sourceOrbitIndex, int sourceNodesPerOrbit, int destinationNodesPerOrbit)
-    {
-        if (sourceNodesPerOrbit == destinationNodesPerOrbit)
-        {
-            return sourceOrbitIndex;
-        }
-        if (sourceNodesPerOrbit == 12 && destinationNodesPerOrbit == 16)
-        {
-            return TemplateToOrbit16[sourceOrbitIndex];
-        }
-        if (sourceNodesPerOrbit == 6 && destinationNodesPerOrbit == 16)
-        {
-            return sourceOrbitIndex switch
-            {
-                0 => 0,
-                1 => 3,
-                2 => 5,
-                3 => 8,
-                4 => 11,
-                5 => 13,
-                _ => throw new ArgumentOutOfRangeException(nameof(sourceOrbitIndex)),
-            };
-        }
-        return (int)Math.Floor(sourceOrbitIndex * destinationNodesPerOrbit / (double)sourceNodesPerOrbit);
+        return ClusterOrbitIndexTranslator.Translate(corrected, templateSlots, skillsPerOrbit);
     }
 
     private static ArcConnector BuildArcConnector(

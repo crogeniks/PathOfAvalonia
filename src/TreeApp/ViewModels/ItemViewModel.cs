@@ -82,8 +82,7 @@ public sealed class ItemViewModel
     private static (IReadOnlyList<BodyLine> Implicits, IReadOnlyList<BodyLine> Body, IReadOnlyList<BodyLine> StatusFlags)
         ParseBodySections(ImportedItem item)
     {
-        var rawLines = item.RawText.Split('\n');
-        var i = SkipHeaderLines(rawLines, item.Rarity);
+        var itemLines = item.Text.BodyLines;
 
         var implicits = new List<BodyLine>();
         var body = new List<BodyLine>();
@@ -101,9 +100,9 @@ public sealed class ItemViewModel
             body.Add(new BodyLine("Rune: " + rune, BrushRune));
         }
 
-        for (; i < rawLines.Length; i++)
+        foreach (var itemLine in itemLines)
         {
-            var line = rawLines[i].Trim();
+            var line = itemLine.Text;
 
             if (string.IsNullOrEmpty(line))
             {
@@ -117,7 +116,7 @@ public sealed class ItemViewModel
 
             if (line.StartsWith("Variant:", StringComparison.OrdinalIgnoreCase)
                 || line.StartsWith("Selected Variant:", StringComparison.OrdinalIgnoreCase)
-                || !ItemVariant.IsActive(line, item.SelectedVariant))
+                || !ItemVariant.IsActive(itemLine.Raw, item.SelectedVariant))
             {
                 continue;
             }
@@ -160,94 +159,40 @@ public sealed class ItemViewModel
                     implicitCount = n;
                     continue;
                 }
-                body.Add(ParseModLine(line));
+                body.Add(ParseModLine(itemLine));
             }
             else if (implicitsSeen < implicitCount)
             {
-                implicits.Add(ParseModLine(line));
+                implicits.Add(ParseModLine(itemLine));
                 implicitsSeen++;
             }
             else
             {
-                body.Add(ParseModLine(line));
+                body.Add(ParseModLine(itemLine));
             }
         }
 
         return (implicits, body, statusFlags);
     }
 
-    private static int SkipHeaderLines(string[] lines, string rarity)
-    {
-        var i = 0;
-
-        while (i < lines.Length && string.IsNullOrWhiteSpace(lines[i]))
-        {
-            i++;
-        }
-
-        if (i < lines.Length && lines[i].Trim().StartsWith("Rarity:", StringComparison.OrdinalIgnoreCase))
-        {
-            i++;
-        }
-
-        while (i < lines.Length && string.IsNullOrWhiteSpace(lines[i]))
-        {
-            i++;
-        }
-
-        if (i < lines.Length && !lines[i].Trim().StartsWith("---", StringComparison.Ordinal))
-        {
-            i++;
-        }
-
-        while (i < lines.Length && string.IsNullOrWhiteSpace(lines[i]))
-        {
-            i++;
-        }
-
-        var ru = rarity.ToUpperInvariant();
-        if ((ru == "RARE" || ru == "UNIQUE")
-            && i < lines.Length
-            && !lines[i].Trim().StartsWith("---", StringComparison.Ordinal))
-        {
-            i++;
-        }
-
-        return i;
-    }
-
     private static bool IsStatusFlag(string line) =>
         line is "Corrupted" or "Split" or "Mirrored" or "Fractured Item" or "Desecrated" or "Unreleased";
 
-    private static BodyLine ParseModLine(string line)
+    private static BodyLine ParseModLine(ItemTextLine line)
     {
-        if (line == "--------")
+        if (line.Text == "--------")
         {
             return new BodyLine("---", BrushSeparator);
         }
 
-        var (text, brush) = StripPrefixes(line);
-        return new BodyLine(text, brush);
+        return new BodyLine(line.Text, BrushForTags(line.Tags));
     }
 
-    // Strips all leading {tag} tokens. {range:X}, {tags:X}, and {variant:X} are metadata;
-    // other recognized tags set color.
-    private static (string Text, IBrush Brush) StripPrefixes(string line)
+    private static IBrush BrushForTags(IReadOnlyList<string> tags)
     {
         var brush = BrushDefault;
-        var span = line.AsSpan();
-
-        while (span.StartsWith("{", StringComparison.Ordinal))
+        foreach (var tag in tags)
         {
-            var close = span.IndexOf('}');
-            if (close < 0)
-            {
-                break;
-            }
-
-            var tag = span[1..close].ToString();
-            span = span[(close + 1)..];
-
             if (tag.StartsWith("range:", StringComparison.Ordinal)
                 || tag.StartsWith("tags:", StringComparison.Ordinal))
             {
@@ -271,7 +216,6 @@ public sealed class ItemViewModel
                 _           => brush,
             };
         }
-
-        return (span.ToString(), brush);
+        return brush;
     }
 }

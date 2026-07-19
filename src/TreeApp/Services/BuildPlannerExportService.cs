@@ -96,7 +96,7 @@ public sealed class BuildPlannerExportService(
         IReadOnlyList<Poe2BuildPlannerExportFile> exports,
         CancellationToken cancellationToken)
     {
-        var startFolder = await TryGetStartFolderAsync(storageProvider, buildPlannerPaths.CurrentDirectory);
+        var startFolder = await StorageStartFolderResolver.TryGetAsync(storageProvider, buildPlannerPaths.CurrentDirectory);
         var folders = await storageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
             Title = "Export Path of Exile 2 builds",
@@ -130,21 +130,6 @@ public sealed class BuildPlannerExportService(
         }
 
         return new BuildPlannerExportFileResult(folder.Name, skipped, exports.Count);
-    }
-
-    private static async Task<IStorageFolder?> TryGetStartFolderAsync(
-        IStorageProvider storageProvider,
-        string startPath)
-    {
-        try
-        {
-            Directory.CreateDirectory(startPath);
-            return await storageProvider.TryGetFolderFromPathAsync(startPath);
-        }
-        catch
-        {
-            return null;
-        }
     }
 
     private static string SanitizeFileName(string value)

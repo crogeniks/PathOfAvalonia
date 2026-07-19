@@ -243,14 +243,13 @@ public static class Poe2BuildPlannerExporter
         var slots = new List<BuildInventorySlot>();
         foreach (var item in items)
         {
-            var inventoryId = InventoryId(item.Slot);
-            if (inventoryId is null)
+            if (!BuildPlannerItemSlots.TryGetByDisplayName(item.Slot, out var plannerSlot))
             {
                 continue;
             }
 
             slots.Add(new BuildInventorySlot(
-                inventoryId,
+                plannerSlot.InventoryId,
                 IsUnique(item) && !string.IsNullOrWhiteSpace(item.Name) ? item.Name : null,
                 IsUnique(item) ? null : BuildItemAdditionalText(item),
                 DefaultLevelInterval()));
@@ -278,17 +277,14 @@ public static class Poe2BuildPlannerExporter
             textLines.Add(item.BaseType);
         }
 
-        foreach (var line in item.RawText
-            .Replace("\r\n", "\n")
-            .Split('\n')
-            .Select(line => line.Trim()))
+        foreach (var line in item.Text.BodyLines)
         {
-            if (SkipItemLine(line, item))
+            if (SkipItemLine(line.Text, item))
             {
                 continue;
             }
 
-            textLines.Add($"{modIndex++}. {line}");
+            textLines.Add($"{modIndex++}. {line.Text}");
         }
 
         var text = string.Join('\n', textLines).Trim();
@@ -321,32 +317,6 @@ public static class Poe2BuildPlannerExporter
 
     private static bool IsUnique(ImportedItem item) =>
         string.Equals(item.Rarity, "Unique", StringComparison.OrdinalIgnoreCase);
-
-    private static string? InventoryId(string slot) =>
-        slot switch
-        {
-            "Weapon 1" => "Weapon1",
-            "Weapon 2" => "Weapon2",
-            "Weapon 1 Swap" => "Weapon1Swap",
-            "Weapon 2 Swap" => "Weapon2Swap",
-            "Helmet" => "Helm1",
-            "Body Armour" => "BodyArmour1",
-            "Gloves" => "Gloves1",
-            "Boots" => "Boots1",
-            "Amulet" => "Amulet1",
-            "Ring 1" => "Ring1",
-            "Ring 2" => "Ring2",
-            "Belt" => "Belt1",
-            "Flask 1" => "Flask1",
-            "Flask 2" => "Flask2",
-            "Flask 3" => "Flask3",
-            "Flask 4" => "Flask4",
-            "Flask 5" => "Flask5",
-            "Charm 1" => "Charm1",
-            "Charm 2" => "Charm2",
-            _ => null,
-        };
-
     private sealed record BuildFile(
         [property: JsonPropertyName("name")] string Name,
         [property: JsonPropertyName("author")] string? Author,

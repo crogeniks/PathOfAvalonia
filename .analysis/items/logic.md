@@ -13,6 +13,12 @@
 - Influence flags (Shaper, Elder, Warlord, Hunter, Crusader, Redeemer, Searing Exarch, Eater of Worlds).
 - Requirements.
 
+In the Avalonia port, `ItemTextSections` normalizes copied item text (line
+endings and PoB colour codes), separates header/body lines, and tokenizes
+leading `{tag}` metadata once in the domain. `RawItemParser` populates it on
+`ImportedItem`; UI presentation and Build Planner export consume that model
+rather than reparsing `RawText`.
+
 ### Store
 `ItemsTab.items[id]` — all instantiated items for the build.
 

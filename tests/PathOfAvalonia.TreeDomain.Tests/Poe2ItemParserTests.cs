@@ -66,4 +66,21 @@ public sealed class Poe2ItemParserTests
         Assert.Contains(vm.StatusFlags, line => line.Text == "Corrupted");
         Assert.All(vm.Body.Concat(vm.StatusFlags), line => Assert.DoesNotContain("^", line.Text));
     }
+
+    [Fact]
+    public void NormalizesItemTextSectionsAndTagsOnceForDomainConsumers()
+    {
+        var item = RawItemParser.Parse("Body Armour", """
+            Rarity: Rare
+            ^6Dire Shell
+            ^5Expert Hexer's Robe
+            --------
+            {crafted}{variant:2}+50 to maximum Life
+            """);
+
+        Assert.Equal(3, item.Text.HeaderLineCount);
+        var mod = Assert.Single(item.Text.BodyLines.Where(line => line.Text.StartsWith("+50", StringComparison.Ordinal)));
+        Assert.Equal(["crafted", "variant:2"], mod.Tags);
+        Assert.Equal("+50 to maximum Life", mod.Text);
+    }
 }

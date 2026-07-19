@@ -32,7 +32,7 @@ public sealed class TextFileSaveService : ITextFileSaveService
         TextFileSaveRequest request,
         CancellationToken cancellationToken)
     {
-        var startFolder = await TryGetStartFolderAsync(storageProvider, request.SuggestedStartDirectory);
+        var startFolder = await StorageStartFolderResolver.TryGetAsync(storageProvider, request.SuggestedStartDirectory);
         var file = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = request.Title,
@@ -53,20 +53,5 @@ public sealed class TextFileSaveService : ITextFileSaveService
         await stream.WriteAsync(bytes, cancellationToken);
 
         return file;
-    }
-
-    private static async Task<IStorageFolder?> TryGetStartFolderAsync(
-        IStorageProvider storageProvider,
-        string startPath)
-    {
-        try
-        {
-            Directory.CreateDirectory(startPath);
-            return await storageProvider.TryGetFolderFromPathAsync(startPath);
-        }
-        catch
-        {
-            return null;
-        }
     }
 }

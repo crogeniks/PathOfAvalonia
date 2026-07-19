@@ -12,6 +12,7 @@ public sealed record ImportedItem(
     public IReadOnlyList<string> Runes { get; init; } = [];
     public IReadOnlyList<string> Variants { get; init; } = [];
     public int? SelectedVariant { get; init; }
+    public ItemTextSections Text { get; init; } = ItemTextSections.Parse(RawText);
 }
 
 public sealed record ImportedSocketedJewel(int SocketNodeId, int ItemId);

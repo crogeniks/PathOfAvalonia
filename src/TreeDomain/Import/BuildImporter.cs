@@ -5,28 +5,14 @@ namespace PathOfAvalonia.TreeDomain.Import;
 public static class BuildImporter
 {
     public static async Task<ImportedBuild> ImportAsync(string text, CancellationToken cancellationToken = default)
-    {
-        var input = ImportInput.From(text);
-        if (PobbInBuildImporter.LooksLikeUrl(input.Text))
-        {
-            var code = await PobbInBuildImporter.FetchBuildCodeAsync(input.Text, cancellationToken).ConfigureAwait(false);
-            return PobBuildCodeDecoder.Decode(code, "pobb.in");
-        }
-
-        return DecodeInput(input);
-    }
+        => await BuildImportDispatcher.ImportAsync(
+            text,
+            code => PobBuildCodeDecoder.Decode(code, "pobb.in"),
+            DecodeInput,
+            cancellationToken).ConfigureAwait(false);
 
     public static ImportedBuild Import(string text)
-    {
-        var input = ImportInput.From(text);
-        if (PobbInBuildImporter.LooksLikeUrl(input.Text))
-        {
-            var code = PobbInBuildImporter.FetchBuildCodeAsync(input.Text).GetAwaiter().GetResult();
-            return PobBuildCodeDecoder.Decode(code, "pobb.in");
-        }
-
-        return DecodeInput(input);
-    }
+        => BuildImportDispatcher.Import(text, code => PobBuildCodeDecoder.Decode(code, "pobb.in"), DecodeInput);
 
     private static ImportedBuild DecodeInput(ImportInput input)
     {

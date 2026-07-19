@@ -203,8 +203,7 @@ public static class Poe2BuildPlannerImporter
         var id = 1;
         foreach (var slot in slots ?? [])
         {
-            var displaySlot = SlotName(slot.InventoryId);
-            if (displaySlot is null)
+            if (!BuildPlannerItemSlots.TryGetByInventoryId(slot.InventoryId, out var plannerSlot))
             {
                 continue;
             }
@@ -213,7 +212,7 @@ public static class Poe2BuildPlannerImporter
             var name = isUnique ? slot.UniqueName! : ItemName(slot.AdditionalText) ?? "Build Planner Item";
             var baseType = isUnique ? slot.UniqueName! : ItemName(slot.AdditionalText) ?? "Build Planner Item";
             yield return new ImportedItem(
-                displaySlot,
+                plannerSlot.DisplayName,
                 isUnique ? "Unique" : "Normal",
                 name,
                 baseType,
@@ -285,31 +284,6 @@ public static class Poe2BuildPlannerImporter
 
         return new string(result.ToArray());
     }
-
-    private static string? SlotName(string? inventoryId) =>
-        inventoryId switch
-        {
-            "Weapon1" => "Weapon 1",
-            "Weapon2" => "Weapon 2",
-            "Weapon1Swap" => "Weapon 1 Swap",
-            "Weapon2Swap" => "Weapon 2 Swap",
-            "Helm1" => "Helmet",
-            "BodyArmour1" => "Body Armour",
-            "Gloves1" => "Gloves",
-            "Boots1" => "Boots",
-            "Amulet1" => "Amulet",
-            "Ring1" => "Ring 1",
-            "Ring2" => "Ring 2",
-            "Belt1" => "Belt",
-            "Flask1" => "Flask 1",
-            "Flask2" => "Flask 2",
-            "Flask3" => "Flask 3",
-            "Flask4" => "Flask 4",
-            "Flask5" => "Flask 5",
-            "Charm1" => "Charm 1",
-            "Charm2" => "Charm 2",
-            _ => null,
-        };
 
     private sealed record BuildFile(
         [property: JsonPropertyName("name")] string? Name,

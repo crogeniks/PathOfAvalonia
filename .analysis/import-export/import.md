@@ -40,6 +40,15 @@ encode: XML → Deflate (zlib) → base64 → URL-safe ('+'→'-', '/'→'_')
 decode: URL-safe → base64 decode → Inflate (zlib) → XML → LoadDB
 ```
 
+## Avalonia Port Boundaries
+
+- PoE1 and PoE2 importers share the transport dispatch for pasted `pobb.in`
+  links, while each game retains its own local-input decoder and user-facing
+  validation errors.
+- `BuildPlannerItemSlots` is the canonical mapping between PoB display slots,
+  Build Planner `inventory_id` values, and equipment ordering. Build Planner
+  import/export and PoB item-set sorting must use it rather than local maps.
+
 ## Tree URL Paste
 
 PoE tree URL format decoded directly by `PassiveSpec:DecodeURL()`. PoEPlanner URLs handled by `DecodePoePlannerURL()`.
