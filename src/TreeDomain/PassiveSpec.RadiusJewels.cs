@@ -12,28 +12,59 @@ public sealed partial class PassiveSpec
             throw new KeyNotFoundException($"Node {nodeId} is not present in the passive tree.");
         }
 
+        var effectiveName = node.Name;
+        var effectiveIcon = node.Icon;
         var stats = (IReadOnlyList<string>)node.Stats;
+        var replacesNode = false;
         var affectedBy = new List<int>();
         TimelessConqueror? conqueror = null;
-        foreach (var effect in _activeRadiusEffects.Where(effect => EffectAffectsNode(effect, nodeId)))
+        var affectingEffects = _activeRadiusEffects
+            .Where(effect => EffectAffectsNode(effect, nodeId))
+            .OrderBy(effect => effect.SocketNodeId)
+            .ToArray();
+        var timelessEffect = affectingEffects.FirstOrDefault(effect => effect.TimelessJewel is not null);
+        foreach (var effect in affectingEffects)
         {
             affectedBy.Add(effect.SocketNodeId);
             if (effect.Conqueror is { } c)
             {
                 conqueror = c;
             }
-            foreach (var transform in effect.NodeTransforms)
+        }
+
+        if (timelessEffect is not null)
+        {
+            conqueror = timelessEffect.Conqueror;
+            if (timelessEffect.TimelessNodeEffects.TryGetValue(nodeId, out var timelessNode))
             {
-                stats = transform.Apply(node, stats);
+                effectiveName = timelessNode.EffectiveName;
+                effectiveIcon = timelessNode.EffectiveIcon;
+                stats = timelessNode.EffectiveStats;
+                replacesNode = timelessNode.ReplacesNode;
+            }
+        }
+        else
+        {
+            foreach (var effect in affectingEffects)
+            {
+                foreach (var transform in effect.NodeTransforms)
+                {
+                    stats = transform.Apply(node, stats);
+                }
             }
         }
 
-        return new EffectiveNodeView(node, stats, conqueror is not null, conqueror, affectedBy);
+        return new EffectiveNodeView(node, effectiveName, effectiveIcon, stats, replacesNode, conqueror is not null, conqueror, affectedBy);
     }
 
     public bool IsAllocatedByRadiusJewel(int nodeId) =>
         _activeRadiusEffects.Any(effect =>
             effect.AllowsUnconnectedAllocation
+            && EffectAffectsNode(effect, nodeId));
+
+    public bool IsConqueredByTimelessJewel(int nodeId) =>
+        _activeRadiusEffects.Any(effect =>
+            effect.TimelessJewel is not null
             && EffectAffectsNode(effect, nodeId));
 
     private void RebuildActiveRadiusEffects()
@@ -62,6 +93,8 @@ public sealed partial class PassiveSpec
                 continue;
             }
 
+            effect = ResolveTimelessNodeEffects(effect);
+
             _activeRadiusEffects.Add(effect);
             var center = effect.AlternateCenterNodeId is { } centerNodeId && Tree.Nodes.TryGetValue(centerNodeId, out var alternate)
                 ? alternate
@@ -77,6 +110,26 @@ public sealed partial class PassiveSpec
         }
 
         AddOracleKeystoneAllocationRadii();
+    }
+
+    private RadiusJewelEffect ResolveTimelessNodeEffects(RadiusJewelEffect effect)
+    {
+        if (effect.TimelessJewel is not { } timelessJewel
+            || _timelessJewelData.IsEmpty
+            || !_socketRadiusMembership.TryGetValue(effect.SocketNodeId, out var membership)
+            || !membership.NodesByRadiusIndex.TryGetValue(effect.RadiusIndex, out var nodeIds))
+        {
+            return effect;
+        }
+
+        var nodes = nodeIds
+            .Select(nodeId => Tree.Nodes.GetValueOrDefault(nodeId))
+            .Where(node => node is not null)
+            .Cast<Node>();
+        return effect with
+        {
+            TimelessNodeEffects = _timelessJewelData.Resolve(timelessJewel, nodes),
+        };
     }
 
     private void AddOracleKeystoneAllocationRadii()

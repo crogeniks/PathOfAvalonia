@@ -31,6 +31,7 @@ public sealed partial class PassiveSpec
     private readonly IReadOnlyDictionary<int, RadiusMembership> _socketRadiusMembership;
     private readonly IReadOnlyDictionary<int, RadiusMembership> _keystoneRadiusMembership;
     private readonly Dictionary<string, int> _keystoneNodeIdsByName;
+    private readonly TimelessJewelData _timelessJewelData;
     private readonly List<RadiusJewelEffect> _activeRadiusEffects = new();
     private readonly List<JewelRadiusVisual> _activeJewelRadii = new();
 
@@ -45,7 +46,11 @@ public sealed partial class PassiveSpec
     {
     }
 
-    public PassiveSpec(TreeModel tree, ClassCatalog classes, GameFeatureFlags features)
+    public PassiveSpec(
+        TreeModel tree,
+        ClassCatalog classes,
+        GameFeatureFlags features,
+        TimelessJewelData? timelessJewelData = null)
     {
         Tree = tree;
         Classes = classes;
@@ -53,6 +58,7 @@ public sealed partial class PassiveSpec
         _jewelRadiusTable = JewelRadiusTable.For(tree.GameId, tree.Version);
         _socketRadiusMembership = RadiusMembership.BuildForSockets(tree, _jewelRadiusTable);
         _keystoneRadiusMembership = RadiusMembership.BuildForKeystones(tree, _jewelRadiusTable);
+        _timelessJewelData = timelessJewelData ?? TimelessJewelData.Empty;
         _keystoneNodeIdsByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         _classStartNodeByIndex = new Dictionary<int, int>();
         _ascendancyStartNodeByName = new Dictionary<string, int>(StringComparer.Ordinal);

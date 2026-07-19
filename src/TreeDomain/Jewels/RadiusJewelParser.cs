@@ -23,7 +23,8 @@ public static partial class RadiusJewelParser
         var text = Normalize(item.RawText);
         var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var radiusIndex = ParseRadiusIndex(lines, table, tree.GameId);
-        var conqueror = ParseConqueror(text);
+        var timelessJewel = TimelessJewelParser.Parse(item);
+        var conqueror = timelessJewel?.Conqueror ?? ParseConqueror(text);
         var kind = DetermineKind(item, text, conqueror);
         var alternateCenter = ParseAlternateCenter(text, keystoneNodeIdsByName);
 
@@ -54,7 +55,10 @@ public static partial class RadiusJewelParser
             alternateCenter,
             conqueror,
             ParseTransforms(lines),
-            AllowsUnconnectedAllocation: text.Contains("can be Allocated without being connected to your tree", StringComparison.OrdinalIgnoreCase));
+            AllowsUnconnectedAllocation: text.Contains("can be Allocated without being connected to your tree", StringComparison.OrdinalIgnoreCase))
+        {
+            TimelessJewel = timelessJewel,
+        };
     }
 
     private static int? ParseRadiusIndex(IReadOnlyList<string> lines, JewelRadiusTable table, GameId gameId)

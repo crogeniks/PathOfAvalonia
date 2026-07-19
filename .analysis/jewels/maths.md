@@ -38,11 +38,25 @@ Node layout:
 Deterministic lookup (pseudo):
 
 ```
-key = (jewelType, conqueror, seed, nodeIndex)
+key = (jewelType, normalizedSeed, nodeIndex)
 replacement = lut[key]      -- stat array
 ```
 
-LUT is precomputed by GGG and redistributed in `.zip` form. Decompression happens once per jewel instance; results cached in memory.
+The LUT is precomputed by GGG and redistributed in zlib-compressed form.
+PathOfAvalonia inflates each family once per application asset cache and caches
+the resolved effects of each active jewel on `PassiveSpec` rebuild.
+
+Elegant Hubris normalizes its displayed seed with `seed / 20` before indexing.
+For non-Vaal families the fixed-width LUT stores one operation byte for each
+of the 452 mapped notables per seed. Operation IDs below 96 select a stat
+addition; IDs at or above 96 select a replacement node. Local IDs are converted
+through the jewel-specific mapping before this split.
+
+Glorious Vanity uses a variable-width payload. A size byte is stored for every
+`(nodeIndex, seed)`, followed by the payloads. Two- or three-byte payloads
+select a replacement and provide its rolled values. Six- or eight-byte
+payloads select Might/Legacy of the Vaal and pair several addition IDs with
+rolls; repeated additions are summed before their stat text is materialized.
 
 ## Cluster — added Small Passives
 

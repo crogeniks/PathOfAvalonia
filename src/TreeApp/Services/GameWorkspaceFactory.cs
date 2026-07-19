@@ -33,11 +33,13 @@ public sealed class GameWorkspaceFactory(
     {
         var treeTask = assets.LoadTreeAsync(game, treeVersion);
         var spritesTask = assets.LoadSpritesAsync(game, treeVersion);
-        await Task.WhenAll(treeTask, spritesTask);
+        var timelessJewelDataTask = assets.LoadTimelessJewelDataAsync(game, treeVersion);
+        await Task.WhenAll(treeTask, spritesTask, timelessJewelDataTask);
 
         var tree = await treeTask;
         var sprites = await spritesTask;
-        var spec = new PassiveSpec(tree, tree.Classes, game.FeatureFlags);
+        var timelessJewelData = await timelessJewelDataTask;
+        var spec = new PassiveSpec(tree, tree.Classes, game.FeatureFlags, timelessJewelData);
         var equipment = new EquipmentViewModel();
         var state = new BuildWorkspaceState(
             game,

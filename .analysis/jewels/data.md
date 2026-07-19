@@ -27,7 +27,21 @@ Per passive-skill entry:
 - `LegionPassives.lua` — list of replaceable nodes per jewel type.
 - `LegionTradeIds.lua` — mapping to trade-site stat IDs (for trade queries).
 - `NodeIndexMapping.lua` — PoE tree node ID → LUT index (1931 nodes total).
-- Compressed LUT blobs (outside repo, downloaded to user data dir) — keyed by `(jewelType, conqueror, seed, nodeIndex)`.
+- Zlib-compressed LUT blobs keyed by `(jewelType, seed, nodeIndex)`. The
+  conqueror variant independently selects the keystone replacement.
+
+PathOfAvalonia packages generated copies under `assets/PoE1/TimelessJewels/`:
+
+- `definitions.json` — compact additions/replacement nodes from
+  `LegionPassives.lua`, including roll metadata.
+- `mapping.json` — the 1,931 tree-node indices and per-jewel local/global
+  operation-ID maps from `NodeIndexMapping.lua`.
+- one `.z` LUT per timeless jewel family, kept in PoB's original compressed
+  binary representation.
+- the four timeless replacement-node sprite sheets plus `sprites.json`.
+
+`tools/export_timeless_jewels.lua` regenerates all of these assets from the
+sibling Path of Building checkout.
 
 ## Abyss Jewel Mods (`Data/ModJewelAbyss.lua`)
 

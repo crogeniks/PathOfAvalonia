@@ -72,6 +72,8 @@ public sealed class PassiveTreeViewModel
 
     public EffectiveNodeView EffectiveNode(int nodeId) => _spec.EffectiveNode(nodeId);
 
+    public bool IsConqueredByTimelessJewel(int nodeId) => _spec.IsConqueredByTimelessJewel(nodeId);
+
     public IEnumerable<string> PassiveEffectLines(Node node) => _spec.EffectiveNode(node.Id).EffectiveStats;
 
     public ImportedItem? SocketedJewelAt(int socketNodeId) =>

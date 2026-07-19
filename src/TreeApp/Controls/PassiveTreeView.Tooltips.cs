@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Media;
 using PathOfAvalonia.TreeApp.ViewModels;
 using PathOfAvalonia.TreeDomain;
+using PathOfAvalonia.TreeDomain.Jewels;
 
 namespace PathOfAvalonia.TreeApp.Controls;
 
@@ -23,12 +24,13 @@ public sealed partial class PassiveTreeView
             return;
         }
 
+        var effective = _vm.EffectiveNode(node.Id);
         var paddingX = 12.0;
         var paddingY = 9.0;
         var maxWidth = AvailableTooltipWidth();
-        var contentWidth = TooltipContentWidth(node.Name, 20, Typeface.Default, paddingX, maxWidth);
-        var titleLines = CreateWrappedText(node.Name, contentWidth, 20, TooltipTitleBrush, Typeface.Default);
-        var lines = BuildTooltipLines(node, contentWidth);
+        var contentWidth = TooltipContentWidth(effective.EffectiveName, 20, Typeface.Default, paddingX, maxWidth);
+        var titleLines = CreateWrappedText(effective.EffectiveName, contentWidth, 20, TooltipTitleBrush, Typeface.Default);
+        var lines = BuildTooltipLines(node, effective, contentWidth);
 
         DrawTooltip(ctx, titleLines, [], lines, contentWidth, paddingX, paddingY, maxWidth, TooltipBorderBrush);
     }
@@ -244,20 +246,25 @@ public sealed partial class PassiveTreeView
         return height - 2;
     }
 
-    private List<TooltipLine> BuildTooltipLines(Node node, double contentWidth)
+    private List<TooltipLine> BuildTooltipLines(Node node, EffectiveNodeView effective, double contentWidth)
     {
         var lines = new List<TooltipLine>();
 
-        var passiveLines = PassiveEffectLines(node).ToArray();
+        var passiveLines = node.Type == NodeType.Mastery
+            ? PassiveEffectLines(node).ToArray()
+            : effective.EffectiveStats.ToArray();
         var statLinkSpans = passiveLines.SequenceEqual(node.Stats) && node.StatLinkSpans.Count == node.Stats.Count
             ? node.StatLinkSpans
             : null;
         AddWrappedLines(lines, passiveLines, contentWidth, TooltipStatBrush, 14, Typeface.Default, linkSpans: statLinkSpans);
         AddWeaponSetTooltipLine(lines, node, contentWidth);
         AddAllocationPreviewLines(lines, node, contentWidth);
-        AddWrappedLines(lines, node.FlavourText, contentWidth, TooltipFlavourBrush, 14,
-            new Typeface(FontFamily.Default, FontStyle.Italic, FontWeight.Normal));
-        AddWrappedLines(lines, node.ReminderText, contentWidth, TooltipReminderBrush, 12, Typeface.Default, gapBefore: lines.Count > 0);
+        if (!effective.ReplacesNode)
+        {
+            AddWrappedLines(lines, node.FlavourText, contentWidth, TooltipFlavourBrush, 14,
+                new Typeface(FontFamily.Default, FontStyle.Italic, FontWeight.Normal));
+            AddWrappedLines(lines, node.ReminderText, contentWidth, TooltipReminderBrush, 12, Typeface.Default, gapBefore: lines.Count > 0);
+        }
         AddDiffTooltipLine(lines, node, contentWidth);
 
         return lines;

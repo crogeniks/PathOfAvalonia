@@ -14,6 +14,11 @@ public sealed partial class PassiveTreeView
     private void DrawNode(DrawingContext ctx, Node n, bool alloc, bool hover, bool useClusterSocketFrame)
     {
         var screen = TreeToScreen(n.X, n.Y);
+        var effective = n.Visual is null
+            && n.Type is NodeType.Normal or NodeType.Notable or NodeType.Keystone
+            && _vm.IsConqueredByTimelessJewel(n.Id)
+            ? _vm.EffectiveNode(n.Id)
+            : null;
         var allocationSet = alloc ? _vm.AllocationSetOf(n.Id) : PassiveAllocationSet.Normal;
         if (TryDrawGameSpecificNode(ctx, n, alloc, hover, screen))
         {
@@ -25,7 +30,9 @@ public sealed partial class PassiveTreeView
             return;
         }
 
-        var (iconAtlas, iconPath) = IconSprite(n, alloc, hover: false);
+        var usesLegionIcon = effective is not null
+            && !string.Equals(effective.EffectiveIcon, n.Icon, StringComparison.Ordinal);
+        var (iconAtlas, iconPath) = IconSprite(n, alloc, effective?.EffectiveIcon, usesLegionIcon);
         if (iconAtlas is not null && iconPath is not null)
         {
             _ = DrawSprite(ctx, iconAtlas, iconPath, screen);
@@ -362,16 +369,22 @@ public sealed partial class PassiveTreeView
         }
     }
 
-    private static (string? atlas, string? path) IconSprite(Node n, bool alloc, bool hover) => n.Type switch
+    private static (string? atlas, string? path) IconSprite(Node n, bool alloc, string? effectiveIcon, bool usesLegionIcon)
     {
-        NodeType.Normal => (alloc ? "normalActive" : "normalInactive", n.Icon),
-        NodeType.Notable => (alloc ? "notableActive" : "notableInactive", n.Icon),
-        NodeType.Keystone => (alloc ? "keystoneActive" : "keystoneInactive", n.Icon),
-        NodeType.Mastery when alloc && n.ActiveIcon is not null => ("masteryActiveSelected", n.ActiveIcon),
-        NodeType.Mastery when n.InactiveIcon is not null => ("masteryInactive", n.InactiveIcon),
-        NodeType.Mastery => ("mastery", n.Icon),
-        _ => (null, null),
-    };
+        var (atlas, path) = n.Type switch
+        {
+            NodeType.Normal => (alloc ? "normalActive" : "normalInactive", effectiveIcon ?? n.Icon),
+            NodeType.Notable => (alloc ? "notableActive" : "notableInactive", effectiveIcon ?? n.Icon),
+            NodeType.Keystone => (alloc ? "keystoneActive" : "keystoneInactive", effectiveIcon ?? n.Icon),
+            NodeType.Mastery when alloc && n.ActiveIcon is not null => ("masteryActiveSelected", n.ActiveIcon),
+            NodeType.Mastery when n.InactiveIcon is not null => ("masteryInactive", n.InactiveIcon),
+            NodeType.Mastery => ("mastery", n.Icon),
+            _ => (null, null),
+        };
+        return usesLegionIcon && atlas is not null
+            ? ($"legion{char.ToUpperInvariant(atlas[0])}{atlas[1..]}", path)
+            : (atlas, path);
+    }
 
     private static string? FrameKey(NodeType type, bool alloc, bool hover,
         ClusterJewelSize? clusterSize = null) =>

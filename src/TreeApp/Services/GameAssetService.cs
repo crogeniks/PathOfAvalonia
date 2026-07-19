@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using PathOfAvalonia.TreeDomain;
+using PathOfAvalonia.TreeDomain.Jewels;
 
 namespace PathOfAvalonia.TreeApp.Services;
 
@@ -13,6 +15,8 @@ public interface IGameAssetService
 {
     Task<TreeModel> LoadTreeAsync(GameDefinition game, string? version = null);
     Task<SpriteMap> LoadSpritesAsync(GameDefinition game, string? version = null);
+    Task<TimelessJewelData?> LoadTimelessJewelDataAsync(GameDefinition game, string? version = null) =>
+        Task.FromResult<TimelessJewelData?>(null);
     Stream OpenAsset(GameDefinition game, string relativePath);
     Bitmap? LoadBitmap(GameDefinition game, string relativePath, string? version = null);
     Bitmap? LoadSharedBitmap(string relativePath);
@@ -31,6 +35,7 @@ public sealed class GameAssetService(GameRegistry games, IGameAssetLayoutRegistr
 {
     private readonly ConcurrentDictionary<GameAssetKey, Lazy<Task<TreeModel>>> _trees = new();
     private readonly ConcurrentDictionary<GameAssetKey, Lazy<Task<SpriteMap>>> _sprites = new();
+    private readonly ConcurrentDictionary<GameAssetKey, Lazy<Task<TimelessJewelData?>>> _timelessJewels = new();
 
     public Task<TreeModel> LoadTreeAsync(GameDefinition game, string? version = null)
     {
@@ -47,6 +52,19 @@ public sealed class GameAssetService(GameRegistry games, IGameAssetLayoutRegistr
         return _sprites.GetOrAdd(key, static (assetKey, state) =>
             new Lazy<Task<SpriteMap>>(
                 () => Task.Run(() => state.LoadSprites(assetKey)),
+                LazyThreadSafetyMode.ExecutionAndPublication), this).Value;
+    }
+
+    public Task<TimelessJewelData?> LoadTimelessJewelDataAsync(GameDefinition game, string? version = null)
+    {
+        var key = new GameAssetKey(game.Id, version ?? game.DefaultTreeVersion);
+        if (layouts.Get(game.Id).TimelessJewelDataPaths(key.Version) is null)
+        {
+            return Task.FromResult<TimelessJewelData?>(null);
+        }
+        return _timelessJewels.GetOrAdd(key, static (assetKey, state) =>
+            new Lazy<Task<TimelessJewelData?>>(
+                () => Task.Run(() => state.LoadTimelessJewelData(assetKey)),
                 LazyThreadSafetyMode.ExecutionAndPublication), this).Value;
     }
 
@@ -68,17 +86,54 @@ public sealed class GameAssetService(GameRegistry games, IGameAssetLayoutRegistr
             using var jewels = OpenAsset(game, spritePaths.Paths[2]);
             using var masteryEffectDisabled = OpenAsset(game, spritePaths.Paths[3]);
             using var masteryEffectActive = OpenAsset(game, spritePaths.Paths[4]);
-            return SpriteMap.LoadPoe2FromGggAssets(skills, frames, jewels, masteryEffectDisabled, masteryEffectActive);
+            return AddSupplementalSprites(game, key.Version,
+                SpriteMap.LoadPoe2FromGggAssets(skills, frames, jewels, masteryEffectDisabled, masteryEffectActive));
         }
 
         if (spritePaths.Kind == SpriteDataKind.Poe1GggTree)
         {
             using var treeStream = OpenAsset(game, spritePaths.Paths[0]);
-            return SpriteMap.LoadPoe1FromGggTree(treeStream, spritePaths.AssetPrefix!);
+            return AddSupplementalSprites(game, key.Version,
+                SpriteMap.LoadPoe1FromGggTree(treeStream, spritePaths.AssetPrefix!));
         }
 
         using var stream = OpenAsset(game, spritePaths.Paths[0]);
-        return SpriteMap.LoadFromJson(stream);
+        return AddSupplementalSprites(game, key.Version, SpriteMap.LoadFromJson(stream));
+    }
+
+    private SpriteMap AddSupplementalSprites(GameDefinition game, string version, SpriteMap sprites)
+    {
+        foreach (var path in layouts.Get(game.Id).AdditionalSpriteDataPaths(version))
+        {
+            using var stream = OpenAsset(game, path);
+            sprites = sprites.Merge(SpriteMap.LoadFromJson(stream));
+        }
+        return sprites;
+    }
+
+    private TimelessJewelData? LoadTimelessJewelData(GameAssetKey key)
+    {
+        var game = GameDefinitionFor(key.GameId);
+        var paths = layouts.Get(game.Id).TimelessJewelDataPaths(key.Version)
+            ?? throw new InvalidOperationException($"No timeless jewel assets are registered for {game.DisplayName} {key.Version}.");
+        using var definitions = OpenAsset(game, paths.Definitions);
+        using var mapping = OpenAsset(game, paths.Mapping);
+        var lookups = new Dictionary<TimelessJewelType, Stream>();
+        try
+        {
+            foreach (var (type, path) in paths.Lookups)
+            {
+                lookups[type] = OpenAsset(game, path);
+            }
+            return TimelessJewelData.Load(definitions, mapping, lookups);
+        }
+        finally
+        {
+            foreach (var stream in lookups.Values)
+            {
+                stream.Dispose();
+            }
+        }
     }
 
     private GameDefinition GameDefinitionFor(GameId gameId) => games.Get(gameId);

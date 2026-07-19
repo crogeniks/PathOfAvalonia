@@ -10,4 +10,9 @@ public sealed record RadiusJewelEffect(
     int? AlternateCenterNodeId,
     TimelessConqueror? Conqueror,
     IReadOnlyList<NodeStatTransform> NodeTransforms,
-    bool AllowsUnconnectedAllocation);
+    bool AllowsUnconnectedAllocation)
+{
+    public TimelessJewelSpec? TimelessJewel { get; init; }
+    public IReadOnlyDictionary<int, TimelessNodeEffect> TimelessNodeEffects { get; init; } =
+        new Dictionary<int, TimelessNodeEffect>();
+}

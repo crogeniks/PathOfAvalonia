@@ -26,6 +26,16 @@ public sealed class SpriteMap
         return a.Coords.TryGetValue(key, out var r) ? r : null;
     }
 
+    public SpriteMap Merge(SpriteMap additional)
+    {
+        var atlases = new Dictionary<string, SpriteAtlas>(Atlases, StringComparer.Ordinal);
+        foreach (var (name, atlas) in additional.Atlases)
+        {
+            atlases[name] = atlas;
+        }
+        return new SpriteMap { Atlases = atlases };
+    }
+
     public static SpriteMap LoadFromJson(Stream stream)
     {
         var dto = JsonSerializer.Deserialize<SpriteMapDto>(stream, JsonOpts)
