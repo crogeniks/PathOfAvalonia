@@ -57,12 +57,16 @@ public sealed class ShellViewModelTests
     private static ShellViewModel CreateViewModel(IUserSettingsService settings) =>
         new(
             new GameRegistry(),
+            CreateWorkspaceFactory(),
+            settings);
+
+    private static IGameWorkspaceFactory CreateWorkspaceFactory() =>
+        new GameWorkspaceFactory(
             new StubAssets(),
-            settings,
+            new GameAssetLayoutRegistry([new Poe1GameAssetLayout(), new Poe2GameAssetLayout()]),
             Mock.Of<IBuildPlannerExportService>(),
             Mock.Of<IBuildPlannerImportService>(),
-            Mock.Of<IStorageProviderAccessor>(),
-            new GameAssetLayoutRegistry([new Poe1GameAssetLayout(), new Poe2GameAssetLayout()]));
+            Mock.Of<IStorageProviderAccessor>());
 
     private sealed class StubSettings : IUserSettingsService
     {

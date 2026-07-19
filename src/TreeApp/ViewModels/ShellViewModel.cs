@@ -17,30 +17,18 @@ public enum ShellPage
 public sealed partial class ShellViewModel : ObservableObject
 {
     private readonly GameRegistry _games;
-    private readonly IGameAssetService _assets;
+    private readonly IGameWorkspaceFactory _workspaceFactory;
     private readonly IUserSettingsService _settings;
-    private readonly IBuildPlannerExportService _buildPlannerExportService;
-    private readonly IBuildPlannerImportService _buildPlannerImportService;
-    private readonly IStorageProviderAccessor _storageProviderAccessor;
-    private readonly IGameAssetLayoutRegistry _assetLayouts;
     private int _workspaceLoadRequest;
 
     public ShellViewModel(
         GameRegistry games,
-        IGameAssetService assets,
-        IUserSettingsService settings,
-        IBuildPlannerExportService buildPlannerExportService,
-        IBuildPlannerImportService buildPlannerImportService,
-        IStorageProviderAccessor storageProviderAccessor,
-        IGameAssetLayoutRegistry assetLayouts)
+        IGameWorkspaceFactory workspaceFactory,
+        IUserSettingsService settings)
     {
         _games = games;
-        _assets = assets;
+        _workspaceFactory = workspaceFactory;
         _settings = settings;
-        _buildPlannerExportService = buildPlannerExportService;
-        _buildPlannerImportService = buildPlannerImportService;
-        _storageProviderAccessor = storageProviderAccessor;
-        _assetLayouts = assetLayouts;
         Games = _games.Games.Select(g => new GameChoiceViewModel(g, settings.LastGameId == g.Id)).ToArray();
 
         if (settings.LastGameId is { } lastGame && _games.TryGet(lastGame, out var game))
@@ -98,42 +86,16 @@ public sealed partial class ShellViewModel : ObservableObject
         CurrentPage = ShellPage.Landing;
         try
         {
-            var treeTask = _assets.LoadTreeAsync(game, treeVersion);
-            var spritesTask = _assets.LoadSpritesAsync(game, treeVersion);
-            await Task.WhenAll(treeTask, spritesTask);
+            var workspace = await _workspaceFactory.CreateAsync(
+                game,
+                treeVersion,
+                SwitchTreeVersionAsync,
+                BackToLandingCommand);
             if (request != _workspaceLoadRequest)
             {
                 return;
             }
-
-            var tree = await treeTask;
-            var sprites = await spritesTask;
-            var spec = new PassiveSpec(tree, tree.Classes, game.FeatureFlags);
-            var equipment = new EquipmentViewModel();
-            var treePanel = new MainWindowViewModel(
-                spec,
-                game.ImportStrategy,
-                equipment,
-                _buildPlannerExportService,
-                _buildPlannerImportService,
-                _storageProviderAccessor);
-            var workspace = new GameWorkspace
-            {
-                Game = game,
-                Tree = tree,
-                Sprites = sprites,
-                Classes = tree.Classes,
-                Spec = spec,
-                TreeViewModel = treePanel.TreeViewModel,
-                Equipment = equipment,
-            };
-            ActiveWorkspace = new GameWorkspaceViewModel(
-                workspace,
-                treePanel,
-                new TreeImageAssetResolver(game, _assets, _assetLayouts, treeVersion),
-                _assets,
-                SwitchTreeVersionAsync,
-                BackToLandingCommand);
+            ActiveWorkspace = workspace;
             CurrentPage = ShellPage.Workspace;
             StatusMessage = string.Empty;
             _settings.LastGameId = game.Id;
