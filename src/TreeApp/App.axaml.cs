@@ -36,6 +36,7 @@ public partial class App : Application
         sc.AddSingleton<IBuildPlannerExportService, BuildPlannerExportService>();
         sc.AddSingleton<IBuildPlannerImportService, BuildPlannerImportService>();
         sc.AddSingleton<IStorageProviderAccessor, StorageProviderAccessor>();
+        sc.AddSingleton<IBuildPlannerFileService, BuildPlannerFileService>();
 
         sc.AddTransient<IGameWorkspaceFactory, GameWorkspaceFactory>();
         sc.AddSingleton<ShellViewModel>();

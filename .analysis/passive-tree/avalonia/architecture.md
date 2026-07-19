@@ -42,6 +42,17 @@ Three boundaries worth enforcing:
 2. **Domain ↔ Asset:** the domain only exposes logical sprite identifiers (`node.Icon`, `node.OverlayKey`); the view resolves them through `SpriteRegistry`. Lets you swap asset backends (e.g. test-time stubs).
 3. **Asset ↔ Data:** `TreeModel` and `SpriteRegistry` are **completely immutable** once constructed. Hot-reloading a new version is "discard and rebuild."
 
+### Workspace composition
+
+`BuildWorkspaceState` is the canonical per-open-build composition object. It owns
+the game definition, mutable `PassiveSpec`, sprites, `PassiveTreeViewModel`, and
+`EquipmentViewModel`; no second workspace container should cache aliases for
+objects reachable from that state. UI workflows are deliberately split into
+`TreeSelectionViewModel` (class/ascendancy selection) and
+`BuildImportExportViewModel` (decode, variants, equipment refresh, import/export
+feedback). File-picker access stays behind `IBuildPlannerFileService`, so neither
+workflow view model depends on Avalonia `IStorageProvider`.
+
 ## 2. Type Catalogue
 
 ### Domain

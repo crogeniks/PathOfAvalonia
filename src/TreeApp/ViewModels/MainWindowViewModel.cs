@@ -1,7 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -11,69 +8,15 @@ using PathOfAvalonia.TreeDomain.Import;
 
 namespace PathOfAvalonia.TreeApp.ViewModels;
 
-public partial class MainWindowViewModel : ObservableObject
+/// <summary>
+/// Compatibility composition facade for older callers. New workspace code uses
+/// <see cref="TreeSelectionViewModel"/> and <see cref="BuildImportExportViewModel"/>
+/// directly; this type contains no workflow logic.
+/// </summary>
+[System.Obsolete("Use TreeSelectionViewModel and BuildImportExportViewModel from BuildWorkspaceState.")]
+public sealed class MainWindowViewModel : ObservableObject
 {
-    private readonly PassiveSpec _spec;
-    private readonly IImportStrategy _importStrategy;
-    private readonly IBuildPlannerExportService _buildPlannerExportService;
-    private readonly IBuildPlannerImportService _buildPlannerImportService;
-    private readonly IStorageProviderAccessor _storageProviderAccessor;
-    private bool _syncingClass;
-    private bool _syncingAscendancy;
-    private bool _syncingVariants;
-    private ImportedBuild? _lastImportedBuild;
-    private ImportResult? _lastImportResult;
-
-    // Multi-KB PoB build codes lag Avalonia's TextBox on every click/select.
-    // After paste, we stash the full string here and replace the TextBox text
-    // with a short marker so the control only ever lays out ~40 chars.
-    private string? _pastedBuildCode;
-    private const string PlaceholderPrefix = "<pasted build code — ";
-    private const string PlaceholderSuffix = " chars, press Import>";
-
-    private static readonly IBrush StatusDefaultBrush = new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xDD));
-    private static readonly IBrush StatusSuccessBrush = new SolidColorBrush(Color.FromRgb(0x8A, 0xE0, 0x90));
-    private static readonly IBrush StatusErrorBrush   = new SolidColorBrush(Color.FromRgb(0xE0, 0x8A, 0x8A));
-
-    public EquipmentViewModel Equipment { get; }
-    public PassiveTreeViewModel TreeViewModel { get; }
-    public IReadOnlyList<string> ClassNames => _spec.Classes.ClassNames;
-    public IReadOnlyList<string> AscendancyNames => _spec.Classes.AscendancyNames(SelectedClassIndex);
-    public bool IsImportSupported => _importStrategy.IsSupported;
-    public bool IsImportUnsupported => !_importStrategy.IsSupported;
-    public bool SupportsBuildPlannerExport => _spec.Tree.GameId == GameId.PathOfExile2;
-    public bool SupportsBuildPlannerImport => _spec.Tree.GameId == GameId.PathOfExile2;
-    public bool CanExportBuildPlanner => _spec.Tree.GameId == GameId.PathOfExile2 && _lastImportedBuild is not null;
-    public ImportedBuild? CurrentImportedBuild => _lastImportedBuild;
-    public string UnsupportedImportStatus => "Build import is not available for this game yet.";
-    public string ImportPrompt => _spec.Tree.GameId == GameId.PathOfExile2
-        ? "Paste a Path of Building 2 build code or pobb.in URL"
-        : "Paste a PoE tree URL, PoB build code, or pobb.in URL:";
-    public string ImportPlaceholder => _spec.Tree.GameId == GameId.PathOfExile2
-        ? "https://pobb.in/... or PoB2 code"
-        : "https://pobb.in/... or PoB code";
-
-    [ObservableProperty] public partial int SelectedClassIndex { get; set; }
-    [ObservableProperty] public partial int SelectedAscendancyIndex { get; set; }
-    [ObservableProperty] public partial string SelectedAscendancyName { get; set; } = "None";
-    [ObservableProperty] public partial string ImportInput { get; set; } = string.Empty;
-    [ObservableProperty] public partial string ImportStatus { get; set; } = string.Empty;
-    [ObservableProperty] public partial bool ImportStatusIsError { get; set; }
-    [ObservableProperty] public partial IReadOnlyList<ImportedVariantOptionViewModel> PassiveTreeVariantOptions { get; set; } = [];
-    [ObservableProperty] public partial IReadOnlyList<ImportedVariantOptionViewModel> ItemSetVariantOptions { get; set; } = [];
-    [ObservableProperty] public partial bool HasPassiveTreeVariants { get; set; }
-    [ObservableProperty] public partial bool HasItemSetVariants { get; set; }
-    [ObservableProperty] public partial bool IsTreeControlsCollapsed { get; set; }
-    [ObservableProperty] public partial int SelectedPassiveTreeVariantIndex { get; set; }
-    [ObservableProperty] public partial int SelectedItemSetVariantIndex { get; set; }
-
-    public bool IsTreeControlsExpanded => !IsTreeControlsCollapsed;
-    public string TreeControlsToggleText => IsTreeControlsCollapsed ? "Show controls" : "Hide controls";
-
-    public IBrush ImportStatusForeground =>
-        string.IsNullOrEmpty(ImportStatus) ? StatusDefaultBrush :
-        ImportStatusIsError ? StatusErrorBrush : StatusSuccessBrush;
-
+    private readonly BuildWorkspaceState _state;
     public MainWindowViewModel(
         PassiveSpec spec,
         IImportStrategy importStrategy,
@@ -82,364 +25,56 @@ public partial class MainWindowViewModel : ObservableObject
         IBuildPlannerImportService buildPlannerImportService,
         IStorageProviderAccessor storageProviderAccessor)
     {
-        _spec = spec;
-        _importStrategy = importStrategy;
-        _buildPlannerExportService = buildPlannerExportService;
-        _buildPlannerImportService = buildPlannerImportService;
-        _storageProviderAccessor = storageProviderAccessor;
-        Equipment = equipment;
-        TreeViewModel = new PassiveTreeViewModel(spec);
-        SelectedClassIndex = spec.SelectedClassIndex;
-        SelectedAscendancyIndex = spec.SelectedAscendancyIndex;
-        SelectedAscendancyName = AscendancyNameAt(SelectedClassIndex, SelectedAscendancyIndex);
-        _spec.SpecChanged += OnSpecChanged;
+        _state = new BuildWorkspaceState(
+            new GameDefinition(spec.Tree.GameId, spec.Tree.GameId.ToString(), spec.Tree.GameId.ToString(), spec.Tree.Version, string.Empty, null!, importStrategy, spec.Features),
+            spec,
+            new SpriteMap { Atlases = new Dictionary<string, SpriteAtlas>() },
+            new PassiveTreeViewModel(spec),
+            equipment);
+        Selection = new TreeSelectionViewModel(_state);
+        ImportExport = new BuildImportExportViewModel(
+            _state,
+            importStrategy,
+            new BuildPlannerFileService(storageProviderAccessor, buildPlannerExportService, buildPlannerImportService));
     }
 
-    private void OnSpecChanged()
-    {
-        _syncingClass = true;
-        _syncingAscendancy = true;
-        SelectedClassIndex = _spec.SelectedClassIndex;
-        OnPropertyChanged(nameof(AscendancyNames));
-        SelectedAscendancyIndex = _spec.SelectedAscendancyIndex;
-        SelectedAscendancyName = AscendancyNameAt(SelectedClassIndex, SelectedAscendancyIndex);
-        _syncingClass = false;
-        _syncingAscendancy = false;
-    }
+    public TreeSelectionViewModel Selection { get; }
+    public BuildImportExportViewModel ImportExport { get; }
+    public EquipmentViewModel Equipment => _state.Equipment;
+    public PassiveTreeViewModel TreeViewModel => _state.Tree;
 
-    partial void OnSelectedClassIndexChanged(int value)
-    {
-        OnPropertyChanged(nameof(AscendancyNames));
-        if (!_syncingClass && value >= 0)
-        {
-            _spec.SetClass(value);
-        }
-    }
+    public IReadOnlyList<string> ClassNames => Selection.ClassNames;
+    public IReadOnlyList<string> AscendancyNames => Selection.AscendancyNames;
+    public int SelectedClassIndex { get => Selection.SelectedClassIndex; set => Selection.SelectedClassIndex = value; }
+    public int SelectedAscendancyIndex { get => Selection.SelectedAscendancyIndex; set => Selection.SelectedAscendancyIndex = value; }
+    public string SelectedAscendancyName { get => Selection.SelectedAscendancyName; set => Selection.SelectedAscendancyName = value; }
+    public bool IsTreeControlsCollapsed => Selection.IsTreeControlsCollapsed;
+    public bool IsTreeControlsExpanded => Selection.IsTreeControlsExpanded;
+    public string TreeControlsToggleText => Selection.TreeControlsToggleText;
+    public IRelayCommand ToggleTreeControlsCommand => Selection.ToggleTreeControlsCommand;
 
-    partial void OnSelectedAscendancyIndexChanged(int value)
-    {
-        if (!_syncingAscendancy && value >= 0)
-        {
-            _spec.SetAscendancy(value);
-        }
-    }
-
-    partial void OnSelectedAscendancyNameChanged(string value)
-    {
-        if (_syncingAscendancy)
-        {
-            return;
-        }
-        var names = AscendancyNames;
-        var index = AscendancyIndexOf(names, value);
-        if (index >= 0)
-        {
-            _spec.SetAscendancy(index);
-        }
-    }
-
-    partial void OnImportInputChanged(string value)
-    {
-        // When the view sets the placeholder marker, don't clear _pastedBuildCode.
-        if (value.StartsWith(PlaceholderPrefix, StringComparison.Ordinal)
-            && value.EndsWith(PlaceholderSuffix, StringComparison.Ordinal))
-        {
-            return;
-        }
-        _pastedBuildCode = null;
-    }
-
-    // Called by the code-behind TextChanged handler, which sets TextBox.Text directly
-    // (bypassing the TwoWay binding reentrancy guard that would suppress the update).
-    // Returns the placeholder string to display, or null if no replacement is needed.
-    internal string? TryReplaceBuildCode(string text)
-    {
-        if (text.Length <= 500 || !PobBuildCodeDecoder.LooksLikeBuildCode(text.Trim()))
-        {
-            return null;
-        }
-
-        _pastedBuildCode = text;
-        return $"{PlaceholderPrefix}{text.Length}{PlaceholderSuffix}";
-    }
-
-    partial void OnImportStatusChanged(string value) =>
-        OnPropertyChanged(nameof(ImportStatusForeground));
-
-    partial void OnImportStatusIsErrorChanged(bool value) =>
-        OnPropertyChanged(nameof(ImportStatusForeground));
-
-    partial void OnIsTreeControlsCollapsedChanged(bool value)
-    {
-        OnPropertyChanged(nameof(IsTreeControlsExpanded));
-        OnPropertyChanged(nameof(TreeControlsToggleText));
-    }
-
-    [RelayCommand]
-    private void ToggleTreeControls() =>
-        IsTreeControlsCollapsed = !IsTreeControlsCollapsed;
-
-    partial void OnSelectedPassiveTreeVariantIndexChanged(int value)
-    {
-        if (_syncingVariants || _lastImportedBuild is null || value < 0)
-        {
-            return;
-        }
-
-        try
-        {
-            _lastImportedBuild = _lastImportedBuild.WithPassiveTreeVariant(value);
-            _lastImportResult = _spec.ApplyImport(_lastImportedBuild);
-            Equipment.LoadBuild(_lastImportedBuild);
-            ImportStatus = BuildImportStatus(_lastImportResult);
-            ImportStatusIsError = false;
-        }
-        catch (ArgumentOutOfRangeException)
-        {
-        }
-    }
-
-    partial void OnSelectedItemSetVariantIndexChanged(int value)
-    {
-        if (_syncingVariants || _lastImportedBuild is null || value < 0)
-        {
-            return;
-        }
-
-        try
-        {
-            _lastImportedBuild = _lastImportedBuild.WithItemSetVariant(value);
-            Equipment.LoadBuild(_lastImportedBuild);
-            if (_lastImportResult is not null)
-            {
-                ImportStatus = BuildImportStatus(_lastImportResult with { Build = _lastImportedBuild });
-                ImportStatusIsError = false;
-            }
-        }
-        catch (ArgumentOutOfRangeException)
-        {
-        }
-    }
-
-    [RelayCommand]
-    private async Task Import()
-    {
-        var text = _pastedBuildCode ?? ImportInput;
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return;
-        }
-        try
-        {
-            var build = await _importStrategy.ImportAsync(text);
-            ApplyImportedBuild(build);
-        }
-        catch (Exception ex)
-        {
-            ResetVariantState();
-            ImportStatus = $"Import failed: {ex.Message}";
-            ImportStatusIsError = true;
-        }
-    }
-
-    private void ApplyImportedBuild(ImportedBuild build)
-    {
-        _syncingVariants = true;
-        _lastImportedBuild = build;
-        OnExportStateChanged();
-        PassiveTreeVariantOptions = build.PassiveTreeVariants
-            .Select(variant => new ImportedVariantOptionViewModel(variant.Index, variant.DisplayName))
-            .ToArray();
-        ItemSetVariantOptions = build.ItemSetVariants
-            .Select(variant => new ImportedVariantOptionViewModel(variant.Index, variant.DisplayName))
-            .ToArray();
-        HasPassiveTreeVariants = PassiveTreeVariantOptions.Count > 1;
-        HasItemSetVariants = ItemSetVariantOptions.Count > 1;
-        SelectedPassiveTreeVariantIndex = build.ActivePassiveTreeVariantIndex;
-        SelectedItemSetVariantIndex = build.ActiveItemSetVariantIndex;
-        _syncingVariants = false;
-
-        var result = _spec.ApplyImport(build);
-        _lastImportResult = result;
-        Equipment.LoadBuild(build);
-        ImportStatus = BuildImportStatus(result);
-        ImportStatusIsError = false;
-    }
-
-    private static string BuildImportStatus(ImportResult result)
-    {
-        var build = result.Build;
-        var status = $"{build.Source}: {result.Applied} nodes applied, {result.Skipped} skipped";
-        if (result.WeaponSet1Allocations > 0)
-        {
-            status += $", weapon set 1: {result.WeaponSet1Allocations}";
-        }
-        if (result.WeaponSet2Allocations > 0)
-        {
-            status += $", weapon set 2: {result.WeaponSet2Allocations}";
-        }
-        if (build.PassiveTreeVariants.Count > 1
-            && build.PassiveTreeVariants.FirstOrDefault(v => v.Index == build.ActivePassiveTreeVariantIndex) is { } selectedPassive)
-        {
-            status += $", tree: {selectedPassive.DisplayName}";
-        }
-        if (build.ItemSetVariants.Count > 1
-            && build.ItemSetVariants.FirstOrDefault(v => v.Index == build.ActiveItemSetVariantIndex) is { } selectedItemSet)
-        {
-            status += $", item set: {selectedItemSet.DisplayName}";
-        }
-        if (build.Items.Count > 0)
-        {
-            status += $", {build.Items.Count} items imported";
-        }
-        var skillGroupCount = build.Skills.SkillSets.Sum(set => set.Groups.Count);
-        if (skillGroupCount > 0)
-        {
-            status += $", {skillGroupCount} skill groups imported";
-        }
-        if (build.Metrics.Source == ImportedMetricSource.SavedXmlSnapshot)
-        {
-            status += ", DPS: saved snapshot";
-        }
-
-        var unsupported = new List<string>();
-        if (result.UnsupportedClusterJewels > 0)
-        {
-            unsupported.Add($"{result.UnsupportedClusterJewels} cluster nodes");
-        }
-        if (result.UnsupportedAttributeOverrides > 0)
-        {
-            unsupported.Add($"{result.UnsupportedAttributeOverrides} attribute override{(result.UnsupportedAttributeOverrides == 1 ? string.Empty : "s")}");
-        }
-        if (result.UnsupportedSocketedJewels > 0)
-        {
-            unsupported.Add($"{result.UnsupportedSocketedJewels} socketed jewel{(result.UnsupportedSocketedJewels == 1 ? string.Empty : "s")}");
-        }
-        if (unsupported.Count > 0)
-        {
-            status += "; unsupported: " + string.Join(", ", unsupported);
-        }
-        return status;
-    }
-
-    [RelayCommand]
-    private void Clear()
-    {
-        _spec.Clear();
-        Equipment.Clear();
-        ResetVariantState();
-        _pastedBuildCode = null;
-        ImportInput = string.Empty;
-        ImportStatus = "cleared";
-        ImportStatusIsError = false;
-    }
-
-    [RelayCommand]
-    private async Task ExportBuildPlanner()
-    {
-        var storageProvider = _storageProviderAccessor.StorageProvider;
-        if (storageProvider is null || _lastImportedBuild is not { } build)
-        {
-            return;
-        }
-
-        try
-        {
-            var result = await _buildPlannerExportService.ExportAsync(
-                storageProvider,
-                _spec.Tree,
-                _spec.Classes,
-                build,
-                default);
-            if (result is null)
-            {
-                return;
-            }
-
-            var exported = result.FileCount == 1
-                ? result.Name
-                : $"{result.FileCount} build files to {result.Name}";
-            ImportStatus = result.SkippedNodeCount == 0
-                ? $"Exported {exported}"
-                : $"Exported {exported}; skipped {result.SkippedNodeCount} node(s) without Build Planner ids";
-            ImportStatusIsError = false;
-        }
-        catch (Exception ex)
-        {
-            ImportStatus = $"Export failed: {ex.Message}";
-            ImportStatusIsError = true;
-        }
-    }
-
-    [RelayCommand]
-    private async Task ImportBuildPlanner()
-    {
-        var storageProvider = _storageProviderAccessor.StorageProvider;
-        if (storageProvider is null)
-        {
-            return;
-        }
-
-        try
-        {
-            var result = await _buildPlannerImportService.ImportAsync(storageProvider, _spec.Tree, default);
-            if (result is null)
-            {
-                return;
-            }
-
-            ApplyImportedBuild(result.Build);
-            if (result.SkippedPassiveCount > 0)
-            {
-                ImportStatus += $"; skipped {result.SkippedPassiveCount} unknown Build Planner passive id(s)";
-            }
-        }
-        catch (Exception ex)
-        {
-            ResetVariantState();
-            ImportStatus = $"Build Planner import failed: {ex.Message}";
-            ImportStatusIsError = true;
-        }
-    }
-
-    private void ResetVariantState()
-    {
-        _lastImportedBuild = null;
-        _lastImportResult = null;
-        _syncingVariants = true;
-        PassiveTreeVariantOptions = [];
-        ItemSetVariantOptions = [];
-        HasPassiveTreeVariants = false;
-        HasItemSetVariants = false;
-        SelectedPassiveTreeVariantIndex = 0;
-        SelectedItemSetVariantIndex = 0;
-        _syncingVariants = false;
-        OnExportStateChanged();
-    }
-
-    private void OnExportStateChanged()
-    {
-        OnPropertyChanged(nameof(CanExportBuildPlanner));
-        OnPropertyChanged(nameof(CurrentImportedBuild));
-    }
-
-    private string AscendancyNameAt(int classIndex, int ascendancyIndex)
-    {
-        var names = _spec.Classes.AscendancyNames(classIndex);
-        return ascendancyIndex >= 0 && ascendancyIndex < names.Count ? names[ascendancyIndex] : names[0];
-    }
-
-    private static int AscendancyIndexOf(IReadOnlyList<string> names, string value)
-    {
-        for (var i = 0; i < names.Count; i++)
-        {
-            if (names[i] == value)
-            {
-                return i;
-            }
-        }
-        return -1;
-    }
+    public bool IsImportSupported => ImportExport.IsImportSupported;
+    public bool IsImportUnsupported => ImportExport.IsImportUnsupported;
+    public bool SupportsBuildPlannerExport => ImportExport.SupportsBuildPlannerExport;
+    public bool SupportsBuildPlannerImport => ImportExport.SupportsBuildPlannerImport;
+    public bool CanExportBuildPlanner => ImportExport.CanExportBuildPlanner;
+    public ImportedBuild? CurrentImportedBuild => ImportExport.CurrentImportedBuild;
+    public string UnsupportedImportStatus => ImportExport.UnsupportedImportStatus;
+    public string ImportPrompt => ImportExport.ImportPrompt;
+    public string ImportPlaceholder => ImportExport.ImportPlaceholder;
+    public string ImportInput { get => ImportExport.ImportInput; set => ImportExport.ImportInput = value; }
+    public string ImportStatus => ImportExport.ImportStatus;
+    public bool ImportStatusIsError => ImportExport.ImportStatusIsError;
+    public IBrush ImportStatusForeground => ImportExport.ImportStatusForeground;
+    public IReadOnlyList<ImportedVariantOptionViewModel> PassiveTreeVariantOptions => ImportExport.PassiveTreeVariantOptions;
+    public IReadOnlyList<ImportedVariantOptionViewModel> ItemSetVariantOptions => ImportExport.ItemSetVariantOptions;
+    public bool HasPassiveTreeVariants => ImportExport.HasPassiveTreeVariants;
+    public bool HasItemSetVariants => ImportExport.HasItemSetVariants;
+    public int SelectedPassiveTreeVariantIndex { get => ImportExport.SelectedPassiveTreeVariantIndex; set => ImportExport.SelectedPassiveTreeVariantIndex = value; }
+    public int SelectedItemSetVariantIndex { get => ImportExport.SelectedItemSetVariantIndex; set => ImportExport.SelectedItemSetVariantIndex = value; }
+    public IRelayCommand ImportCommand => ImportExport.ImportCommand;
+    public IRelayCommand ClearCommand => ImportExport.ClearCommand;
+    public IRelayCommand ImportBuildPlannerCommand => ImportExport.ImportBuildPlannerCommand;
+    public IRelayCommand ExportBuildPlannerCommand => ImportExport.ExportBuildPlannerCommand;
+    internal string? TryReplaceBuildCode(string text) => ImportExport.TryReplaceBuildCode(text);
 }
-
-public sealed record ImportedVariantOptionViewModel(int Index, string DisplayName);

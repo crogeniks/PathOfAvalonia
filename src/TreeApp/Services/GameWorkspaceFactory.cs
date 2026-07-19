@@ -39,27 +39,22 @@ public sealed class GameWorkspaceFactory(
         var sprites = await spritesTask;
         var spec = new PassiveSpec(tree, tree.Classes, game.FeatureFlags);
         var equipment = new EquipmentViewModel();
-        var treePanel = new MainWindowViewModel(
+        var state = new BuildWorkspaceState(
+            game,
             spec,
+            sprites,
+            new PassiveTreeViewModel(spec),
+            equipment);
+        var treeSelection = new TreeSelectionViewModel(state);
+        var importExport = new BuildImportExportViewModel(
+            state,
             game.ImportStrategy,
-            equipment,
-            buildPlannerExportService,
-            buildPlannerImportService,
-            storageProviderAccessor);
-        var workspace = new GameWorkspace
-        {
-            Game = game,
-            Tree = tree,
-            Sprites = sprites,
-            Classes = tree.Classes,
-            Spec = spec,
-            TreeViewModel = treePanel.TreeViewModel,
-            Equipment = equipment,
-        };
+            new BuildPlannerFileService(storageProviderAccessor, buildPlannerExportService, buildPlannerImportService));
 
         return new GameWorkspaceViewModel(
-            workspace,
-            treePanel,
+            state,
+            treeSelection,
+            importExport,
             new TreeImageAssetResolver(game, assets, assetLayouts, treeVersion),
             assets,
             switchTreeVersion,

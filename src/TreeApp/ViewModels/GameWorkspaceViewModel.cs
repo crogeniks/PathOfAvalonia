@@ -9,17 +9,6 @@ using PathOfAvalonia.TreeDomain;
 
 namespace PathOfAvalonia.TreeApp.ViewModels;
 
-public sealed class GameWorkspace
-{
-    public required GameDefinition Game { get; init; }
-    public required TreeModel Tree { get; init; }
-    public required SpriteMap Sprites { get; init; }
-    public required ClassCatalog Classes { get; init; }
-    public required PassiveSpec Spec { get; init; }
-    public required PassiveTreeViewModel TreeViewModel { get; init; }
-    public required EquipmentViewModel Equipment { get; init; }
-}
-
 public sealed partial class GameWorkspaceViewModel : ObservableObject
 {
     private const string NoDiffVersion = "None";
@@ -30,70 +19,77 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
     private readonly int _initialAllocatedCount;
 
     public GameWorkspaceViewModel(
-        GameWorkspace workspace,
-        MainWindowViewModel treePanel,
+        BuildWorkspaceState state,
+        TreeSelectionViewModel treeSelection,
+        BuildImportExportViewModel importExport,
         ITreeImageAssetResolver imageResolver,
         IGameAssetService assets,
         Func<GameDefinition, string, Task> switchTreeVersion,
         IRelayCommand backToLandingCommand)
     {
-        Workspace = workspace;
-        TreePanel = treePanel;
+        State = state;
+        TreeSelection = treeSelection;
+        ImportExport = importExport;
         ImageResolver = imageResolver;
         _assets = assets;
         _switchTreeVersion = switchTreeVersion;
         BackToLandingCommand = backToLandingCommand;
-        SelectedTreeVersion = workspace.Tree.Version;
-        TreeVersionOptions = workspace.Game.TreeVersions;
-        DiffTreeVersionOptions = [NoDiffVersion, .. workspace.Game.TreeVersions.Where(version => version != workspace.Tree.Version)];
-        _initialClassIndex = workspace.Spec.SelectedClassIndex;
-        _initialAllocatedCount = workspace.Spec.AllocatedNodes.Count;
-        workspace.Spec.SpecChanged += () => OnPropertyChanged(nameof(IsDirty));
+        SelectedTreeVersion = state.Spec.Tree.Version;
+        TreeVersionOptions = state.Game.TreeVersions;
+        DiffTreeVersionOptions = [NoDiffVersion, .. state.Game.TreeVersions.Where(version => version != state.Spec.Tree.Version)];
+        _initialClassIndex = state.Spec.SelectedClassIndex;
+        _initialAllocatedCount = state.Spec.AllocatedNodes.Count;
+        state.Spec.SpecChanged += () => OnPropertyChanged(nameof(IsDirty));
     }
 
-    public GameWorkspace Workspace { get; }
-    public MainWindowViewModel TreePanel { get; }
+    public BuildWorkspaceState State { get; }
+    public TreeSelectionViewModel TreeSelection { get; }
+    public BuildImportExportViewModel ImportExport { get; }
+    [Obsolete("Use State. This projection does not own separate workspace state.")]
+    public BuildWorkspaceState Workspace => State;
+    [Obsolete("Use ImportExport or TreeSelection.")]
+    public BuildImportExportViewModel TreePanel => ImportExport;
     public ITreeImageAssetResolver ImageResolver { get; }
     public IRelayCommand BackToLandingCommand { get; }
-    public string GameName => Workspace.Game.DisplayName;
-    public string TreeVersion => Workspace.Tree.Version;
+    public string GameName => State.Game.DisplayName;
+    public string TreeVersion => State.Spec.Tree.Version;
     // Keep the current PoE1 tree visible even while it has only one version, so the
     // version-selection affordance is already in place when the 3.29 tree arrives.
-    public bool HasTreeVersionOptions => Workspace.Game.Id == GameId.PathOfExile1 || TreeVersionOptions.Count > 1;
+    public bool HasTreeVersionOptions => State.Game.Id == GameId.PathOfExile1 || TreeVersionOptions.Count > 1;
     public bool HasDiffVersionOptions => DiffTreeVersionOptions.Count > 1;
     public IReadOnlyList<string> TreeVersionOptions { get; }
     public IReadOnlyList<string> DiffTreeVersionOptions { get; }
-    public string DiffSummary => TreePanel.TreeViewModel.Diff.HasChanges
-        ? $"+{TreePanel.TreeViewModel.Diff.AddedCount} ~{TreePanel.TreeViewModel.Diff.ChangedCount} -{TreePanel.TreeViewModel.Diff.RemovedCount}"
+    public string DiffSummary => State.Tree.Diff.HasChanges
+        ? $"+{State.Tree.Diff.AddedCount} ~{State.Tree.Diff.ChangedCount} -{State.Tree.Diff.RemovedCount}"
         : string.Empty;
-    public bool SupportsEquipment => Workspace.Game.FeatureFlags.SupportsEquipmentImport;
+    public bool SupportsEquipment => State.Game.FeatureFlags.SupportsEquipmentImport;
     public bool IsDirty =>
-        Workspace.Spec.SelectedClassIndex != _initialClassIndex
-        || Workspace.Spec.SelectedAscendancyIndex != 0
-        || Workspace.Spec.AllocatedNodes.Count != _initialAllocatedCount
-        || Workspace.Spec.ActiveSubgraphs.Count > 0
-        || Workspace.Spec.SocketedJewels.Count > 0
-        || Workspace.Spec.AttributeOverrides.Count > 0;
+        State.Spec.SelectedClassIndex != _initialClassIndex
+        || State.Spec.SelectedAscendancyIndex != 0
+        || State.Spec.AllocatedNodes.Count != _initialAllocatedCount
+        || State.Spec.ActiveSubgraphs.Count > 0
+        || State.Spec.SocketedJewels.Count > 0
+        || State.Spec.AttributeOverrides.Count > 0;
 
     [ObservableProperty] public partial string SelectedTreeVersion { get; set; } = string.Empty;
     [ObservableProperty] public partial string SelectedDiffTreeVersion { get; set; } = NoDiffVersion;
 
     partial void OnSelectedTreeVersionChanged(string value)
     {
-        if (string.IsNullOrWhiteSpace(value) || value == Workspace.Tree.Version)
+        if (string.IsNullOrWhiteSpace(value) || value == State.Spec.Tree.Version)
         {
             return;
         }
 
-        _ = _switchTreeVersion(Workspace.Game, value);
+        _ = _switchTreeVersion(State.Game, value);
     }
 
     async partial void OnSelectedDiffTreeVersionChanged(string value)
     {
-        if (string.IsNullOrWhiteSpace(value) || value == NoDiffVersion || value == Workspace.Tree.Version)
+        if (string.IsNullOrWhiteSpace(value) || value == NoDiffVersion || value == State.Spec.Tree.Version)
         {
             _diffLoadRequest++;
-            TreePanel.TreeViewModel.SetDiff(TreeDiff.Empty);
+            State.Tree.SetDiff(TreeDiff.Empty);
             OnPropertyChanged(nameof(DiffSummary));
             return;
         }
@@ -101,20 +97,20 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
         var request = ++_diffLoadRequest;
         try
         {
-            var baseline = await _assets.LoadTreeAsync(Workspace.Game, value);
+            var baseline = await _assets.LoadTreeAsync(State.Game, value);
             if (request != _diffLoadRequest || SelectedDiffTreeVersion != value)
             {
                 return;
             }
 
-            TreePanel.TreeViewModel.SetDiff(TreeDiff.Compare(Workspace.Tree, baseline));
+            State.Tree.SetDiff(TreeDiff.Compare(State.Spec.Tree, baseline));
             OnPropertyChanged(nameof(DiffSummary));
         }
         catch
         {
             if (request == _diffLoadRequest)
             {
-                TreePanel.TreeViewModel.SetDiff(TreeDiff.Empty);
+                State.Tree.SetDiff(TreeDiff.Empty);
                 OnPropertyChanged(nameof(DiffSummary));
             }
         }

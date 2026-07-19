@@ -3,6 +3,7 @@
              xmlns:local="clr-namespace:PathOfAvalonia.TreeApp"
              xmlns:vm="clr-namespace:PathOfAvalonia.TreeApp.ViewModels"
              x:Class="PathOfAvalonia.TreeApp.Views.GameWorkspaceView"
+             x:Name="Root"
              x:DataType="vm:GameWorkspaceViewModel">
     <Grid Background="#101018" RowDefinitions="48,*">
         <Border Background="#15151D" BorderBrush="#30303A" BorderThickness="0,0,0,1">
@@ -62,8 +63,8 @@
                             BorderBrush="#3A3A4A" BorderThickness="1">
                         <StackPanel Orientation="Vertical"
                                     Spacing="6"
-                                    DataContext="{Binding TreePanel}"
-                                    x:DataType="vm:MainWindowViewModel">
+                                    DataContext="{Binding TreeSelection}"
+                                    x:DataType="vm:TreeSelectionViewModel">
                             <Button Content="{Binding TreeControlsToggleText}"
                                     Command="{Binding ToggleTreeControlsCommand}"
                                     HorizontalAlignment="Right"/>
@@ -80,6 +81,9 @@
                                 <ComboBox ItemsSource="{Binding AscendancyNames}"
                                           SelectedItem="{Binding SelectedAscendancyName}"
                                           HorizontalAlignment="Stretch"/>
+                                <StackPanel DataContext="{Binding DataContext.ImportExport, ElementName=Root}"
+                                            x:DataType="vm:BuildImportExportViewModel"
+                                            Spacing="6">
                                 <TextBlock Text="Import build" Foreground="#EAEAEA" FontWeight="Bold"
                                            Margin="0,6,0,0"
                                            IsVisible="{Binding IsImportSupported}"/>
@@ -125,6 +129,7 @@
                                 <TextBlock Text="{Binding ImportStatus}"
                                            Foreground="{Binding ImportStatusForeground}"
                                            TextWrapping="Wrap"/>
+                                </StackPanel>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -136,8 +141,8 @@
                                 Spacing="8"
                                 Margin="14,12,14,4"
                                 HorizontalAlignment="Left"
-                                DataContext="{Binding TreePanel}"
-                                x:DataType="vm:MainWindowViewModel"
+                                DataContext="{Binding ImportExport}"
+                                x:DataType="vm:BuildImportExportViewModel"
                                 IsVisible="{Binding HasItemSetVariants}">
                         <TextBlock Text="Item set"
                                    Foreground="#EAEAEA"
@@ -148,7 +153,7 @@
                                   SelectedIndex="{Binding SelectedItemSetVariantIndex}"
                                   DisplayMemberBinding="{Binding DisplayName}"/>
                     </StackPanel>
-                    <local:EquipmentView Grid.Row="1" DataContext="{Binding Workspace.Equipment}"/>
+                    <local:EquipmentView Grid.Row="1" DataContext="{Binding State.Equipment}"/>
                 </Grid>
             </TabItem>
             <TabItem Header="Gems &amp; DPS" IsEnabled="{Binding SupportsEquipment}">
@@ -157,7 +162,7 @@
                                 Spacing="8"
                                 Margin="14,12,14,4"
                                 HorizontalAlignment="Left"
-                                DataContext="{Binding Workspace.Equipment}"
+                                DataContext="{Binding State.Equipment}"
                                 x:DataType="vm:EquipmentViewModel"
                                 IsVisible="{Binding HasSkillSetVariants}">
                         <TextBlock Text="Skill set"
@@ -169,7 +174,7 @@
                                   SelectedIndex="{Binding SelectedSkillSetIndex}"
                                   DisplayMemberBinding="{Binding DisplayName}"/>
                     </StackPanel>
-                    <local:BuildOutputView Grid.Row="1" DataContext="{Binding Workspace.Equipment}"/>
+                    <local:BuildOutputView Grid.Row="1" DataContext="{Binding State.Equipment}"/>
                 </Grid>
             </TabItem>
         </TabControl>

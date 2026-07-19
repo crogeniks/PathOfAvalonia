@@ -23,7 +23,7 @@ public partial class GameWorkspaceView : UserControl
         var root = this.FindControl<Grid>("TreeRoot")!;
         if (root.Children.Count == 1)
         {
-            root.Children.Insert(0, new PassiveTreeView(vm.TreePanel.TreeViewModel, vm.Workspace.Sprites, vm.ImageResolver));
+            root.Children.Insert(0, new PassiveTreeView(vm.State.Tree, vm.State.Sprites, vm.ImageResolver));
         }
 
         var inputBox = this.FindControl<TextBox>("ImportInput");
@@ -31,7 +31,7 @@ public partial class GameWorkspaceView : UserControl
         {
             inputBox.TextChanged += (_, _) =>
             {
-                var placeholder = vm.TreePanel.TryReplaceBuildCode(inputBox.Text ?? string.Empty);
+                var placeholder = vm.ImportExport.TryReplaceBuildCode(inputBox.Text ?? string.Empty);
                 if (placeholder != null)
                 {
                     inputBox.Text = placeholder;
