@@ -31,6 +31,32 @@ rather than reparsing `RawText`.
 ## Item Sets
 Alternate gear configurations per build (e.g. mapping/bossing). Each set owns a full equipment layout. Flask sets overlay on top. Switching is a reference swap — no data duplication.
 
+### Avalonia equipment workspace
+
+`EquipmentWorkspace` is the mutable per-build item store used by the Avalonia
+equipment tab. It follows the upstream ownership model:
+
+- The item library owns each `ImportedItem` once by ID.
+- A loadout only maps canonical equipment slot names to those IDs.
+- Passive-tree jewel sockets are stored separately from loadouts because they
+  belong to the active passive spec in upstream PoB, not to an item set.
+- Creating or editing an item passes PoB-compatible raw text through
+  `RawItemParser`; imported and custom items therefore share one representation.
+- `ApplyTo(ImportedBuild)` produces an updated build snapshot so subsequent
+  Build Planner exports include item-library and loadout edits.
+
+The current slot compatibility layer uses an item's imported or author-selected
+default slot family. Exact base-type restrictions will move to the item-base
+database when that upstream data is ported. Charm slots and charm equipment are
+restricted to PoE2; that game exposes Charm 1 through Charm 3. Flask layout is
+also game-specific: PoE1 exposes Flask 1–5, while PoE2 exposes distinct Life
+Flask and Mana Flask slots. Legacy PoE2 imports using `Flask 1`/`Flask 2` are
+normalized to those semantic slots, and each slot rejects the other flask type.
+
+`PassiveSpec.SetSocketedJewel` updates a single socket without reapplying a build
+import. It rebuilds cluster subgraphs and radius effects and prunes allocations
+that are no longer permitted by the replaced jewel.
+
 ## Quality & Catalysts
 
 - Quality scales base stats (armour/evasion/ES, physical weapon damage) by `(1 + q/100)`.

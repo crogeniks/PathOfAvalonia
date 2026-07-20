@@ -2,105 +2,566 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:PathOfAvalonia.TreeApp.ViewModels"
              x:Class="PathOfAvalonia.TreeApp.EquipmentView"
+             x:Name="Root"
              x:DataType="vm:EquipmentViewModel"
-             Background="#101018">
-    <Grid>
-        <TextBlock Text="{Binding EmptyMessage}"
-                   IsVisible="{Binding !HasItems}"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   Foreground="#AAAACC" FontSize="16"/>
+             Background="#0C0D12">
+    <UserControl.Styles>
+        <Style Selector="TextBlock.sectionTitle">
+            <Setter Property="Foreground" Value="#F4F4F8"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="TextBlock.muted">
+            <Setter Property="Foreground" Value="#85899A"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style Selector="Button.primary">
+            <Setter Property="Background" Value="#6657D9"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#8072F0"/>
+            <Setter Property="Padding" Value="14,7"/>
+        </Style>
+        <Style Selector="Button.compact">
+            <Setter Property="Padding" Value="9,5"/>
+            <Setter Property="MinWidth" Value="32"/>
+        </Style>
+        <Style Selector="ListBox.workspaceList">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="ListBox.workspaceList ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="ListBox.workspaceList ListBoxItem:selected">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
+        <Style Selector="ListBox.workspaceList ListBoxItem:selected Border.selectableCard">
+            <Setter Property="Background" Value="#25243A"/>
+            <Setter Property="BorderBrush" Value="#7164D9"/>
+        </Style>
+        <Style Selector="Border.panel">
+            <Setter Property="Background" Value="#111219"/>
+            <Setter Property="BorderBrush" Value="#252731"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+    </UserControl.Styles>
 
-        <ScrollViewer IsVisible="{Binding HasItems}">
-            <StackPanel Spacing="10" Margin="8,10,8,10">
-                <ItemsControl ItemsSource="{Binding Groups}" IsVisible="{Binding HasItems}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="vm:ItemGroupViewModel">
-                            <StackPanel Margin="0,0,0,2" Spacing="6">
-                                <TextBlock Text="{Binding Header}"
-                                           Foreground="#DDDDEE"
-                                           FontWeight="Bold"
-                                           FontSize="14"
-                                           Margin="4,0,0,0"/>
-                                <ItemsControl ItemsSource="{Binding Items}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <WrapPanel Orientation="Horizontal"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate DataType="vm:ItemViewModel">
-                                            <Border Width="260"
-                                                    Margin="6"
-                                                    Padding="10"
-                                                    Background="#141420"
+    <Grid RowDefinitions="72,*">
+        <Border Background="#12131A"
+                BorderBrush="#292B35"
+                BorderThickness="0,0,0,1"
+                Padding="18,10">
+            <Grid ColumnDefinitions="Auto,28,Auto,8,210,8,Auto,8,Auto,*,Auto,12,Auto"
+                  VerticalAlignment="Center">
+                <StackPanel>
+                    <TextBlock Text="Equipment lab"
+                               Foreground="#F6F6FA"
+                               FontSize="18"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Text="Build, compare, and swap complete loadouts"
+                               Classes="muted"/>
+                </StackPanel>
+
+                <TextBlock Grid.Column="2"
+                           Text="Loadout"
+                           Foreground="#A5A8B6"
+                           VerticalAlignment="Center"/>
+                <ComboBox Grid.Column="4"
+                          x:Name="LoadoutSelector"
+                          ItemsSource="{Binding LoadoutOptions}"
+                          SelectedIndex="{Binding SelectedLoadoutIndex}"
+                          DisplayMemberBinding="{Binding Name}"
+                          HorizontalAlignment="Stretch"/>
+                <Button Grid.Column="6"
+                        Classes="compact"
+                        Content="+"
+                        Command="{Binding CreateLoadoutCommand}"
+                        ToolTip.Tip="New empty loadout"/>
+                <Button Grid.Column="8"
+                        x:Name="DuplicateLoadoutButton"
+                        Classes="compact"
+                        Content="Duplicate"
+                        Command="{Binding DuplicateLoadoutCommand}"/>
+
+                <StackPanel Grid.Column="10"
+                            Orientation="Horizontal"
+                            Spacing="5"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="Weapons"
+                               Foreground="#85899A"
+                               VerticalAlignment="Center"
+                               Margin="0,0,3,0"/>
+                    <ToggleButton Content="I"
+                                  Width="34"
+                                  IsChecked="{Binding IsPrimaryWeaponSet, Mode=OneWay}"
+                                  Command="{Binding UsePrimaryWeaponsCommand}"/>
+                    <ToggleButton Content="II"
+                                  Width="34"
+                                  IsChecked="{Binding IsSwapWeaponSet, Mode=OneWay}"
+                                  Command="{Binding UseSwapWeaponsCommand}"/>
+                </StackPanel>
+                <Button Grid.Column="12"
+                        x:Name="NewItemButton"
+                        Classes="primary"
+                        Content="＋  New item"
+                        Command="{Binding NewItemCommand}"/>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" ColumnDefinitions="296,372,*">
+            <!-- Equipped slots -->
+            <Border Classes="panel" BorderThickness="0,0,1,0">
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <StackPanel Margin="16,14,16,10" Spacing="3">
+                        <TextBlock Text="Equipped" Classes="sectionTitle"/>
+                        <TextBlock Text="Select a slot to filter compatible items" Classes="muted"/>
+                    </StackPanel>
+
+                    <Border Grid.Row="1"
+                            Margin="16,0,16,10"
+                            Padding="10"
+                            Background="#171821"
+                            CornerRadius="6">
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                            <TextBlock Text="Loadout name" Classes="muted"/>
+                            <Button Grid.Column="1"
+                                    Grid.RowSpan="2"
+                                    Content="Delete"
+                                    Classes="compact"
+                                    IsEnabled="{Binding CanDeleteLoadout}"
+                                    Command="{Binding DeleteLoadoutCommand}"
+                                    VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="1"
+                                     Margin="0,3,8,0"
+                                     Text="{Binding ActiveLoadoutName}"
+                                     PlaceholderText="Loadout name"/>
+                        </Grid>
+                    </Border>
+
+                    <ListBox Grid.Row="2"
+                             x:Name="SlotsList"
+                             Classes="workspaceList"
+                             Margin="10,0,8,10"
+                             ItemsSource="{Binding Slots}"
+                             SelectedItem="{Binding SelectedSlot}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="vm:EquipmentSlotViewModel">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Category}"
+                                               IsVisible="{Binding ShowCategoryHeader}"
+                                               Foreground="#777C91"
+                                               FontSize="10"
+                                               FontWeight="Bold"
+                                               Margin="8,8,0,5"/>
+                                    <Border Classes="selectableCard"
+                                            Padding="9,8"
+                                            Background="#16171F"
+                                            BorderBrush="#282A35"
+                                            BorderThickness="1"
+                                            CornerRadius="7">
+                                        <Grid ColumnDefinitions="38,*,Auto">
+                                            <Border Width="30"
+                                                    Height="30"
+                                                    CornerRadius="6"
+                                                    Background="#242634"
+                                                    VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding ShortName}"
+                                                           Foreground="#AFA7F5"
+                                                           FontWeight="Bold"
+                                                           FontSize="10"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           Foreground="#E3E4EA"
+                                                           FontSize="11"/>
+                                                <TextBlock Text="Empty slot"
+                                                           IsVisible="{Binding IsEmpty}"
+                                                           Foreground="#626676"
+                                                           FontSize="11"/>
+                                                <ContentControl Content="{Binding Item}"
+                                                                IsVisible="{Binding HasItem}">
+                                                    <ContentControl.ContentTemplate>
+                                                        <DataTemplate DataType="vm:ItemViewModel">
+                                                            <TextBlock Text="{Binding Name}"
+                                                                       Foreground="{Binding NameBrush}"
+                                                                       FontWeight="SemiBold"
+                                                                       FontSize="12"
+                                                                       TextTrimming="CharacterEllipsis"/>
+                                                        </DataTemplate>
+                                                    </ContentControl.ContentTemplate>
+                                                </ContentControl>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2"
+                                                       Text="›"
+                                                       Foreground="#676B7D"
+                                                       FontSize="20"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <!-- Item library -->
+            <Border Grid.Column="1" Classes="panel" BorderThickness="0,0,1,0">
+                <Grid RowDefinitions="Auto,Auto,*,Auto">
+                    <Grid Margin="16,14,16,9" ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="{Binding SelectedSlotTitle}" Classes="sectionTitle"/>
+                            <TextBlock Text="{Binding LibrarySummary}" Classes="muted"/>
+                        </StackPanel>
+                        <CheckBox Grid.Column="1"
+                                  Content="Compatible"
+                                  IsChecked="{Binding ShowCompatibleOnly}"
+                                  VerticalAlignment="Center"
+                                  Foreground="#A6A9B7"/>
+                    </Grid>
+
+                    <TextBox Grid.Row="1"
+                             x:Name="ItemSearchBox"
+                             Margin="16,0,16,10"
+                             Text="{Binding SearchText}"
+                             PlaceholderText="Search names, bases, or modifiers…"/>
+
+                    <Grid Grid.Row="2">
+                        <ListBox Classes="workspaceList"
+                                 x:Name="LibraryList"
+                                 Margin="10,0,8,8"
+                                 ItemsSource="{Binding FilteredItems}"
+                                 SelectedItem="{Binding SelectedLibraryItem}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="vm:ItemViewModel">
+                                    <Border Classes="selectableCard"
+                                            Padding="11,9"
+                                            Background="#16171F"
+                                            BorderBrush="{Binding BorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="7">
+                                        <Grid ColumnDefinitions="5,*,Auto">
+                                            <Border Background="{Binding NameBrush}"
+                                                    CornerRadius="2"
+                                                    Margin="0,1,0,1"/>
+                                            <StackPanel Grid.Column="1" Margin="10,0,6,0" Spacing="2">
+                                                <TextBlock Text="{Binding Name}"
+                                                           Foreground="{Binding NameBrush}"
+                                                           FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding BaseType}"
+                                                           Foreground="#969AA9"
+                                                           FontSize="11"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding UsageText}"
+                                                           Foreground="#686D80"
+                                                           FontSize="10"
+                                                           IsVisible="{Binding HasUsageText}"/>
+                                            </StackPanel>
+                                            <Border Grid.Column="2"
+                                                    Background="#22232D"
+                                                    CornerRadius="4"
+                                                    Padding="6,3"
+                                                    VerticalAlignment="Top">
+                                                <TextBlock Text="{Binding Rarity}"
+                                                           Foreground="#A6A9B7"
+                                                           FontSize="9"/>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <StackPanel IsVisible="{Binding !HasItems}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Width="270"
+                                    Spacing="9">
+                            <Border Width="46" Height="46" CornerRadius="23" Background="#24223A" HorizontalAlignment="Center">
+                                <TextBlock Text="＋" Foreground="#A99EF3" FontSize="25" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="Start your item library"
+                                       Foreground="#E0E1E7"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="Create custom gear or paste item text copied from Path of Exile."
+                                       Foreground="#85899A"
+                                       FontSize="11"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"/>
+                            <Button Classes="primary"
+                                    Content="Create first item"
+                                    Command="{Binding NewItemCommand}"
+                                    HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Grid.Row="3"
+                            Background="#14151C"
+                            BorderBrush="#292B35"
+                            BorderThickness="0,1,0,0"
+                            Padding="12,9">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="7" IsVisible="{Binding !IsConfirmingItemDelete}">
+                                <Button Classes="primary compact"
+                                        Content="Equip"
+                                        Command="{Binding EquipSelectedItemCommand}"
+                                        IsEnabled="{Binding CanEquipSelectedItem}"/>
+                                <Button Classes="compact"
+                                        x:Name="UnequipButton"
+                                        Content="Unequip"
+                                        Command="{Binding UnequipSelectedSlotCommand}"
+                                        IsEnabled="{Binding CanUnequipSelectedSlot}"/>
+                                <Button Classes="compact"
+                                        Content="Edit"
+                                        Command="{Binding EditSelectedItemCommand}"
+                                        IsEnabled="{Binding HasSelectedLibraryItem}"/>
+                                <Button Classes="compact"
+                                        Content="Copy"
+                                        Command="{Binding DuplicateSelectedItemCommand}"
+                                        IsEnabled="{Binding HasSelectedLibraryItem}"/>
+                                <Button Classes="compact"
+                                        Content="Delete"
+                                        Command="{Binding RequestDeleteSelectedItemCommand}"
+                                        IsEnabled="{Binding HasSelectedLibraryItem}"/>
+                            </StackPanel>
+                            <Grid IsVisible="{Binding IsConfirmingItemDelete}" ColumnDefinitions="*,Auto,7,Auto">
+                                <TextBlock Text="Delete this item from every loadout?"
+                                           Foreground="#E7A3A3"
+                                           FontSize="11"
+                                           VerticalAlignment="Center"/>
+                                <Button Grid.Column="1"
+                                        Classes="compact"
+                                        Content="Cancel"
+                                        Command="{Binding CancelDeleteSelectedItemCommand}"/>
+                                <Button Grid.Column="3"
+                                        Classes="compact"
+                                        Content="Delete"
+                                        Foreground="#FFB0B0"
+                                        Command="{Binding ConfirmDeleteSelectedItemCommand}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- Detail / editor -->
+            <Border Grid.Column="2" Background="#0D0E13">
+                <Grid>
+                    <Grid IsVisible="{Binding !IsEditorOpen}">
+                        <StackPanel IsVisible="{Binding !HasSelectedLibraryItem}"
+                                    Width="420"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Spacing="16">
+                            <Border Width="68" Height="68" CornerRadius="18" Background="#1B1B29" HorizontalAlignment="Center">
+                                <TextBlock Text="◇" Foreground="#8275E6" FontSize="38" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="Select an item to inspect it"
+                                           Foreground="#EAEBF0"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="Pick an equipment slot, choose a compatible item, then equip it. You can keep alternatives in the library and reuse them across loadouts."
+                                           Foreground="#85899A"
+                                           TextWrapping="Wrap"
+                                           TextAlignment="Center"
+                                           LineHeight="18"/>
+                            </StackPanel>
+                            <Grid ColumnDefinitions="*,12,*,12,*">
+                                <StackPanel Spacing="5">
+                                    <Border Width="28" Height="28" CornerRadius="14" Background="#26243D" HorizontalAlignment="Center">
+                                        <TextBlock Text="1" Foreground="#B7AEF8" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="Choose slot" Classes="muted" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="5">
+                                    <Border Width="28" Height="28" CornerRadius="14" Background="#26243D" HorizontalAlignment="Center">
+                                        <TextBlock Text="2" Foreground="#B7AEF8" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="Pick item" Classes="muted" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="4" Spacing="5">
+                                    <Border Width="28" Height="28" CornerRadius="14" Background="#26243D" HorizontalAlignment="Center">
+                                        <TextBlock Text="3" Foreground="#B7AEF8" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="Equip" Classes="muted" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+
+                        <ScrollViewer x:Name="ItemDetailPanel"
+                                      IsVisible="{Binding HasSelectedLibraryItem}">
+                            <ContentControl Content="{Binding SelectedLibraryItem}"
+                                            Margin="34,28">
+                                <ContentControl.ContentTemplate>
+                                    <DataTemplate DataType="vm:ItemViewModel">
+                                        <StackPanel MaxWidth="620" HorizontalAlignment="Center" Spacing="14">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <StackPanel Spacing="3">
+                                                    <TextBlock Text="Item details" Classes="sectionTitle"/>
+                                                    <TextBlock Text="{Binding UsageText}" Classes="muted"/>
+                                                </StackPanel>
+                                                <Border Grid.Column="1"
+                                                        Background="#1C1D27"
+                                                        CornerRadius="5"
+                                                        Padding="8,4">
+                                                    <TextBlock Text="{Binding Slot}"
+                                                               Foreground="#999DAD"
+                                                               FontSize="10"/>
+                                                </Border>
+                                            </Grid>
+
+                                            <Border Padding="22,20"
+                                                    Background="#14151C"
                                                     BorderBrush="{Binding BorderBrush}"
                                                     BorderThickness="1"
-                                                    CornerRadius="4"
-                                                    VerticalAlignment="Top">
-                                                <StackPanel Spacing="3">
-                                                    <TextBlock Text="{Binding Slot}"
-                                                               Foreground="#777799"
-                                                               FontSize="10"
-                                                               Margin="0,0,0,1"/>
+                                                    CornerRadius="10">
+                                                <StackPanel Spacing="6">
                                                     <TextBlock Text="{Binding Name}"
                                                                Foreground="{Binding NameBrush}"
                                                                FontWeight="Bold"
-                                                               TextWrapping="Wrap"/>
+                                                               FontSize="20"
+                                                               TextWrapping="Wrap"
+                                                               TextAlignment="Center"/>
                                                     <TextBlock Text="{Binding BaseType}"
                                                                IsVisible="{Binding HasSeparateName}"
-                                                               Foreground="#AAAAAA"
-                                                               FontSize="11"
-                                                               TextWrapping="Wrap"/>
-                                                    <ItemsControl ItemsSource="{Binding Implicits}"
-                                                                  IsVisible="{Binding HasImplicits}">
+                                                               Foreground="#B0B2BA"
+                                                               FontSize="13"
+                                                               TextWrapping="Wrap"
+                                                               TextAlignment="Center"/>
+                                                    <Border Height="1" Background="{Binding BorderBrush}" Margin="0,7"/>
+                                                    <ItemsControl ItemsSource="{Binding Implicits}" IsVisible="{Binding HasImplicits}">
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate DataType="vm:ModLineViewModel">
                                                                 <TextBlock Text="{Binding Text}"
                                                                            Foreground="{Binding Brush}"
-                                                                           FontSize="10"
-                                                                           TextWrapping="Wrap"/>
+                                                                           FontSize="12"
+                                                                           TextWrapping="Wrap"
+                                                                           TextAlignment="Center"
+                                                                           Margin="0,2"/>
                                                             </DataTemplate>
                                                         </ItemsControl.ItemTemplate>
                                                     </ItemsControl>
-                                                    <Border Height="1"
-                                                            Background="{Binding BorderBrush}"
-                                                            Margin="0,4,0,4"/>
                                                     <ItemsControl ItemsSource="{Binding Body}">
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate DataType="vm:ModLineViewModel">
                                                                 <TextBlock Text="{Binding Text}"
                                                                            Foreground="{Binding Brush}"
-                                                                           FontSize="10"
-                                                                           TextWrapping="Wrap"/>
+                                                                           FontSize="12"
+                                                                           TextWrapping="Wrap"
+                                                                           TextAlignment="Center"
+                                                                           Margin="0,2"/>
                                                             </DataTemplate>
                                                         </ItemsControl.ItemTemplate>
                                                     </ItemsControl>
                                                     <Border Height="1"
                                                             Background="{Binding BorderBrush}"
                                                             IsVisible="{Binding HasStatusFlags}"
-                                                            Margin="0,4,0,4"/>
-                                                    <ItemsControl ItemsSource="{Binding StatusFlags}"
-                                                                  IsVisible="{Binding HasStatusFlags}">
+                                                            Margin="0,7"/>
+                                                    <ItemsControl ItemsSource="{Binding StatusFlags}" IsVisible="{Binding HasStatusFlags}">
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate DataType="vm:ModLineViewModel">
                                                                 <TextBlock Text="{Binding Text}"
                                                                            Foreground="{Binding Brush}"
-                                                                           FontSize="10"
-                                                                           TextWrapping="Wrap"/>
+                                                                           FontWeight="SemiBold"
+                                                                           FontSize="12"
+                                                                           TextAlignment="Center"/>
                                                             </DataTemplate>
                                                         </ItemsControl.ItemTemplate>
                                                     </ItemsControl>
                                                 </StackPanel>
                                             </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ContentControl.ContentTemplate>
+                            </ContentControl>
+                        </ScrollViewer>
+                    </Grid>
+
+                    <Grid x:Name="ItemEditor"
+                          IsVisible="{Binding IsEditorOpen}"
+                          RowDefinitions="Auto,Auto,*,Auto"
+                          Margin="26,20">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="{Binding EditorTitle}"
+                                           Foreground="#F2F2F7"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="Paste copied item text or write PoB-compatible custom modifiers."
+                                           Classes="muted"/>
                             </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-        </ScrollViewer>
+                            <Button Grid.Column="1"
+                                    Classes="compact"
+                                    Content="Cancel"
+                                    Command="{Binding CancelEditorCommand}"/>
+                        </Grid>
+
+                        <Grid Grid.Row="1" ColumnDefinitions="Auto,240,*" Margin="0,16,0,10">
+                            <TextBlock Text="Default slot"
+                                       Foreground="#A5A8B6"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,10,0"/>
+                            <ComboBox Grid.Column="1"
+                                      x:Name="EditorSlotSelector"
+                                      ItemsSource="{Binding EditorSlotOptions}"
+                                      SelectedItem="{Binding EditorSelectedSlot}"/>
+                            <TextBlock Grid.Column="2"
+                                       Text="Used for compatibility filtering."
+                                       Classes="muted"
+                                       VerticalAlignment="Center"
+                                       Margin="12,0,0,0"/>
+                        </Grid>
+
+                        <Border Grid.Row="2"
+                                Background="#111219"
+                                BorderBrush="#30323E"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="2">
+                            <TextBox Text="{Binding EditorRawText}"
+                                     x:Name="EditorTextBox"
+                                     AcceptsReturn="True"
+                                     TextWrapping="NoWrap"
+                                     FontFamily="Cascadia Mono,Consolas,monospace"
+                                     FontSize="12"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Padding="14"
+                                     VerticalContentAlignment="Top"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     PlaceholderText="Rarity: Rare&#10;Item Name&#10;Base Type&#10;--------&#10;+50 to maximum Life"/>
+                        </Border>
+
+                        <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="0,12,0,0">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding EditorError}"
+                                           IsVisible="{Binding HasEditorError}"
+                                           Foreground="#EF8C8C"
+                                           FontSize="11"/>
+                                <TextBlock Text="Tip: copied in-game item text can be pasted without modification."
+                                           IsVisible="{Binding !HasEditorError}"
+                                           Classes="muted"/>
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                    x:Name="SaveItemButton"
+                                    Classes="primary"
+                                    Content="Save item"
+                                    Command="{Binding SaveItemCommand}"/>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

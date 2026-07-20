@@ -24,4 +24,25 @@ public sealed class BuildPlannerItemSlotTests
             BuildPlannerItemSlots.All.Select(slot => slot.SortOrder).Order(),
             BuildPlannerItemSlots.All.Select(slot => BuildPlannerItemSlots.SortOrder(slot.DisplayName)));
     }
+
+    [Fact]
+    public void Poe2IncludesAllThreeCharmSlots()
+    {
+        Assert.Equal(
+            ["Charm1", "Charm2", "Charm3"],
+            BuildPlannerItemSlots.All
+                .Where(slot => slot.DisplayName.StartsWith("Charm ", StringComparison.Ordinal))
+                .Select(slot => slot.InventoryId));
+    }
+
+    [Fact]
+    public void Poe2UsesOneLifeAndOneManaFlaskSlot()
+    {
+        Assert.Equal(
+            [("Life Flask", "Flask1"), ("Mana Flask", "Flask2")],
+            BuildPlannerItemSlots.All
+                .Where(slot => slot.DisplayName.Contains("Flask", StringComparison.Ordinal))
+                .Select(slot => (slot.DisplayName, slot.InventoryId)));
+        Assert.False(BuildPlannerItemSlots.TryGetByInventoryId("Flask3", out _));
+    }
 }

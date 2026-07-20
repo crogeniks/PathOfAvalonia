@@ -40,6 +40,7 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
         _initialClassIndex = state.Spec.SelectedClassIndex;
         _initialAllocatedCount = state.Spec.AllocatedNodes.Count;
         state.Spec.SpecChanged += () => OnPropertyChanged(nameof(IsDirty));
+        state.Equipment.EquipmentChanged += () => OnPropertyChanged(nameof(IsDirty));
     }
 
     public BuildWorkspaceState State { get; }
@@ -69,7 +70,8 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
         || State.Spec.AllocatedNodes.Count != _initialAllocatedCount
         || State.Spec.ActiveSubgraphs.Count > 0
         || State.Spec.SocketedJewels.Count > 0
-        || State.Spec.AttributeOverrides.Count > 0;
+        || State.Spec.AttributeOverrides.Count > 0
+        || State.Equipment.IsDirty;
 
     [ObservableProperty] public partial string SelectedTreeVersion { get; set; } = string.Empty;
     [ObservableProperty] public partial string SelectedDiffTreeVersion { get; set; } = NoDiffVersion;

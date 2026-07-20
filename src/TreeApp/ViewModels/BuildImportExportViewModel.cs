@@ -33,6 +33,7 @@ public sealed partial class BuildImportExportViewModel : ObservableObject
         _state = state;
         _importStrategy = importStrategy;
         _files = files;
+        _state.Equipment.EquipmentChanged += OnEquipmentChanged;
     }
 
     public bool IsImportSupported => _importStrategy.IsSupported;
@@ -172,6 +173,24 @@ public sealed partial class BuildImportExportViewModel : ObservableObject
         HasItemSetVariants = false;
         SelectedPassiveTreeVariantIndex = 0;
         SelectedItemSetVariantIndex = 0;
+        _syncingVariants = false;
+        OnExportStateChanged();
+    }
+
+    private void OnEquipmentChanged()
+    {
+        if (_lastImportedBuild is null)
+        {
+            return;
+        }
+
+        _lastImportedBuild = _state.Equipment.ApplyToBuild(_lastImportedBuild);
+        _syncingVariants = true;
+        ItemSetVariantOptions = _lastImportedBuild.ItemSetVariants
+            .Select(variant => new ImportedVariantOptionViewModel(variant.Index, variant.DisplayName))
+            .ToArray();
+        HasItemSetVariants = ItemSetVariantOptions.Count > 1;
+        SelectedItemSetVariantIndex = _lastImportedBuild.ActiveItemSetVariantIndex;
         _syncingVariants = false;
         OnExportStateChanged();
     }

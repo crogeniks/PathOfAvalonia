@@ -40,7 +40,7 @@ public sealed class GameWorkspaceFactory(
         var sprites = await spritesTask;
         var timelessJewelData = await timelessJewelDataTask;
         var spec = new PassiveSpec(tree, tree.Classes, game.FeatureFlags, timelessJewelData);
-        var equipment = new EquipmentViewModel();
+        var equipment = new EquipmentViewModel(spec);
         var state = new BuildWorkspaceState(
             game,
             spec,

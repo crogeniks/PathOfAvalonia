@@ -3,18 +3,100 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using PathOfAvalonia.TreeDomain;
 using PathOfAvalonia.TreeDomain.Import;
+using PathOfAvalonia.TreeDomain.Items;
 
 namespace PathOfAvalonia.TreeApp.ViewModels;
 
 public partial class EquipmentViewModel : ObservableObject
 {
+    private readonly EquipmentWorkspace _workspace;
+    private readonly PassiveSpec? _spec;
     private IReadOnlyList<ImportedSkillSet> _importedSkillSets = [];
+    private bool _synchronizingLoadout;
+    private bool _synchronizingSlots;
+    private bool _synchronizingTreeJewels;
+    private int? _editorItemId;
+
+    public EquipmentViewModel(PassiveSpec? spec = null)
+    {
+        _spec = spec;
+        _workspace = new EquipmentWorkspace(spec?.Tree.GameId);
+        if (_spec is not null)
+        {
+            _spec.SpecChanged += OnSpecChanged;
+        }
+        RefreshEquipment(preserveSelectedItemId: null);
+    }
+
+    public event Action? EquipmentChanged;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasItems))]
     [NotifyPropertyChangedFor(nameof(HasContent))]
     public partial ObservableCollection<ItemGroupViewModel> Groups { get; set; } = new();
+
+    [ObservableProperty]
+    public partial ObservableCollection<EquipmentSlotViewModel> Slots { get; set; } = new();
+
+    [ObservableProperty]
+    public partial ObservableCollection<ItemViewModel> FilteredItems { get; set; } = new();
+
+    [ObservableProperty]
+    public partial ObservableCollection<EquipmentLoadoutOptionViewModel> LoadoutOptions { get; set; } = new();
+
+    [ObservableProperty]
+    public partial ObservableCollection<string> EditorSlotOptions { get; set; } = new();
+
+    [ObservableProperty]
+    public partial int SelectedLoadoutIndex { get; set; }
+
+    [ObservableProperty]
+    public partial string ActiveLoadoutName { get; set; } = "Default";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedSlot))]
+    [NotifyPropertyChangedFor(nameof(CanUnequipSelectedSlot))]
+    [NotifyPropertyChangedFor(nameof(SelectedSlotTitle))]
+    public partial EquipmentSlotViewModel? SelectedSlot { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedLibraryItem))]
+    [NotifyPropertyChangedFor(nameof(CanEquipSelectedItem))]
+    public partial ItemViewModel? SelectedLibraryItem { get; set; }
+
+    [ObservableProperty]
+    public partial string SearchText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool ShowCompatibleOnly { get; set; } = true;
+
+    [ObservableProperty]
+    public partial int SelectedWeaponSet { get; set; } = 1;
+
+    [ObservableProperty]
+    public partial bool IsEditorOpen { get; set; }
+
+    [ObservableProperty]
+    public partial string EditorTitle { get; set; } = "Create custom item";
+
+    [ObservableProperty]
+    public partial string EditorRawText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string EditorSelectedSlot { get; set; } = "Helmet";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasEditorError))]
+    public partial string EditorError { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool IsConfirmingItemDelete { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsDirty { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasMetrics))]
@@ -36,14 +118,28 @@ public partial class EquipmentViewModel : ObservableObject
     [ObservableProperty]
     public partial string EmptyMessage { get; set; } = "Import a build to see equipment.";
 
-    public bool HasItems => Groups.Any(group => group.Items.Count > 0);
+    public bool HasItems => _workspace.Items.Count > 0;
     public bool HasMetrics => Metrics is not null;
     public bool HasSkillGroups => SkillGroups.Count > 0;
     public bool HasContent => HasItems || HasMetrics || HasSkillGroups;
     public bool HasSkillSetVariants => SkillSetOptions.Count > 1;
+    public bool HasSelectedSlot => SelectedSlot is not null;
+    public bool HasSelectedLibraryItem => SelectedLibraryItem is not null;
+    public bool CanUnequipSelectedSlot => SelectedSlot?.HasItem == true;
+    public bool CanEquipSelectedItem => SelectedSlot is not null
+        && SelectedLibraryItem is not null
+        && EquipmentSlotCatalog.IsCompatible(SelectedLibraryItem.Item, SelectedSlot.Name)
+        && SelectedSlot.Item?.ItemId != SelectedLibraryItem.ItemId;
+    public bool CanDeleteLoadout => LoadoutOptions.Count > 1;
+    public bool HasEditorError => !string.IsNullOrWhiteSpace(EditorError);
+    public string SelectedSlotTitle => SelectedSlot is null ? "Item library" : $"Items for {SelectedSlot.DisplayName}";
+    public string LibrarySummary => FilteredItems.Count == 1 ? "1 item" : $"{FilteredItems.Count} items";
+    public bool IsPrimaryWeaponSet => SelectedWeaponSet == 1;
+    public bool IsSwapWeaponSet => SelectedWeaponSet == 2;
 
     public void LoadBuild(ImportedBuild build)
     {
+        _workspace.Load(build);
         Metrics = build.Metrics.Source != ImportedMetricSource.None || !string.IsNullOrWhiteSpace(build.Metrics.ErrorMessage)
             ? ImportedBuildMetricsViewModel.FromImported(build.Metrics)
             : null;
@@ -54,74 +150,479 @@ public partial class EquipmentViewModel : ObservableObject
             ? build.Skills.ActiveSkillSetIndex
             : 0;
         RefreshSkillGroups();
-
-        var groups = new List<ItemGroupViewModel>();
-        var activeItems = build.Items.ToArray();
-
-        var equipment = activeItems.Where(item => GroupName(item) == "Equipment").ToArray();
-        if (equipment.Length > 0)
-        {
-            groups.Add(new ItemGroupViewModel(
-                "Equipment",
-                equipment.Select(item => ItemViewModel.FromImported(item))));
-        }
-
-        var flaskCharmItems = activeItems.Where(item => GroupName(item) == "Flasks & Charms").ToArray();
-        if (flaskCharmItems.Length > 0)
-        {
-            groups.Add(new ItemGroupViewModel(
-                "Flasks & Charms",
-                flaskCharmItems.Select(item => ItemViewModel.FromImported(item))));
-        }
-
-        var jewelItems = activeItems
-            .Where(item => GroupName(item) == "Jewels")
-            .Select(item => ItemViewModel.FromImported(item))
-            .ToArray();
-        if (jewelItems.Length > 0)
-        {
-            groups.Add(new ItemGroupViewModel("Jewels", jewelItems));
-        }
-
-        var socketedJewels = SocketedJewels(build, activeItems.Select(item => item.Id).ToHashSet()).ToArray();
-        if (socketedJewels.Length > 0)
-        {
-            groups.Add(new ItemGroupViewModel("Socketed Tree Jewels", socketedJewels));
-        }
-
-        if (groups.Count == 0)
-        {
-            EmptyMessage = "Import a build to view equipment.";
-            Groups = new ObservableCollection<ItemGroupViewModel>();
-            return;
-        }
-        EmptyMessage = string.Empty;
-        Groups = new ObservableCollection<ItemGroupViewModel>(groups);
+        RefreshEquipment(preserveSelectedItemId: null);
+        IsDirty = false;
     }
 
     public void Clear()
     {
-        Groups = new ObservableCollection<ItemGroupViewModel>();
+        _workspace.Reset();
         Metrics = null;
         _importedSkillSets = [];
         SkillSetOptions = new ObservableCollection<ImportedSkillSetOptionViewModel>();
         SelectedSkillSetIndex = 0;
         SkillGroups = new ObservableCollection<ImportedSkillGroupViewModel>();
-        EmptyMessage = "Import a build to view equipment.";
+        IsEditorOpen = false;
+        IsConfirmingItemDelete = false;
+        RefreshEquipment(preserveSelectedItemId: null);
+        SynchronizeTreeJewels();
+        IsDirty = false;
     }
 
     public void MarkUnsupported()
     {
-        Groups = new ObservableCollection<ItemGroupViewModel>();
+        _workspace.Reset();
         Metrics = null;
         _importedSkillSets = [];
         SkillSetOptions = new ObservableCollection<ImportedSkillSetOptionViewModel>();
         SelectedSkillSetIndex = 0;
         SkillGroups = new ObservableCollection<ImportedSkillGroupViewModel>();
         EmptyMessage = "Equipment is not available for this game yet.";
+        RefreshEquipment(preserveSelectedItemId: null);
+        EmptyMessage = "Equipment is not available for this game yet.";
+    }
+
+    public ImportedBuild ApplyToBuild(ImportedBuild build) => _workspace.ApplyTo(build);
+
+    partial void OnSelectedLoadoutIndexChanged(int value)
+    {
+        if (_synchronizingLoadout || !_workspace.SetActiveLoadout(value))
+        {
+            return;
+        }
+        RefreshEquipment(SelectedLibraryItem?.ItemId);
+        NotifyEquipmentChanged();
+    }
+
+    partial void OnActiveLoadoutNameChanged(string value)
+    {
+        if (_synchronizingLoadout || string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+        _workspace.RenameActiveLoadout(value);
+        RefreshLoadouts();
+        NotifyEquipmentChanged();
+    }
+
+    partial void OnSelectedSlotChanged(EquipmentSlotViewModel? value)
+    {
+        if (_synchronizingSlots)
+        {
+            return;
+        }
+        RefreshLibrary(value?.Item?.ItemId);
+        OnPropertyChanged(nameof(CanEquipSelectedItem));
+    }
+
+    partial void OnSelectedLibraryItemChanged(ItemViewModel? value)
+    {
+        IsConfirmingItemDelete = false;
+        OnPropertyChanged(nameof(CanEquipSelectedItem));
+    }
+
+    partial void OnSearchTextChanged(string value) => RefreshLibrary(SelectedLibraryItem?.ItemId);
+    partial void OnShowCompatibleOnlyChanged(bool value) => RefreshLibrary(SelectedLibraryItem?.ItemId);
+
+    [RelayCommand]
+    private void UsePrimaryWeapons()
+    {
+        if (SelectedWeaponSet == 1) return;
+        SelectedWeaponSet = 1;
+        OnPropertyChanged(nameof(IsPrimaryWeaponSet));
+        OnPropertyChanged(nameof(IsSwapWeaponSet));
+        RefreshSlots();
+    }
+
+    [RelayCommand]
+    private void UseSwapWeapons()
+    {
+        if (SelectedWeaponSet == 2) return;
+        SelectedWeaponSet = 2;
+        OnPropertyChanged(nameof(IsPrimaryWeaponSet));
+        OnPropertyChanged(nameof(IsSwapWeaponSet));
+        RefreshSlots();
+    }
+
+    [RelayCommand]
+    private void CreateLoadout()
+    {
+        _workspace.CreateLoadout($"Loadout {_workspace.Loadouts.Count + 1}", copyActive: false);
+        RefreshEquipment(preserveSelectedItemId: null);
+        NotifyEquipmentChanged();
+    }
+
+    [RelayCommand]
+    private void DuplicateLoadout()
+    {
+        _workspace.CreateLoadout($"{_workspace.ActiveLoadout.Name} copy", copyActive: true);
+        RefreshEquipment(SelectedLibraryItem?.ItemId);
+        NotifyEquipmentChanged();
+    }
+
+    [RelayCommand]
+    private void DeleteLoadout()
+    {
+        if (!_workspace.DeleteActiveLoadout()) return;
+        RefreshEquipment(preserveSelectedItemId: null);
+        NotifyEquipmentChanged();
+    }
+
+    [RelayCommand]
+    private void NewItem()
+    {
+        var slot = SelectedSlot?.Name ?? EditorSlotOptions.FirstOrDefault() ?? "Helmet";
+        _editorItemId = null;
+        EditorTitle = "Create custom item";
+        EditorSelectedSlot = slot;
+        EditorRawText = NewItemTemplate(slot);
+        EditorError = string.Empty;
+        IsEditorOpen = true;
+    }
+
+    [RelayCommand]
+    private void EditSelectedItem()
+    {
+        if (SelectedLibraryItem is not { } selected) return;
+        _editorItemId = selected.ItemId;
+        EditorTitle = $"Edit {selected.Name}";
+        EditorSelectedSlot = selected.Slot;
+        EditorRawText = string.IsNullOrWhiteSpace(selected.RawText) ? BuildFallbackRaw(selected.Item) : selected.RawText;
+        EditorError = string.Empty;
+        IsEditorOpen = true;
+    }
+
+    [RelayCommand]
+    private void DuplicateSelectedItem()
+    {
+        if (SelectedLibraryItem is not { } selected) return;
+        var raw = string.IsNullOrWhiteSpace(selected.RawText) ? BuildFallbackRaw(selected.Item) : selected.RawText;
+        var copy = _workspace.AddItem(raw, selected.Slot);
+        RefreshEquipment(copy.Id);
+        NotifyEquipmentChanged();
+    }
+
+    [RelayCommand]
+    private void SaveItem()
+    {
+        EditorError = ValidateEditor();
+        if (HasEditorError)
+        {
+            return;
+        }
+
+        ImportedItem item;
+        if (_editorItemId is { } itemId)
+        {
+            item = _workspace.UpdateItem(itemId, EditorRawText, EditorSelectedSlot);
+        }
+        else
+        {
+            item = _workspace.AddItem(EditorRawText, EditorSelectedSlot);
+            if (SelectedSlot is { } slot && EquipmentSlotCatalog.IsCompatible(item, slot.Name))
+            {
+                _workspace.Equip(slot.Name, item.Id);
+            }
+        }
+
+        _editorItemId = null;
+        IsEditorOpen = false;
+        SynchronizeTreeJewels();
+        RefreshEquipment(item.Id);
+        NotifyEquipmentChanged();
+    }
+
+    [RelayCommand]
+    private void CancelEditor()
+    {
+        _editorItemId = null;
+        IsEditorOpen = false;
+        EditorError = string.Empty;
+    }
+
+    [RelayCommand]
+    private void EquipSelectedItem()
+    {
+        if (SelectedSlot is not { } slot || SelectedLibraryItem is not { } item || !_workspace.Equip(slot.Name, item.ItemId))
+        {
+            return;
+        }
+        SynchronizeTreeJewels();
+        RefreshEquipment(item.ItemId);
+        NotifyEquipmentChanged();
+    }
+
+    [RelayCommand]
+    private void UnequipSelectedSlot()
+    {
+        if (SelectedSlot is not { } slot || !_workspace.Unequip(slot.Name)) return;
+        SynchronizeTreeJewels();
+        RefreshEquipment(preserveSelectedItemId: null);
+        NotifyEquipmentChanged();
+    }
+
+    [RelayCommand]
+    private void RequestDeleteSelectedItem()
+    {
+        if (SelectedLibraryItem is not null)
+        {
+            IsConfirmingItemDelete = true;
+        }
+    }
+
+    [RelayCommand]
+    private void CancelDeleteSelectedItem() => IsConfirmingItemDelete = false;
+
+    [RelayCommand]
+    private void ConfirmDeleteSelectedItem()
+    {
+        if (SelectedLibraryItem is not { } selected || !_workspace.DeleteItem(selected.ItemId)) return;
+        IsConfirmingItemDelete = false;
+        IsEditorOpen = false;
+        SynchronizeTreeJewels();
+        RefreshEquipment(preserveSelectedItemId: null);
+        NotifyEquipmentChanged();
     }
 
     partial void OnSelectedSkillSetIndexChanged(int value) => RefreshSkillGroups();
+
+    private void RefreshEquipment(int? preserveSelectedItemId)
+    {
+        RefreshLoadouts();
+        RefreshSlots();
+        RefreshGroups();
+        RefreshLibrary(preserveSelectedItemId);
+        EmptyMessage = HasItems
+            ? string.Empty
+            : "Your item library is empty. Create an item or paste copied item text to get started.";
+        OnPropertyChanged(nameof(HasItems));
+        OnPropertyChanged(nameof(HasContent));
+        OnPropertyChanged(nameof(CanDeleteLoadout));
+        OnPropertyChanged(nameof(CanUnequipSelectedSlot));
+        OnPropertyChanged(nameof(CanEquipSelectedItem));
+    }
+
+    private void RefreshLoadouts()
+    {
+        _synchronizingLoadout = true;
+        LoadoutOptions = new ObservableCollection<EquipmentLoadoutOptionViewModel>(
+            _workspace.Loadouts.Select((loadout, index) => new EquipmentLoadoutOptionViewModel(index, loadout.Name)));
+        SelectedLoadoutIndex = _workspace.ActiveLoadoutIndex;
+        ActiveLoadoutName = _workspace.ActiveLoadout.Name;
+        _synchronizingLoadout = false;
+    }
+
+    private void RefreshSlots()
+    {
+        var selectedName = SelectedSlot?.Name;
+        var definitions = EquipmentSlotCatalog.ForGame(_spec?.Tree.GameId)
+            .Where(slot => SelectedWeaponSet == 1
+                ? !slot.Name.EndsWith(" Swap", StringComparison.Ordinal)
+                : slot.Name.EndsWith(" Swap", StringComparison.Ordinal) || !slot.Name.StartsWith("Weapon", StringComparison.Ordinal))
+            .ToList();
+
+        var jewelSocketIds = new HashSet<int>();
+        if (_spec is not null)
+        {
+            foreach (var node in _spec.Tree.Nodes.Values.Where(node =>
+                         node.Type == NodeType.JewelSocket
+                         && node.Name != "Charm Socket"
+                         && _spec.IsAllocated(node.Id)))
+            {
+                jewelSocketIds.Add(node.Id);
+            }
+            foreach (var node in _spec.ActiveSubgraphs.Values
+                         .SelectMany(graph => graph.Nodes)
+                         .Where(node => node.Type == NodeType.JewelSocket && _spec.IsAllocated(node.Id)))
+            {
+                jewelSocketIds.Add(node.Id);
+            }
+        }
+        definitions.AddRange(jewelSocketIds.Order().Select((id, index) => EquipmentSlotCatalog.Jewel(id, index)));
+
+        var slots = new List<EquipmentSlotViewModel>();
+        EquipmentSlotCategory? previousCategory = null;
+        foreach (var definition in definitions.OrderBy(slot => slot.SortOrder))
+        {
+            var item = _workspace.EquippedItemId(definition.Name) is { } itemId
+                && _workspace.Items.TryGetValue(itemId, out var imported)
+                    ? ItemViewModel.FromImported(imported, definition.Name, $"Equipped · {DisplaySlotName(definition.Name)}")
+                    : null;
+            var showHeader = previousCategory != definition.Category;
+            slots.Add(new EquipmentSlotViewModel(
+                definition.Name,
+                DisplaySlotName(definition.Name),
+                definition.ShortName,
+                CategoryName(definition.Category),
+                showHeader,
+                item));
+            previousCategory = definition.Category;
+        }
+
+        _synchronizingSlots = true;
+        Slots = new ObservableCollection<EquipmentSlotViewModel>(slots);
+        EditorSlotOptions = new ObservableCollection<string>(slots.Select(slot => slot.Name));
+        SelectedSlot = slots.FirstOrDefault(slot => slot.Name == selectedName) ?? slots.FirstOrDefault();
+        _synchronizingSlots = false;
+        OnPropertyChanged(nameof(HasSelectedSlot));
+        OnPropertyChanged(nameof(SelectedSlotTitle));
+    }
+
+    private void RefreshLibrary(int? preserveSelectedItemId)
+    {
+        var selectedId = preserveSelectedItemId ?? SelectedLibraryItem?.ItemId;
+        var query = SearchText.Trim();
+        var equippedSlots = _workspace.ActiveItems()
+            .GroupBy(item => item.Id)
+            .ToDictionary(group => group.Key, group => string.Join(", ", group.Select(item => DisplaySlotName(item.Slot))));
+        var items = _workspace.Items.Values
+            .Where(item => !ShowCompatibleOnly || SelectedSlot is null || EquipmentSlotCatalog.IsCompatible(item, SelectedSlot.Name))
+            .Where(item => query.Length == 0
+                || item.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || item.BaseType.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || item.RawText.Contains(query, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(item => EquipmentSlotCatalog.Family(item.Slot, item))
+            .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(item => ItemViewModel.FromImported(
+                item,
+                usageText: equippedSlots.TryGetValue(item.Id, out var slots) ? $"Equipped · {slots}" : "Available"))
+            .ToArray();
+        FilteredItems = new ObservableCollection<ItemViewModel>(items);
+        SelectedLibraryItem = selectedId is { } id ? items.FirstOrDefault(item => item.ItemId == id) : null;
+        if (SelectedLibraryItem is null && SelectedSlot?.Item is { } equipped)
+        {
+            SelectedLibraryItem = items.FirstOrDefault(item => item.ItemId == equipped.ItemId);
+        }
+        OnPropertyChanged(nameof(LibrarySummary));
+    }
+
+    private void RefreshGroups()
+    {
+        var groups = new List<ItemGroupViewModel>();
+        var activeGear = _workspace.ActiveGearItems();
+        AddGroup(groups, "Equipment", activeGear.Where(item => GroupName(item) == "Equipment"));
+        AddGroup(groups, "Flasks & Charms", activeGear.Where(item => GroupName(item) == "Flasks & Charms"));
+        AddGroup(groups, "Jewels", activeGear.Where(item => GroupName(item) == "Jewels"));
+        var socketed = _workspace.SocketedJewelItemIds
+            .OrderBy(pair => pair.Key)
+            .Where(pair => _workspace.Items.ContainsKey(pair.Value))
+            .Select(pair => ItemViewModel.FromImported(_workspace.Items[pair.Value], $"Jewel {pair.Key}"))
+            .ToArray();
+        if (socketed.Length > 0)
+        {
+            groups.Add(new ItemGroupViewModel("Socketed Tree Jewels", socketed));
+        }
+        Groups = new ObservableCollection<ItemGroupViewModel>(groups);
+    }
+
+    private static void AddGroup(List<ItemGroupViewModel> groups, string name, IEnumerable<ImportedItem> items)
+    {
+        var viewModels = items.Select(item => ItemViewModel.FromImported(item)).ToArray();
+        if (viewModels.Length > 0)
+        {
+            groups.Add(new ItemGroupViewModel(name, viewModels));
+        }
+    }
+
+    private void SynchronizeTreeJewels()
+    {
+        if (_spec is null || _synchronizingTreeJewels)
+        {
+            return;
+        }
+
+        _synchronizingTreeJewels = true;
+        try
+        {
+            var socketIds = _spec.SocketedJewels.Keys.Concat(_workspace.SocketedJewelItemIds.Keys).Distinct().ToArray();
+            foreach (var socketId in socketIds)
+            {
+                ImportedItem? item = null;
+                if (_workspace.SocketedJewelItemIds.TryGetValue(socketId, out var itemId))
+                {
+                    _workspace.Items.TryGetValue(itemId, out item);
+                }
+                _spec.SetSocketedJewel(socketId, item);
+            }
+        }
+        finally
+        {
+            _synchronizingTreeJewels = false;
+        }
+    }
+
+    private void OnSpecChanged()
+    {
+        if (!_synchronizingTreeJewels)
+        {
+            RefreshSlots();
+            RefreshLibrary(SelectedLibraryItem?.ItemId);
+        }
+    }
+
+    private void NotifyEquipmentChanged()
+    {
+        IsDirty = true;
+        EquipmentChanged?.Invoke();
+    }
+
+    private string ValidateEditor()
+    {
+        if (string.IsNullOrWhiteSpace(EditorSelectedSlot)) return "Choose the item's default slot.";
+        if (string.IsNullOrWhiteSpace(EditorRawText)) return "Enter or paste item text.";
+        var parsed = RawItemParser.Parse(EditorSelectedSlot, EditorRawText);
+        if (string.IsNullOrWhiteSpace(parsed.Name)) return "Item text needs a name after the Rarity line.";
+        if (string.IsNullOrWhiteSpace(parsed.BaseType)) return "Item text needs a base type.";
+        return string.Empty;
+    }
+
+    private static string NewItemTemplate(string slotName)
+    {
+        var (name, baseType, mod) = EquipmentSlotCatalog.Family(slotName, item: null) switch
+        {
+            "Jewel" => ("New Jewel", "Cobalt Jewel", "+10 to Intelligence"),
+            "Life Flask" => ("New Life Flask", "Life Flask", "50% increased Amount Recovered"),
+            "Mana Flask" => ("New Mana Flask", "Mana Flask", "50% increased Amount Recovered"),
+            "Flask" => ("New Flask", "Utility Flask", "20% increased Duration"),
+            "Charm" => ("New Charm", "Charm", "+10% to Fire Resistance"),
+            "Ring" => ("New Ring", "Ruby Ring", "+30 to maximum Life"),
+            "Amulet" => ("New Amulet", "Gold Amulet", "+20 to all Attributes"),
+            "Belt" => ("New Belt", "Leather Belt", "+60 to maximum Life"),
+            "Weapon" => ("New Weapon", "Weapon Base", "100% increased Physical Damage"),
+            _ => ("New Item", $"{slotName} Base", "+50 to maximum Life"),
+        };
+        return $"Rarity: Rare\n{name}\n{baseType}\n--------\n{mod}";
+    }
+
+    private static string BuildFallbackRaw(ImportedItem item)
+    {
+        var header = item.Rarity.Equals("Rare", StringComparison.OrdinalIgnoreCase)
+            || item.Rarity.Equals("Unique", StringComparison.OrdinalIgnoreCase)
+                ? $"Rarity: {item.Rarity}\n{item.Name}\n{item.BaseType}"
+                : $"Rarity: {item.Rarity}\n{item.Name}";
+        return header + "\n--------";
+    }
+
+    private static string DisplaySlotName(string slotName) =>
+        SelectedWeaponLabel(slotName) ?? slotName;
+
+    private static string? SelectedWeaponLabel(string slotName) => slotName switch
+    {
+        "Weapon 1 Swap" => "Weapon 1",
+        "Weapon 2 Swap" => "Weapon 2",
+        _ => null,
+    };
+
+    private static string CategoryName(EquipmentSlotCategory category) => category switch
+    {
+        EquipmentSlotCategory.Weapons => "Weapons",
+        EquipmentSlotCategory.Armour => "Armour",
+        EquipmentSlotCategory.Jewellery => "Jewellery",
+        EquipmentSlotCategory.Flasks => "Flasks",
+        EquipmentSlotCategory.Charms => "Charms",
+        EquipmentSlotCategory.Jewels => "Passive tree jewels",
+        _ => category.ToString(),
+    };
 
     private void RefreshSkillGroups()
     {
@@ -134,22 +635,6 @@ public partial class EquipmentViewModel : ObservableObject
         var set = _importedSkillSets[SelectedSkillSetIndex];
         SkillGroups = new ObservableCollection<ImportedSkillGroupViewModel>(
             set.Groups.Select(group => ImportedSkillGroupViewModel.FromImported(set, group)));
-    }
-
-    private static IEnumerable<ItemViewModel> SocketedJewels(ImportedBuild build, HashSet<int> activeItemIds)
-    {
-        var seen = new HashSet<int>();
-        foreach (var socketed in build.SocketedJewels.OrderBy(jewel => jewel.SocketNodeId))
-        {
-            if (activeItemIds.Contains(socketed.ItemId)
-                || !seen.Add(socketed.ItemId)
-                || !build.ItemsById.TryGetValue(socketed.ItemId, out var item))
-            {
-                continue;
-            }
-
-            yield return ItemViewModel.FromImported(item, $"Jewel {socketed.SocketNodeId}");
-        }
     }
 
     private static string GroupName(ImportedItem item)
@@ -169,6 +654,36 @@ public partial class EquipmentViewModel : ObservableObject
 
         return "Equipment";
     }
+}
+
+public sealed record EquipmentLoadoutOptionViewModel(int Index, string Name);
+
+public sealed class EquipmentSlotViewModel
+{
+    public EquipmentSlotViewModel(
+        string name,
+        string displayName,
+        string shortName,
+        string category,
+        bool showCategoryHeader,
+        ItemViewModel? item)
+    {
+        Name = name;
+        DisplayName = displayName;
+        ShortName = shortName;
+        Category = category;
+        ShowCategoryHeader = showCategoryHeader;
+        Item = item;
+    }
+
+    public string Name { get; }
+    public string DisplayName { get; }
+    public string ShortName { get; }
+    public string Category { get; }
+    public bool ShowCategoryHeader { get; }
+    public ItemViewModel? Item { get; }
+    public bool HasItem => Item is not null;
+    public bool IsEmpty => Item is null;
 }
 
 public sealed class ItemGroupViewModel

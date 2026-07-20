@@ -22,7 +22,10 @@ public sealed class ItemViewModel
     private static readonly IBrush BrushVariant   = new SolidColorBrush(Color.FromRgb(0xC8, 0xA0, 0xFF));
     private static readonly IBrush BrushCustom    = new SolidColorBrush(Color.FromRgb(0xE0, 0xD0, 0x90));
 
+    public ImportedItem Item { get; }
+    public int ItemId { get; }
     public string Slot { get; }
+    public string Rarity { get; }
     public string Name { get; }
     public IBrush NameBrush { get; }
     public string BaseType { get; }
@@ -33,12 +36,21 @@ public sealed class ItemViewModel
     public IReadOnlyList<ModLineViewModel> Body { get; }
     public IReadOnlyList<ModLineViewModel> StatusFlags { get; }
     public bool HasStatusFlags { get; }
+    public string RawText { get; }
+    public string UsageText { get; }
+    public bool HasUsageText { get; }
 
-    private ItemViewModel(ImportedItem item, string? slotOverride = null)
+    private ItemViewModel(ImportedItem item, string? slotOverride = null, string? usageText = null)
     {
+        Item = item;
+        ItemId = item.Id;
         Slot = slotOverride ?? item.Slot;
+        Rarity = string.IsNullOrWhiteSpace(item.Rarity) ? "Normal" : item.Rarity;
         Name = item.Name;
         BaseType = item.BaseType;
+        RawText = item.RawText;
+        UsageText = usageText ?? string.Empty;
+        HasUsageText = !string.IsNullOrWhiteSpace(UsageText);
         HasSeparateName = !string.Equals(item.Name, item.BaseType, StringComparison.Ordinal);
 
         IBrush nameBrush;
@@ -65,7 +77,8 @@ public sealed class ItemViewModel
         HasStatusFlags = StatusFlags.Count > 0;
     }
 
-    public static ItemViewModel FromImported(ImportedItem item, string? slotOverride = null) => new(item, slotOverride);
+    public static ItemViewModel FromImported(ImportedItem item, string? slotOverride = null, string? usageText = null) =>
+        new(item, slotOverride, usageText);
 
     private static IReadOnlyList<ModLineViewModel> ToModLines(IReadOnlyList<BodyLine> lines)
     {

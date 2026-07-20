@@ -10,6 +10,9 @@
   <Folder Name="/tests/PathOfAvalonia.TreeDomain.Tests/">
     <Project Path="tests/PathOfAvalonia.TreeDomain.Tests/PathOfAvalonia.TreeDomain.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/PathOfAvalonia.TreeApp.HeadlessTests/">
+    <Project Path="tests/PathOfAvalonia.TreeApp.HeadlessTests/PathOfAvalonia.TreeApp.HeadlessTests.csproj" />
+  </Folder>
   <Folder Name="/Tools/">
     <File Path="tools\lua_to_json.lua" />
     <Project Path="tools/poe2-assets/generate-poe2-sprites.csproj" />
