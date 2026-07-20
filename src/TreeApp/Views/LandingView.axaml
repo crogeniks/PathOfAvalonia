@@ -10,7 +10,10 @@
             <TextBlock Text="{Binding StatusMessage}" Foreground="#E0A060"/>
             </StackPanel>
         </Grid>
-        <ItemsControl Grid.Row="1" ItemsSource="{Binding Games}" Margin="32,0,32,32">
+        <ItemsControl Name="GameChoices"
+                      Grid.Row="1"
+                      ItemsSource="{Binding Games}"
+                      Margin="32,0,32,32">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                     <StackPanel Orientation="Horizontal" Spacing="16"/>

@@ -7,7 +7,8 @@
         Title="PathOfAvalonia">
     <Grid Background="#101018">
         <ContentControl Name="ShellHost"/>
-        <Border IsVisible="{Binding IsConfirmingGameChange}"
+        <Border Name="GameChangeConfirmation"
+                IsVisible="{Binding IsConfirmingGameChange}"
                 Background="#AA000000">
             <Border Width="460"
                     HorizontalAlignment="Center"
@@ -25,8 +26,12 @@
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Right"
                                 Spacing="8">
-                        <Button Content="Cancel" Command="{Binding CancelGameChangeCommand}"/>
-                        <Button Content="Change Game" Command="{Binding ConfirmGameChangeCommand}"/>
+                        <Button Name="CancelGameChangeButton"
+                                Content="Cancel"
+                                Command="{Binding CancelGameChangeCommand}"/>
+                        <Button Name="ConfirmGameChangeButton"
+                                Content="Change Game"
+                                Command="{Binding ConfirmGameChangeCommand}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>

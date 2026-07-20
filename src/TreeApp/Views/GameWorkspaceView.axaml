@@ -12,19 +12,22 @@
                 <TextBlock Grid.Column="1" Text="{Binding GameName}" Foreground="#CFCFE0" Margin="18,0,0,0" VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="2" Text="Tree" Foreground="#9090A0" Margin="12,0,6,0" VerticalAlignment="Center"
                            IsVisible="{Binding HasTreeVersionOptions}"/>
-                <ComboBox Grid.Column="3"
+                <ComboBox Name="TreeVersionSelector"
+                          Grid.Column="3"
                           Width="98"
                           ItemsSource="{Binding TreeVersionOptions}"
                           SelectedItem="{Binding SelectedTreeVersion}"
                           IsVisible="{Binding HasTreeVersionOptions}"/>
                 <TextBlock Grid.Column="4" Text="Diff" Foreground="#9090A0" Margin="12,0,6,0" VerticalAlignment="Center"
                            IsVisible="{Binding HasDiffVersionOptions}"/>
-                <ComboBox Grid.Column="5"
+                <ComboBox Name="DiffTreeVersionSelector"
+                          Grid.Column="5"
                           Width="98"
                           ItemsSource="{Binding DiffTreeVersionOptions}"
                           SelectedItem="{Binding SelectedDiffTreeVersion}"
                           IsVisible="{Binding HasDiffVersionOptions}"/>
-                <Button Grid.Column="6"
+                <Button Name="DiffLegendButton"
+                        Grid.Column="6"
                         Content="Legend"
                         Margin="8,0,0,0"
                         Padding="8,3"
@@ -51,10 +54,13 @@
                     </Button.Flyout>
                 </Button>
                 <TextBlock Grid.Column="7" Text="{Binding DiffSummary}" Foreground="#C6B36A" Margin="12,0,0,0" VerticalAlignment="Center"/>
-                <Button Grid.Column="8" Content="Change Game" Command="{Binding BackToLandingCommand}"/>
+                <Button Name="ChangeGameButton"
+                        Grid.Column="8"
+                        Content="Change Game"
+                        Command="{Binding BackToLandingCommand}"/>
             </Grid>
         </Border>
-        <TabControl Grid.Row="1" Background="#101018">
+        <TabControl Name="WorkspaceTabs" Grid.Row="1" Background="#101018">
             <TabItem Header="Passive Tree">
                 <Grid Name="TreeRoot" Background="#101018">
                     <Border HorizontalAlignment="Right" VerticalAlignment="Top"
@@ -65,20 +71,24 @@
                                     Spacing="6"
                                     DataContext="{Binding TreeSelection}"
                                     x:DataType="vm:TreeSelectionViewModel">
-                            <Button Content="{Binding TreeControlsToggleText}"
+                            <Button Name="TreeControlsToggleButton"
+                                    Content="{Binding TreeControlsToggleText}"
                                     Command="{Binding ToggleTreeControlsCommand}"
                                     HorizontalAlignment="Right"/>
-                            <StackPanel Orientation="Vertical"
+                            <StackPanel Name="TreeControlsPanel"
+                                        Orientation="Vertical"
                                         Spacing="6"
                                         Width="360"
                                         IsVisible="{Binding IsTreeControlsExpanded}">
                                 <TextBlock Text="Class" Foreground="#EAEAEA" FontWeight="Bold"/>
-                                <ComboBox ItemsSource="{Binding ClassNames}"
+                                <ComboBox Name="ClassSelector"
+                                          ItemsSource="{Binding ClassNames}"
                                           SelectedIndex="{Binding SelectedClassIndex}"
                                           HorizontalAlignment="Stretch"/>
                                 <TextBlock Text="Ascendancy" Foreground="#EAEAEA" FontWeight="Bold"
                                            Margin="0,6,0,0"/>
-                                <ComboBox ItemsSource="{Binding AscendancyNames}"
+                                <ComboBox Name="AscendancySelector"
+                                          ItemsSource="{Binding AscendancyNames}"
                                           SelectedItem="{Binding SelectedAscendancyName}"
                                           HorizontalAlignment="Stretch"/>
                                 <StackPanel DataContext="{Binding DataContext.ImportExport, ElementName=Root}"
@@ -102,12 +112,18 @@
                                     </TextBox.KeyBindings>
                                 </TextBox>
                                 <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsImportSupported}">
-                                    <Button Content="Import" Command="{Binding ImportCommand}"/>
-                                    <Button Content="Clear" Command="{Binding ClearCommand}"/>
-                                    <Button Content="Import .build"
+                                    <Button Name="ImportButton"
+                                            Content="Import"
+                                            Command="{Binding ImportCommand}"/>
+                                    <Button Name="ClearButton"
+                                            Content="Clear"
+                                            Command="{Binding ClearCommand}"/>
+                                    <Button Name="ImportBuildPlannerButton"
+                                            Content="Import .build"
                                             Command="{Binding ImportBuildPlannerCommand}"
                                             IsVisible="{Binding SupportsBuildPlannerImport}"/>
-                                    <Button Content="Export .build"
+                                    <Button Name="ExportBuildPlannerButton"
+                                            Content="Export .build"
                                             Command="{Binding ExportBuildPlannerCommand}"
                                             IsVisible="{Binding SupportsBuildPlannerExport}"
                                             IsEnabled="{Binding CanExportBuildPlanner}"/>
@@ -126,7 +142,8 @@
                                            Foreground="#AAAACC"
                                            TextWrapping="Wrap"
                                            IsVisible="{Binding IsImportUnsupported}"/>
-                                <TextBlock Text="{Binding ImportStatus}"
+                                <TextBlock Name="ImportStatusText"
+                                           Text="{Binding ImportStatus}"
                                            Foreground="{Binding ImportStatusForeground}"
                                            TextWrapping="Wrap"/>
                                 </StackPanel>
@@ -135,10 +152,10 @@
                     </Border>
                 </Grid>
             </TabItem>
-            <TabItem Header="Equipment" IsEnabled="{Binding SupportsEquipment}">
+            <TabItem Name="EquipmentTab" Header="Equipment" IsEnabled="{Binding SupportsEquipment}">
                 <local:EquipmentView DataContext="{Binding State.Equipment}"/>
             </TabItem>
-            <TabItem Header="Gems &amp; DPS" IsEnabled="{Binding SupportsEquipment}">
+            <TabItem Name="BuildOutputTab" Header="Gems &amp; DPS" IsEnabled="{Binding SupportsEquipment}">
                 <Grid RowDefinitions="Auto,*" Background="#101018">
                     <StackPanel Orientation="Horizontal"
                                 Spacing="8"
