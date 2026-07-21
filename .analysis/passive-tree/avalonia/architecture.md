@@ -53,6 +53,13 @@ objects reachable from that state. UI workflows are deliberately split into
 feedback). File-picker access stays behind `IBuildPlannerFileService`, so neither
 workflow view model depends on Avalonia `IStorageProvider`.
 
+The workspace state also connects tree hover intent to the native basic-stat
+calculator. `PassiveTreeViewModel` publishes a non-mutating allocation/refund
+overlay, `EquipmentViewModel` evaluates it using the active loadout, and the
+result is returned to the tree view model for tooltip rendering. The same
+projected view model backs `BasicStatsSidebarView`, so the sidebar and tooltip
+cannot drift to different hover calculations.
+
 ## 2. Type Catalogue
 
 ### Domain

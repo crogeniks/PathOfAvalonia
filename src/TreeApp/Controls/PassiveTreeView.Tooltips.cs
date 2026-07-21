@@ -366,9 +366,51 @@ public sealed partial class PassiveTreeView
     private void AddAllocationPreviewLines(List<TooltipLine> lines, Node node, double contentWidth)
     {
         _ = node;
-        _ = contentWidth;
-        // Future home for "Allocating this node will give you" and DPS/stat deltas.
-        // The app does not yet have the calculation skeleton needed for this section.
+        if (_vm.BasicStatPreview is not { } preview)
+        {
+            return;
+        }
+
+        if (lines.Count > 0)
+        {
+            lines.Add(TooltipLine.Separator);
+        }
+        AddWrappedLines(lines, [preview.TooltipHeading], contentWidth, TooltipReminderBrush, 13, Typeface.Default);
+        if (!preview.HasChanges)
+        {
+            AddWrappedLines(
+                lines,
+                ["No changes to the supported basic stats."],
+                contentWidth,
+                TooltipReminderBrush,
+                13,
+                Typeface.Default);
+        }
+        else
+        {
+            foreach (var change in preview.Changes)
+            {
+                var brush = change.IsPositiveChange ? TooltipPositiveBrush : TooltipNegativeBrush;
+                AddWrappedLines(
+                    lines,
+                    [$"{change.Label}: {change.DeltaText}"],
+                    contentWidth,
+                    brush,
+                    13,
+                    Typeface.Default);
+            }
+        }
+        if (preview.HasWarning)
+        {
+            AddWrappedLines(
+                lines,
+                [preview.WarningText],
+                contentWidth,
+                TooltipFlavourBrush,
+                12,
+                Typeface.Default,
+                gapBefore: true);
+        }
     }
 
     private static void AddWrappedLines(

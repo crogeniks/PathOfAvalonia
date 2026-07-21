@@ -28,6 +28,9 @@ public sealed class Poe2GggClassDto
 {
     [JsonPropertyName("name")] public string Name { get; set; } = string.Empty;
     [JsonPropertyName("integerId")] public int? IntegerId { get; set; }
+    [JsonPropertyName("base_str")] public int BaseStrength { get; set; }
+    [JsonPropertyName("base_dex")] public int BaseDexterity { get; set; }
+    [JsonPropertyName("base_int")] public int BaseIntelligence { get; set; }
     [JsonPropertyName("ascendancies")] public Poe2GggAscendancyDto[] Ascendancies { get; set; } = [];
 }
 

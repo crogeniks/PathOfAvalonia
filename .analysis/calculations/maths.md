@@ -90,3 +90,32 @@ cap Resist ≤ 75% (per-type override possible)
 ## Block / Suppression
 
 Block roll: `min(BlockChance, MaxBlock)` after suppress/avoidance fails. Suppression halves 50% of incoming spell damage when rolled.
+
+## Native basic-stat subset
+
+The Avalonia milestone uses the upstream base setup and attribute ordering:
+
+```text
+PoE1 base Life = 38 + 12 × level + floor(Str / 2)
+PoE1 base Mana = 34 +  6 × level + floor(Int / 2)
+PoE1 Evasion   = 15 base; floor(Dex / 5)% increased
+PoE1 ES        = floor(Int / 10)% increased
+
+PoE2 base Life = 16 + 12 × level + 2 × Str
+PoE2 base Mana = 30 +  4 × level + 2 × Int
+PoE2 Evasion   = 7 base
+```
+
+For each supported stat, flat values are summed first, increased/reduced values
+share one additive bucket, and more/less values multiply independently:
+
+```text
+final = round((intrinsicBase + Σ flat) × (1 + Σ increased / 100)
+              × Π(1 + more / 100))
+```
+
+PoE1 applies the configured penalty to elemental and chaos resistance; PoE2
+applies it only to elemental resistance and starts chaos at 0. Resistances retain
+their uncapped total and clamp the display to the calculated maximum (hard cap
+90). Block and spell block currently use their supported base/increased values
+and clamp to their maximum; suppression clamps to 100.

@@ -5,6 +5,7 @@ using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PathOfAvalonia.TreeDomain;
+using PathOfAvalonia.TreeDomain.Calculations;
 using PathOfAvalonia.TreeDomain.Import;
 using PathOfAvalonia.TreeDomain.Items;
 
@@ -18,7 +19,9 @@ public partial class EquipmentViewModel : ObservableObject
     private bool _synchronizingLoadout;
     private bool _synchronizingSlots;
     private bool _synchronizingTreeJewels;
+    private bool _synchronizingBuildConfiguration;
     private int? _editorItemId;
+    private PassiveAllocationPreview _passiveAllocationPreview = PassiveAllocationPreview.None;
 
     public EquipmentViewModel(PassiveSpec? spec = null)
     {
@@ -29,9 +32,11 @@ public partial class EquipmentViewModel : ObservableObject
             _spec.SpecChanged += OnSpecChanged;
         }
         RefreshEquipment(preserveSelectedItemId: null);
+        RecalculateStats();
     }
 
     public event Action? EquipmentChanged;
+    public event Action<PassiveStatPreviewViewModel?>? PassivePreviewChanged;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasItems))]
@@ -104,6 +109,25 @@ public partial class EquipmentViewModel : ObservableObject
     public partial ImportedBuildMetricsViewModel? Metrics { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasCalculatedStats))]
+    [NotifyPropertyChangedFor(nameof(HasContent))]
+    public partial BasicCharacterStatsViewModel? CalculatedStats { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasTreeCalculatedStats))]
+    public partial BasicCharacterStatsViewModel? TreeCalculatedStats { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPassivePreview))]
+    public partial PassiveStatPreviewViewModel? PassivePreview { get; set; }
+
+    [ObservableProperty]
+    public partial int CharacterLevel { get; set; } = 1;
+
+    [ObservableProperty]
+    public partial int ResistancePenalty { get; set; } = -60;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSkillGroups))]
     [NotifyPropertyChangedFor(nameof(HasContent))]
     public partial ObservableCollection<ImportedSkillGroupViewModel> SkillGroups { get; set; } = new();
@@ -120,8 +144,11 @@ public partial class EquipmentViewModel : ObservableObject
 
     public bool HasItems => _workspace.Items.Count > 0;
     public bool HasMetrics => Metrics is not null;
+    public bool HasCalculatedStats => CalculatedStats is not null;
+    public bool HasTreeCalculatedStats => TreeCalculatedStats is not null;
+    public bool HasPassivePreview => PassivePreview is not null;
     public bool HasSkillGroups => SkillGroups.Count > 0;
-    public bool HasContent => HasItems || HasMetrics || HasSkillGroups;
+    public bool HasContent => HasItems || HasMetrics || HasCalculatedStats || HasSkillGroups;
     public bool HasSkillSetVariants => SkillSetOptions.Count > 1;
     public bool HasSelectedSlot => SelectedSlot is not null;
     public bool HasSelectedLibraryItem => SelectedLibraryItem is not null;
@@ -140,6 +167,10 @@ public partial class EquipmentViewModel : ObservableObject
     public void LoadBuild(ImportedBuild build)
     {
         _workspace.Load(build);
+        _synchronizingBuildConfiguration = true;
+        CharacterLevel = build.CharacterLevel;
+        ResistancePenalty = build.ResistancePenalty;
+        _synchronizingBuildConfiguration = false;
         Metrics = build.Metrics.Source != ImportedMetricSource.None || !string.IsNullOrWhiteSpace(build.Metrics.ErrorMessage)
             ? ImportedBuildMetricsViewModel.FromImported(build.Metrics)
             : null;
@@ -151,12 +182,17 @@ public partial class EquipmentViewModel : ObservableObject
             : 0;
         RefreshSkillGroups();
         RefreshEquipment(preserveSelectedItemId: null);
+        RecalculateStats();
         IsDirty = false;
     }
 
     public void Clear()
     {
         _workspace.Reset();
+        _synchronizingBuildConfiguration = true;
+        CharacterLevel = 1;
+        ResistancePenalty = -60;
+        _synchronizingBuildConfiguration = false;
         Metrics = null;
         _importedSkillSets = [];
         SkillSetOptions = new ObservableCollection<ImportedSkillSetOptionViewModel>();
@@ -166,6 +202,7 @@ public partial class EquipmentViewModel : ObservableObject
         IsConfirmingItemDelete = false;
         RefreshEquipment(preserveSelectedItemId: null);
         SynchronizeTreeJewels();
+        RecalculateStats();
         IsDirty = false;
     }
 
@@ -180,9 +217,56 @@ public partial class EquipmentViewModel : ObservableObject
         EmptyMessage = "Equipment is not available for this game yet.";
         RefreshEquipment(preserveSelectedItemId: null);
         EmptyMessage = "Equipment is not available for this game yet.";
+        RecalculateStats();
     }
 
-    public ImportedBuild ApplyToBuild(ImportedBuild build) => _workspace.ApplyTo(build);
+    public ImportedBuild ApplyToBuild(ImportedBuild build) => _workspace.ApplyTo(build) with
+    {
+        CharacterLevel = CharacterLevel,
+        ResistancePenalty = ResistancePenalty,
+    };
+
+    public void SetPassivePreview(PassiveAllocationPreview preview)
+    {
+        if (_passiveAllocationPreview.Kind == preview.Kind
+            && _passiveAllocationPreview.TargetNodeId == preview.TargetNodeId
+            && _passiveAllocationPreview.HasUnmodeledJewelEffectChange == preview.HasUnmodeledJewelEffectChange
+            && _passiveAllocationPreview.NodeIds.SetEquals(preview.NodeIds))
+        {
+            return;
+        }
+
+        _passiveAllocationPreview = preview;
+        RecalculateStats();
+    }
+
+    partial void OnCharacterLevelChanged(int value)
+    {
+        var clamped = Math.Clamp(value, 1, 100);
+        if (clamped != value)
+        {
+            CharacterLevel = clamped;
+            return;
+        }
+        if (!_synchronizingBuildConfiguration)
+        {
+            NotifyEquipmentChanged();
+        }
+    }
+
+    partial void OnResistancePenaltyChanged(int value)
+    {
+        var clamped = Math.Clamp(value, -60, 0);
+        if (clamped != value)
+        {
+            ResistancePenalty = clamped;
+            return;
+        }
+        if (!_synchronizingBuildConfiguration)
+        {
+            NotifyEquipmentChanged();
+        }
+    }
 
     partial void OnSelectedLoadoutIndexChanged(int value)
     {
@@ -232,6 +316,7 @@ public partial class EquipmentViewModel : ObservableObject
         OnPropertyChanged(nameof(IsPrimaryWeaponSet));
         OnPropertyChanged(nameof(IsSwapWeaponSet));
         RefreshSlots();
+        RecalculateStats();
     }
 
     [RelayCommand]
@@ -242,6 +327,7 @@ public partial class EquipmentViewModel : ObservableObject
         OnPropertyChanged(nameof(IsPrimaryWeaponSet));
         OnPropertyChanged(nameof(IsSwapWeaponSet));
         RefreshSlots();
+        RecalculateStats();
     }
 
     [RelayCommand]
@@ -558,12 +644,60 @@ public partial class EquipmentViewModel : ObservableObject
             RefreshSlots();
             RefreshLibrary(SelectedLibraryItem?.ItemId);
         }
+        RecalculateStats();
     }
 
     private void NotifyEquipmentChanged()
     {
+        RecalculateStats();
         IsDirty = true;
         EquipmentChanged?.Invoke();
+    }
+
+    private void RecalculateStats()
+    {
+        if (_spec is null)
+        {
+            CalculatedStats = null;
+            TreeCalculatedStats = null;
+            PassivePreview = null;
+            PassivePreviewChanged?.Invoke(null);
+            return;
+        }
+
+        var activeItems = _workspace.ActiveItems().ToArray();
+        var current = BasicStatCalculator.Calculate(
+            _spec,
+            activeItems,
+            CharacterLevel,
+            ResistancePenalty,
+            SelectedWeaponSet);
+        CalculatedStats = BasicCharacterStatsViewModel.FromCalculated(current, ResistancePenalty);
+
+        if (_passiveAllocationPreview.IsEmpty)
+        {
+            TreeCalculatedStats = CalculatedStats;
+            PassivePreview = null;
+        }
+        else
+        {
+            var projected = BasicStatCalculator.Calculate(
+                _spec,
+                activeItems,
+                CharacterLevel,
+                ResistancePenalty,
+                SelectedWeaponSet,
+                _passiveAllocationPreview);
+            TreeCalculatedStats = BasicCharacterStatsViewModel.FromCalculated(
+                projected,
+                ResistancePenalty,
+                current);
+            PassivePreview = PassiveStatPreviewViewModel.From(
+                _passiveAllocationPreview,
+                TreeCalculatedStats.Changes);
+        }
+
+        PassivePreviewChanged?.Invoke(PassivePreview);
     }
 
     private string ValidateEditor()
@@ -657,6 +791,234 @@ public partial class EquipmentViewModel : ObservableObject
 }
 
 public sealed record EquipmentLoadoutOptionViewModel(int Index, string Name);
+
+public sealed class BasicCharacterStatsViewModel
+{
+    public BasicCharacterStats Values { get; }
+    public string SourceText { get; }
+    public string CoverageText { get; }
+    public string WarningText { get; }
+    public bool HasWarning => !string.IsNullOrWhiteSpace(WarningText);
+    public ObservableCollection<CalculatedStatMetricViewModel> Stats { get; }
+    public ObservableCollection<CalculatedStatMetricViewModel> Changes { get; }
+
+    private BasicCharacterStatsViewModel(
+        BasicCharacterStats stats,
+        int resistancePenalty,
+        BasicCharacterStats? baseline)
+    {
+        Values = stats;
+        SourceText = baseline is null
+            ? "Calculated locally from the current tree and equipment"
+            : "Projected from the hovered passive change";
+        CoverageText = $"Level {stats.Level} · resistance penalty {resistancePenalty}% · {stats.Coverage.AppliedLineCount} basic-stat lines applied";
+        var warnings = new List<string>();
+        if (stats.Coverage.UnsupportedRelevantLineCount > 0)
+        {
+            warnings.Add($"{stats.Coverage.UnsupportedRelevantLineCount} relevant line(s) need the full modifier/condition system.");
+        }
+        if (stats.Coverage.HasIncompleteItemDefences)
+        {
+            warnings.Add("Saved PoB item text omitted final item defences; ES, armour, evasion, and ward are lower bounds.");
+        }
+        if (stats.Coverage.HasIncompleteShieldBlock)
+        {
+            warnings.Add("Saved shield text omitted its final block property; block is a lower bound.");
+        }
+        warnings.Add("Flasks, buffs, reservations, and conditional effects are excluded.");
+        WarningText = "Experimental subset: " + string.Join(" ", warnings);
+
+        var rows = new List<CalculatedStatMetricViewModel>
+        {
+            IntegerRow("Strength", stats.Strength, baseline?.Strength, "Attributes"),
+            IntegerRow("Dexterity", stats.Dexterity, baseline?.Dexterity, "Attributes"),
+            IntegerRow("Intelligence", stats.Intelligence, baseline?.Intelligence, "Attributes"),
+            IntegerRow("Total Life", stats.Life, baseline?.Life, "Pools"),
+            IntegerRow("Total Mana", stats.Mana, baseline?.Mana, "Pools"),
+            IntegerRow("Energy Shield", stats.EnergyShield, baseline?.EnergyShield, "Pools", stats.Coverage.HasIncompleteItemDefences),
+            DecimalRow("Life Regen", stats.LifeRegeneration, baseline?.LifeRegeneration, "Recovery"),
+            DecimalRow("Mana Regen", stats.ManaRegeneration, baseline?.ManaRegeneration, "Recovery"),
+            IntegerRow("Armour", stats.Armour, baseline?.Armour, "Defences", stats.Coverage.HasIncompleteItemDefences),
+            IntegerRow("Evasion", stats.Evasion, baseline?.Evasion, "Defences", stats.Coverage.HasIncompleteItemDefences),
+        };
+        if (stats.Ward > 0 || baseline?.Ward > 0)
+        {
+            rows.Add(IntegerRow("Ward", stats.Ward, baseline?.Ward, "Defences", stats.Coverage.HasIncompleteItemDefences));
+        }
+        rows.AddRange(
+        [
+            PercentRow("Block Chance", stats.BlockChance, baseline?.BlockChance, "Avoidance", stats.Coverage.HasIncompleteShieldBlock),
+            PercentRow("Spell Block Chance", stats.SpellBlockChance, baseline?.SpellBlockChance, "Avoidance"),
+            PercentRow("Spell Suppression", stats.SpellSuppressionChance, baseline?.SpellSuppressionChance, "Avoidance"),
+            ResistanceRow("Fire Resistance", stats.FireResistance, baseline?.FireResistance, "Resistances"),
+            ResistanceRow("Cold Resistance", stats.ColdResistance, baseline?.ColdResistance, "Resistances"),
+            ResistanceRow("Lightning Resistance", stats.LightningResistance, baseline?.LightningResistance, "Resistances"),
+            ResistanceRow("Chaos Resistance", stats.ChaosResistance, baseline?.ChaosResistance, "Resistances"),
+            SignedPercentRow("Movement Speed", stats.MovementSpeedModifier, baseline?.MovementSpeedModifier, "Movement"),
+        ]);
+        Stats = new ObservableCollection<CalculatedStatMetricViewModel>(rows);
+        Changes = new ObservableCollection<CalculatedStatMetricViewModel>(rows.Where(row => row.HasChange));
+    }
+
+    public static BasicCharacterStatsViewModel FromCalculated(
+        BasicCharacterStats stats,
+        int resistancePenalty,
+        BasicCharacterStats? baseline = null) =>
+        new(stats, resistancePenalty, baseline);
+
+    private static CalculatedStatMetricViewModel IntegerRow(
+        string label,
+        int value,
+        int? baseline,
+        string group,
+        bool partial = false) =>
+        Row(label, PartialNumber(value, partial), group, value - baseline, IntegerDelta(value, baseline));
+
+    private static CalculatedStatMetricViewModel DecimalRow(
+        string label,
+        double value,
+        double? baseline,
+        string group) =>
+        Row(label, Decimal(value), group, value - baseline, DecimalDelta(value, baseline));
+
+    private static CalculatedStatMetricViewModel PercentRow(
+        string label,
+        int value,
+        int? baseline,
+        string group,
+        bool partial = false) =>
+        Row(label, PartialPercent(value, partial), group, value - baseline, IntegerDelta(value, baseline, "%"));
+
+    private static CalculatedStatMetricViewModel SignedPercentRow(
+        string label,
+        int value,
+        int? baseline,
+        string group) =>
+        Row(label, SignedPercent(value), group, value - baseline, IntegerDelta(value, baseline, "%"));
+
+    private static CalculatedStatMetricViewModel ResistanceRow(
+        string label,
+        BasicResistance value,
+        BasicResistance? baseline,
+        string group)
+    {
+        var uncappedChange = baseline is null ? 0 : value.Uncapped - baseline.Uncapped;
+        var maximumChange = baseline is null ? 0 : value.Maximum - baseline.Maximum;
+        var parts = new List<string>();
+        if (uncappedChange != 0)
+        {
+            parts.Add($"{uncappedChange:+0;-0;0}%");
+        }
+        if (maximumChange != 0)
+        {
+            parts.Add($"max {maximumChange:+0;-0;0}%");
+        }
+        return Row(
+            label,
+            Resistance(value),
+            group,
+            uncappedChange != 0 ? uncappedChange : maximumChange,
+            parts.Count == 0 ? string.Empty : $"({string.Join(", ", parts)})");
+    }
+
+    private static CalculatedStatMetricViewModel Row(
+        string label,
+        string value,
+        string group,
+        double? change,
+        string deltaText) => new(
+            label,
+            value,
+            group,
+            deltaText,
+            change > 0,
+            change < 0);
+
+    private static string IntegerDelta(int value, int? baseline, string suffix = "")
+    {
+        if (baseline is null || value == baseline.Value)
+        {
+            return string.Empty;
+        }
+        return $"({value - baseline.Value:+#,0;-#,0;0}{suffix})";
+    }
+
+    private static string DecimalDelta(double value, double? baseline)
+    {
+        if (baseline is null || Math.Abs(value - baseline.Value) < 0.05)
+        {
+            return string.Empty;
+        }
+        return $"({value - baseline.Value:+0.0;-0.0;0.0})";
+    }
+
+    private static string Number(int value) => value.ToString("N0", System.Globalization.CultureInfo.CurrentCulture);
+    private static string PartialNumber(int value, bool partial) => partial ? $"{Number(value)}+ (partial)" : Number(value);
+    private static string Decimal(double value) => value.ToString("N1", System.Globalization.CultureInfo.CurrentCulture);
+    private static string Percent(int value) => $"{value}%";
+    private static string PartialPercent(int value, bool partial) => partial ? $"{value}%+ (partial)" : Percent(value);
+    private static string SignedPercent(int value) => $"{value:+0;-0;0}%";
+    private static string Resistance(BasicResistance value) => value.OverCap > 0
+        ? $"{value.Capped}% (+{value.OverCap}%)"
+        : $"{value.Capped}%";
+}
+
+public sealed record CalculatedStatMetricViewModel(
+    string Label,
+    string Value,
+    string Group,
+    string DeltaText = "",
+    bool IsPositiveChange = false,
+    bool IsNegativeChange = false)
+{
+    public bool HasChange => IsPositiveChange || IsNegativeChange;
+}
+
+public sealed class PassiveStatPreviewViewModel
+{
+    private PassiveStatPreviewViewModel(
+        string sidebarText,
+        string tooltipHeading,
+        string warningText,
+        IEnumerable<CalculatedStatMetricViewModel> changes)
+    {
+        SidebarText = sidebarText;
+        TooltipHeading = tooltipHeading;
+        WarningText = warningText;
+        Changes = new ObservableCollection<CalculatedStatMetricViewModel>(changes);
+    }
+
+    public string SidebarText { get; }
+    public string TooltipHeading { get; }
+    public string WarningText { get; }
+    public ObservableCollection<CalculatedStatMetricViewModel> Changes { get; }
+    public bool HasChanges => Changes.Count > 0;
+    public bool HasWarning => !string.IsNullOrWhiteSpace(WarningText);
+
+    public static PassiveStatPreviewViewModel From(
+        PassiveAllocationPreview preview,
+        IEnumerable<CalculatedStatMetricViewModel> changes)
+    {
+        var nodeLabel = preview.NodeIds.Count == 1 ? "1 passive" : $"{preview.NodeIds.Count} passives";
+        var warning = preview.HasUnmodeledJewelEffectChange
+            ? "Jewel-radius follow-on changes are not included in this preview."
+            : string.Empty;
+        return preview.Kind switch
+        {
+            PassiveAllocationPreviewKind.Allocate => new PassiveStatPreviewViewModel(
+                $"Previewing allocation · {nodeLabel}",
+                $"Allocating {nodeLabel} will give you:",
+                warning,
+                changes),
+            PassiveAllocationPreviewKind.Deallocate => new PassiveStatPreviewViewModel(
+                $"Previewing refund · {nodeLabel}",
+                $"Refunding {nodeLabel} will give you:",
+                warning,
+                changes),
+            _ => new PassiveStatPreviewViewModel(string.Empty, string.Empty, string.Empty, []),
+        };
+    }
+}
 
 public sealed class EquipmentSlotViewModel
 {

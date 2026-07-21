@@ -83,6 +83,15 @@ public sealed partial class PassiveTreeView
         }
     }
 
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        if (!_panning)
+        {
+            _vm.SetHover(null);
+        }
+    }
+
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         var props = e.GetCurrentPoint(this).Properties;

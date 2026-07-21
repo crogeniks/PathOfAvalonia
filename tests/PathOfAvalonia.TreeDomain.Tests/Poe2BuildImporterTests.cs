@@ -9,6 +9,27 @@ namespace PathOfAvalonia.TreeDomain.Tests;
 public sealed class Poe2BuildImporterTests
 {
     [Fact]
+    public void ParseXmlPreservesCharacterLevelAndResistancePenaltyInputs()
+    {
+        var xml = """
+            <PathOfBuilding2>
+              <Build level="87" />
+              <Config>
+                <Input name="resistancePenalty" number="-40" />
+              </Config>
+              <Tree>
+                <Spec treeVersion="0_4" classInternalId="Witch" nodes="1" />
+              </Tree>
+            </PathOfBuilding2>
+            """;
+
+        var build = Poe2BuildXmlParser.Parse(xml);
+
+        Assert.Equal(87, build.CharacterLevel);
+        Assert.Equal(-40, build.ResistancePenalty);
+    }
+
+    [Fact]
     public void BuildCodeDecodesPathOfBuilding2Root()
     {
         var xml = """

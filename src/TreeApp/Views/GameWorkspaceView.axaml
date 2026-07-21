@@ -62,7 +62,11 @@
         </Border>
         <TabControl Name="WorkspaceTabs" Grid.Row="1" Background="#101018">
             <TabItem Header="Passive Tree">
-                <Grid Name="TreeRoot" Background="#101018">
+                <Grid Name="TreeRoot" Background="#101018" ColumnDefinitions="286,*">
+                    <local:BasicStatsSidebarView Name="TreeStatsSidebar"
+                                                 Grid.Column="0"
+                                                 DataContext="{Binding State.Equipment}"/>
+                    <Grid Name="TreeCanvas" Grid.Column="1">
                     <Border HorizontalAlignment="Right" VerticalAlignment="Top"
                             Margin="12" Padding="10"
                             Background="#CC1A1A24" CornerRadius="6"
@@ -150,12 +154,13 @@
                             </StackPanel>
                         </StackPanel>
                     </Border>
+                    </Grid>
                 </Grid>
             </TabItem>
             <TabItem Name="EquipmentTab" Header="Equipment" IsEnabled="{Binding SupportsEquipment}">
                 <local:EquipmentView DataContext="{Binding State.Equipment}"/>
             </TabItem>
-            <TabItem Name="BuildOutputTab" Header="Gems &amp; DPS" IsEnabled="{Binding SupportsEquipment}">
+            <TabItem Name="BuildOutputTab" Header="Calculations" IsEnabled="{Binding SupportsEquipment}">
                 <Grid RowDefinitions="Auto,*" Background="#101018">
                     <StackPanel Orientation="Horizontal"
                                 Spacing="8"

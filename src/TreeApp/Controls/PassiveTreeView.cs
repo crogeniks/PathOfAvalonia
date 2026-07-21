@@ -81,6 +81,8 @@ public sealed partial class PassiveTreeView : Control
     private static readonly IBrush TooltipStatBrush = new SolidColorBrush(Color.FromRgb(0x8D, 0x98, 0xFF));
     private static readonly IBrush TooltipReminderBrush = new SolidColorBrush(Color.FromRgb(0xA6, 0xB1, 0xA4));
     private static readonly IBrush TooltipFlavourBrush = new SolidColorBrush(Color.FromRgb(0xD2, 0x84, 0x2E));
+    private static readonly IBrush TooltipPositiveBrush = new SolidColorBrush(Color.FromRgb(0x63, 0xD4, 0x85));
+    private static readonly IBrush TooltipNegativeBrush = new SolidColorBrush(Color.FromRgb(0xE5, 0x68, 0x68));
     private static readonly IBrush ConnectorBrush = new SolidColorBrush(Color.FromArgb(0x55, 0x40, 0x40, 0x48));
     private static readonly IBrush RequiredPathConnectorBrush = new SolidColorBrush(Color.FromArgb(0x8A, 0x4D, 0xA9, 0xD8));
     private static readonly IBrush HoverPathBrush = new SolidColorBrush(Color.FromArgb(0x80, 0xff, 0xc8, 0x4a));

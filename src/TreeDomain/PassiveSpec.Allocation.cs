@@ -99,26 +99,67 @@ public sealed partial class PassiveSpec
         SpecChanged?.Invoke();
     }
 
+    /// <summary>
+    /// Describes the allocation change a normal tree click would make without
+    /// mutating the spec. Unallocated nodes include their queued path; allocated
+    /// nodes include every dependent that would be disconnected by the refund.
+    /// </summary>
+    public PassiveAllocationPreview PreviewAllocationChange(int id)
+    {
+        if (_forbiddenJewelAllocatedNodes.Contains(id)
+            || (_classStartNodeByIndex.TryGetValue(_selectedClassIndex, out var startId) && startId == id)
+            || (SelectedAscendancyStartNodeId() is { } ascendancyStartId && ascendancyStartId == id))
+        {
+            return PassiveAllocationPreview.None;
+        }
+
+        if (_allocated.Contains(id))
+        {
+            return new PassiveAllocationPreview(
+                id,
+                PassiveAllocationPreviewKind.Deallocate,
+                DeallocationNodeIds(id),
+                _socketedJewels.ContainsKey(id));
+        }
+
+        var path = HoverPathTo(id);
+        return path.IsEmpty
+            ? PassiveAllocationPreview.None
+            : new PassiveAllocationPreview(
+                id,
+                PassiveAllocationPreviewKind.Allocate,
+                path.Nodes.ToHashSet(),
+                _socketedJewels.ContainsKey(id));
+    }
+
     // Removes `id` and any allocated node whose only path to the class-start went
     // through it. BFS over the allocated subgraph from the start, pretending `id`
     // is gone — anything unvisited is a dependent.
     private void DeallocateWithDependents(int id)
     {
         var wasActiveRadiusSocket = _activeRadiusEffects.Any(effect => effect.SocketNodeId == id);
+        var removedNodeIds = DeallocationNodeIds(id);
+        foreach (var removedNodeId in removedNodeIds)
+        {
+            _allocated.Remove(removedNodeId);
+            _masterySelections.Remove(removedNodeId);
+            _allocationSets.Remove(removedNodeId);
+        }
+        RebuildActiveRadiusEffects();
+        if (wasActiveRadiusSocket)
+        {
+            PruneInvalidRadiusOnlyAllocations();
+        }
+        SpecChanged?.Invoke();
+    }
+
+    private HashSet<int> DeallocationNodeIds(int id)
+    {
         var affected = AllocatedComponentFrom(id);
         var roots = DependencyRoots(id).ToList();
         if (roots.Count == 0)
         {
-            _allocated.Remove(id);
-            _masterySelections.Remove(id);
-            _allocationSets.Remove(id);
-            RebuildActiveRadiusEffects();
-            if (wasActiveRadiusSocket)
-            {
-                PruneInvalidRadiusOnlyAllocations();
-            }
-            SpecChanged?.Invoke();
-            return;
+            return [id];
         }
 
         var reachable = new HashSet<int>();
@@ -150,22 +191,11 @@ public sealed partial class PassiveSpec
             }
         }
 
-        _allocated.Remove(id);
-        _masterySelections.Remove(id);
-        _allocationSets.Remove(id);
-        var orphans = _allocated.Where(a => affected.Contains(a) && !reachable.Contains(a)).ToList();
-        foreach (var o in orphans)
-        {
-            _allocated.Remove(o);
-            _masterySelections.Remove(o);
-            _allocationSets.Remove(o);
-        }
-        RebuildActiveRadiusEffects();
-        if (wasActiveRadiusSocket)
-        {
-            PruneInvalidRadiusOnlyAllocations();
-        }
-        SpecChanged?.Invoke();
+        var removed = affected
+            .Where(nodeId => nodeId == id || !reachable.Contains(nodeId))
+            .ToHashSet();
+        removed.Add(id);
+        return removed;
     }
 
     private HashSet<int> AllocatedComponentFrom(int id)

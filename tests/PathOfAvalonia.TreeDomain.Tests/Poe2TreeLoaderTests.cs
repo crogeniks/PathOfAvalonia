@@ -13,6 +13,10 @@ public sealed class Poe2TreeLoaderTests
         Assert.Equal(GameId.PathOfExile2, tree.GameId);
         Assert.Contains("Ranger", tree.Classes.ClassNames);
         Assert.Contains("Deadeye", tree.Classes.AscendancyNames(0));
+        Assert.Equal((7, 7, 15), (
+            tree.Classes.GetClass(5).BaseStrength,
+            tree.Classes.GetClass(5).BaseDexterity,
+            tree.Classes.GetClass(5).BaseIntelligence));
         Assert.Contains(tree.Nodes.Values, n => n.Type == NodeType.ClassStart && n.ClassStartIndex == 0);
         Assert.Contains(tree.Nodes.Values, n =>
             n.Type == NodeType.ClassStart

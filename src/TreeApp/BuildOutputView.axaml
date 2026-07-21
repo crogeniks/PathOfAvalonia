@@ -5,7 +5,7 @@
              x:DataType="vm:EquipmentViewModel"
              Background="#101018">
     <Grid>
-        <TextBlock Text="Import a build to see gems and DPS."
+        <TextBlock Text="Open a game workspace to calculate basic stats."
                    IsVisible="{Binding !HasContent}"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
@@ -14,11 +14,90 @@
 
         <ScrollViewer IsVisible="{Binding HasContent}">
             <StackPanel Spacing="12" Margin="12">
+                <StackPanel IsVisible="{Binding HasCalculatedStats}" Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto,76,Auto,76" ColumnSpacing="8">
+                        <StackPanel>
+                            <TextBlock Text="Basic stats"
+                                       Foreground="#DDDDEE"
+                                       FontWeight="Bold"
+                                       FontSize="14"/>
+                            <TextBlock Text="{Binding CalculatedStats.SourceText}"
+                                       Foreground="#8EA6D8"
+                                       FontSize="11"/>
+                        </StackPanel>
+                        <TextBlock Grid.Column="1"
+                                   Text="Level"
+                                   Foreground="#8888AA"
+                                   VerticalAlignment="Center"/>
+                        <NumericUpDown Name="CharacterLevelInput"
+                                       Grid.Column="2"
+                                       Minimum="1"
+                                       Maximum="100"
+                                       Increment="1"
+                                       FormatString="0"
+                                       Value="{Binding CharacterLevel}"/>
+                        <TextBlock Grid.Column="3"
+                                   Text="Res. penalty"
+                                   Foreground="#8888AA"
+                                   VerticalAlignment="Center"/>
+                        <NumericUpDown Name="ResistancePenaltyInput"
+                                       Grid.Column="4"
+                                       Minimum="-60"
+                                       Maximum="0"
+                                       Increment="10"
+                                       FormatString="0"
+                                       Value="{Binding ResistancePenalty}"/>
+                    </Grid>
+                    <TextBlock Text="{Binding CalculatedStats.CoverageText}"
+                               Foreground="#8888AA"
+                               FontSize="10"/>
+                    <TextBlock Text="{Binding CalculatedStats.WarningText}"
+                               IsVisible="{Binding CalculatedStats.HasWarning}"
+                               Foreground="#D3A86B"
+                               FontSize="10"
+                               TextWrapping="Wrap"/>
+                    <ItemsControl Name="CalculatedStatsList"
+                                  ItemsSource="{Binding CalculatedStats.Stats}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:CalculatedStatMetricViewModel">
+                                <Border Width="174"
+                                        Margin="0,2,8,2"
+                                        Padding="8,5"
+                                        Background="#171722"
+                                        BorderBrush="#24243A"
+                                        BorderThickness="1"
+                                        CornerRadius="4">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Group}" Foreground="#666680" FontSize="9"/>
+                                            <TextBlock Text="{Binding Label}" Foreground="#9999B2" FontSize="10"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding Value}"
+                                                   Foreground="#E4E4EA"
+                                                   FontSize="12"
+                                                   VerticalAlignment="Bottom"
+                                                   Margin="8,0,0,0"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
                 <StackPanel IsVisible="{Binding HasMetrics}" Spacing="8">
-                    <TextBlock Text="{Binding Metrics.SourceText}"
+                    <TextBlock Text="Imported snapshot (comparison only)"
                                Foreground="#DDDDEE"
                                FontWeight="Bold"
                                FontSize="14"/>
+                    <TextBlock Text="{Binding Metrics.SourceText}"
+                               Foreground="#DDDDEE"
+                               FontSize="11"/>
                     <TextBlock Text="{Binding Metrics.BackendText}"
                                IsVisible="{Binding Metrics.HasBackend}"
                                Foreground="#8888AA"

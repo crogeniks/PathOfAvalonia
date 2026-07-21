@@ -183,7 +183,12 @@ public sealed class Poe2TreeLoader : ITreeLoader
                     ascendancy.InternalId ?? ascendancy.Id));
             }
 
-            result.Add(new CharacterClassInfo(catalogIndex, source.Index, source.Class.Name, ascendancies));
+            result.Add(new CharacterClassInfo(catalogIndex, source.Index, source.Class.Name, ascendancies)
+            {
+                BaseStrength = source.Class.BaseStrength,
+                BaseDexterity = source.Class.BaseDexterity,
+                BaseIntelligence = source.Class.BaseIntelligence,
+            });
         }
 
         return (new ClassCatalog { Classes = result }, sourceToCatalogIndex);

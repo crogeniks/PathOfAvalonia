@@ -12,6 +12,10 @@ public sealed class ClassCatalogTests
 
         Assert.Equal(new[] { "Scion", "Marauder", "Ranger", "Witch", "Duelist", "Templar", "Shadow" }, catalog.ClassNames);
         Assert.Equal(new[] { "None", "Juggernaut", "Berserker", "Chieftain" }, catalog.AscendancyNames(1));
+        Assert.Equal((32, 14, 14), (
+            catalog.GetClass(1).BaseStrength,
+            catalog.GetClass(1).BaseDexterity,
+            catalog.GetClass(1).BaseIntelligence));
     }
 
     [Fact]
@@ -23,4 +27,3 @@ public sealed class ClassCatalogTests
         Assert.Equal("Reliquarian", catalog.AscendancyTreeName(0, 2));
     }
 }
-

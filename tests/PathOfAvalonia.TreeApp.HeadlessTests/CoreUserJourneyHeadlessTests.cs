@@ -156,6 +156,70 @@ public sealed class CoreUserJourneyHeadlessTests
     }
 
     [AvaloniaFact]
+    public void CalculationsTabShowsLiveBasicStatsAndEditsCharacterLevel()
+    {
+        var workspace = CreateWorkspace(GameRegistry.CreatePoe1());
+        var view = new GameWorkspaceView { DataContext = workspace };
+        var window = Show(view);
+        try
+        {
+            var tabs = Required<TabControl>(view, "WorkspaceTabs");
+            var tab = Required<TabItem>(view, "BuildOutputTab");
+            Assert.Equal("Calculations", tab.Header);
+
+            tabs.SelectedItem = tab;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(RequiredVisual<ItemsControl>(view, "CalculatedStatsList").ItemCount > 0);
+            var level = RequiredVisual<NumericUpDown>(view, "CharacterLevelInput");
+            level.Value = 10;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(10, workspace.State.Equipment.CharacterLevel);
+            Assert.Equal(10, workspace.State.Equipment.CalculatedStats!.Values.Level);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void PassiveTreeSidebarPreviewsStatsWhilePointerHoversANode()
+    {
+        var workspace = CreateWorkspace(GameRegistry.CreatePoe1());
+        var view = new GameWorkspaceView { DataContext = workspace };
+        var window = Show(view);
+        try
+        {
+            var sidebar = Required<BasicStatsSidebarView>(view, "TreeStatsSidebar");
+            Assert.True(sidebar.IsVisible);
+            Assert.True(RequiredVisual<ItemsControl>(view, "TreeCalculatedStatsList").ItemCount > 0);
+            var baselineStrength = workspace.State.Equipment.CalculatedStats!.Values.Strength;
+            var treeView = Assert.Single(view.GetVisualDescendants().OfType<PassiveTreeView>());
+            Click(window, Required<Button>(view, "TreeControlsToggleButton"));
+            _ = window.CaptureRenderedFrame();
+
+            MoveToTreeNode(
+                window,
+                treeView,
+                workspace.State.Spec.Tree.Nodes[NormalNodeId],
+                workspace.State.Spec.Tree.Bounds);
+
+            Assert.DoesNotContain(NormalNodeId, workspace.State.Spec.AllocatedNodes);
+            Assert.NotNull(workspace.State.Equipment.PassivePreview);
+            Assert.Equal(baselineStrength + 10, workspace.State.Equipment.TreeCalculatedStats!.Values.Strength);
+            Assert.Contains(
+                workspace.State.Equipment.PassivePreview!.Changes,
+                change => change.Label == "Strength" && change.DeltaText == "(+10)");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public void ImportAndClearKeepTreeAndEquipmentInOneWorkspace()
     {
         var importedBuild = EmptyBuild() with
@@ -266,7 +330,13 @@ public sealed class CoreUserJourneyHeadlessTests
     internal static TreeModel CreateTree(GameId gameId, string version)
     {
         var firstStart = Node(FirstClassStartNodeId, "Scion Start", NodeType.ClassStart, -350, -150, classStartIndex: 0);
-        var normal = Node(NormalNodeId, "Connected Passive", NodeType.Normal, 250, -150);
+        var normal = Node(
+            NormalNodeId,
+            "Connected Passive",
+            NodeType.Normal,
+            250,
+            -150,
+            stats: ["+10 to Strength"]);
         var secondStart = Node(SecondClassStartNodeId, "Marauder Start", NodeType.ClassStart, -350, 250, classStartIndex: 1);
         firstStart.LinkedNodes.Add(normal);
         normal.LinkedNodes.Add(firstStart);
@@ -299,7 +369,14 @@ public sealed class CoreUserJourneyHeadlessTests
         };
     }
 
-    private static Node Node(int id, string name, NodeType type, double x, double y, int? classStartIndex = null) => new()
+    private static Node Node(
+        int id,
+        string name,
+        NodeType type,
+        double x,
+        double y,
+        int? classStartIndex = null,
+        IReadOnlyList<string>? stats = null) => new()
     {
         Id = id,
         Name = name,
@@ -310,6 +387,7 @@ public sealed class CoreUserJourneyHeadlessTests
         GroupId = 0,
         Orbit = 0,
         OrbitIndex = 0,
+        Stats = stats ?? [],
     };
 
     private static ImportedBuild EmptyBuild() => new(
@@ -338,6 +416,18 @@ public sealed class CoreUserJourneyHeadlessTests
         window.MouseMove(point.Value);
         window.MouseDown(point.Value, MouseButton.Left);
         window.MouseUp(point.Value, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    private static void MoveToTreeNode(Window window, Control treeView, Node node, TreeBounds bounds)
+    {
+        var scale = Math.Min(treeView.Bounds.Width / bounds.Width, treeView.Bounds.Height / bounds.Height) * 0.95;
+        var point = new Point(
+            node.X * scale + treeView.Bounds.Width * 0.5 - bounds.CenterX * scale,
+            node.Y * scale + treeView.Bounds.Height * 0.5 - bounds.CenterY * scale);
+        var windowPoint = treeView.TranslatePoint(point, window);
+        Assert.NotNull(windowPoint);
+        window.MouseMove(windowPoint.Value);
         Dispatcher.UIThread.RunJobs();
     }
 

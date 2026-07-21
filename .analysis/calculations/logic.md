@@ -34,3 +34,43 @@ ModDB uses scope tags: `Global` (all skills), `Cond` (conditional), `IgnoreCond`
 - `Modules/CalcOffence.lua:4300+` — ailment DPS.
 - `Modules/CalcDefence.lua:638` — defence entry.
 - `Modules/CalcDefence.lua:1044` — defences aggregate.
+
+## Avalonia basic-stat milestone
+
+`TreeDomain.Calculations.BasicStatCalculator` is the first native calculation
+slice. It deliberately does not attempt to port `calcs.perform()` wholesale.
+It consumes a stable snapshot of:
+
+1. Effective stat lines from allocated passives (`PassiveSpec` applies mastery,
+   radius/timeless jewel, PoE2 attribute-choice, and weapon-set selection first).
+2. The active equipment loadout and selected weapon set.
+3. Character level and resistance penalty imported from build XML or edited in
+   the Calculations UI.
+
+The calculator parses only unconditional basic-stat forms, evaluates attributes
+before their inherent life/mana/defence bonuses, then evaluates pools and basic
+defences. `EquipmentViewModel` refreshes the result after spec, equipment,
+level, penalty, loadout, or weapon-set changes. Saved `<PlayerStat>` values are
+retained as a comparison snapshot, not used as calculator inputs.
+
+Unsupported relevant lines are counted and surfaced as partial-coverage UI.
+Conditional effects, buffs, flasks, reservations, keystone flags/conversions,
+skill costs, EHP/max-hit simulation, and all DPS remain future milestones.
+
+### Passive hover preview
+
+The calculator also accepts an optional `PassiveAllocationPreview`. The preview
+is a set overlay on the stable allocated-node snapshot: queued nodes are added,
+or the target and refund dependents are removed, before effective passive stat
+lines are parsed. It never mutates `PassiveSpec`.
+
+`PassiveTreeViewModel` derives that overlay from the current hover target.
+`BuildWorkspaceState` coordinates it with `EquipmentViewModel`, which evaluates
+the projected totals against the same active items, level, penalty, and weapon
+set as the committed result. The projected rows and their deltas feed both the
+tree sidebar and the passive tooltip. Leaving the node restores the committed
+totals immediately.
+
+Allocating or refunding a socket with an equipped radius jewel may change the
+effective state of other nodes. That follow-on state transition is not yet
+simulated by the overlay, so those previews carry an explicit partial warning.

@@ -21,6 +21,9 @@ public sealed class BuildWorkspaceState
         Sprites = sprites;
         Tree = tree;
         Equipment = equipment;
+
+        Tree.HoverPreviewChanged += Equipment.SetPassivePreview;
+        Equipment.PassivePreviewChanged += Tree.SetBasicStatPreview;
     }
 
     public GameDefinition Game { get; }

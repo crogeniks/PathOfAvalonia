@@ -13,6 +13,9 @@ public sealed class ClassCatalog
             ? cls.Ascendancies.Select(a => a.DisplayName).ToArray()
             : Classes[0].Ascendancies.Select(a => a.DisplayName).ToArray();
 
+    public CharacterClassInfo GetClass(int classIndex) =>
+        TryGetClass(classIndex, out var cls) ? cls : Classes[0];
+
     public string? AscendancyTreeName(int classIndex, int ascendancyIndex)
     {
         if (!TryGetClass(classIndex, out var cls)
@@ -107,17 +110,23 @@ public sealed class ClassCatalog
     {
         Classes = new[]
         {
-            Class(0, "Scion", ("Ascendant", "Ascendant"), ("Scavenger", "Reliquarian")),
-            Class(1, "Marauder", ("Juggernaut", "Juggernaut"), ("Berserker", "Berserker"), ("Chieftain", "Chieftain")),
-            Class(2, "Ranger", ("Deadeye", "Deadeye"), ("Raider", "Raider"), ("Pathfinder", "Pathfinder"), ("Warden", "Warden")),
-            Class(3, "Witch", ("Necromancer", "Necromancer"), ("Occultist", "Occultist"), ("Elementalist", "Elementalist")),
-            Class(4, "Duelist", ("Slayer", "Slayer"), ("Gladiator", "Gladiator"), ("Champion", "Champion")),
-            Class(5, "Templar", ("Inquisitor", "Inquisitor"), ("Hierophant", "Hierophant"), ("Guardian", "Guardian")),
-            Class(6, "Shadow", ("Assassin", "Assassin"), ("Trickster", "Trickster"), ("Saboteur", "Saboteur")),
+            Class(0, "Scion", 20, 20, 20, ("Ascendant", "Ascendant"), ("Scavenger", "Reliquarian")),
+            Class(1, "Marauder", 32, 14, 14, ("Juggernaut", "Juggernaut"), ("Berserker", "Berserker"), ("Chieftain", "Chieftain")),
+            Class(2, "Ranger", 14, 32, 14, ("Deadeye", "Deadeye"), ("Raider", "Raider"), ("Pathfinder", "Pathfinder"), ("Warden", "Warden")),
+            Class(3, "Witch", 14, 14, 32, ("Necromancer", "Necromancer"), ("Occultist", "Occultist"), ("Elementalist", "Elementalist")),
+            Class(4, "Duelist", 23, 23, 14, ("Slayer", "Slayer"), ("Gladiator", "Gladiator"), ("Champion", "Champion")),
+            Class(5, "Templar", 23, 14, 23, ("Inquisitor", "Inquisitor"), ("Hierophant", "Hierophant"), ("Guardian", "Guardian")),
+            Class(6, "Shadow", 14, 23, 23, ("Assassin", "Assassin"), ("Trickster", "Trickster"), ("Saboteur", "Saboteur")),
         },
     };
 
-    private static CharacterClassInfo Class(int index, string name, params (string DisplayName, string TreeName)[] ascendancies)
+    private static CharacterClassInfo Class(
+        int index,
+        string name,
+        int baseStrength,
+        int baseDexterity,
+        int baseIntelligence,
+        params (string DisplayName, string TreeName)[] ascendancies)
     {
         var list = new List<AscendancyInfo>
         {
@@ -128,7 +137,12 @@ public sealed class ClassCatalog
             var a = ascendancies[i];
             list.Add(new AscendancyInfo(i + 1, a.DisplayName, a.TreeName, null));
         }
-        return new CharacterClassInfo(index, index, name, list);
+        return new CharacterClassInfo(index, index, name, list)
+        {
+            BaseStrength = baseStrength,
+            BaseDexterity = baseDexterity,
+            BaseIntelligence = baseIntelligence,
+        };
     }
 }
 
@@ -136,7 +150,12 @@ public sealed record CharacterClassInfo(
     int ClassIndex,
     int? ExternalIntegerId,
     string Name,
-    IReadOnlyList<AscendancyInfo> Ascendancies);
+    IReadOnlyList<AscendancyInfo> Ascendancies)
+{
+    public int BaseStrength { get; init; }
+    public int BaseDexterity { get; init; }
+    public int BaseIntelligence { get; init; }
+}
 
 public sealed record AscendancyInfo(
     int AscendancyIndex,

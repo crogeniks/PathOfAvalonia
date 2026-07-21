@@ -56,3 +56,20 @@ When Shift is held, `traceMode = true`; `tracePath` contains the sequence of nod
 ## Tooltips
 
 `AddNodeTooltip()` — name, stats, type (Notable/Keystone/Socket/Mastery), source mods. When comparing specs: colour-coded diff (red=worse, green=better). Mastery effect options listed for allocated mastery nodes.
+
+The Avalonia tree tooltip also shows supported basic-stat differences. For an
+unallocated passive it previews the node and every queued path node; for an
+allocated passive it previews refunding the target and any disconnected
+dependents. Positive changes are green and negative changes are red, matching
+PoB's `PassiveTreeView.lua:1512–1559` interaction at the current calculator's
+smaller coverage level.
+
+## Avalonia live stat sidebar
+
+The passive-tree workspace reserves a 286-pixel left column for locally
+calculated basic stats, corresponding to PoB's persistent build sidebar. It
+shares character level and resistance-penalty state with the Calculations tab.
+While a passive is hovered, the column displays projected totals and inline
+green/red deltas; no allocation is committed. Pointer exit restores the current
+build totals. Partial item-defence and unsupported-modifier warnings remain
+visible at the bottom of the column.

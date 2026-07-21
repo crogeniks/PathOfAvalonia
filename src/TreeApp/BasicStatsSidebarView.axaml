@@ -1,0 +1,109 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PathOfAvalonia.TreeApp.ViewModels"
+             x:Class="PathOfAvalonia.TreeApp.BasicStatsSidebarView"
+             x:DataType="vm:EquipmentViewModel"
+             Background="#121217">
+    <Border BorderBrush="#343440" BorderThickness="0,0,1,0">
+        <Grid RowDefinitions="Auto,Auto,*">
+            <StackPanel Margin="12,12,12,8" Spacing="8">
+                <StackPanel>
+                    <TextBlock Text="Basic stats"
+                               Foreground="#F0F0F4"
+                               FontSize="16"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Text="Live tree and equipment totals"
+                               Foreground="#8EA6D8"
+                               FontSize="10"/>
+                </StackPanel>
+                <Grid ColumnDefinitions="Auto,64,*,Auto,64" ColumnSpacing="6">
+                    <TextBlock Text="Level"
+                               Foreground="#9999AA"
+                               VerticalAlignment="Center"/>
+                    <NumericUpDown Name="TreeCharacterLevelInput"
+                                   Grid.Column="1"
+                                   Minimum="1"
+                                   Maximum="100"
+                                   Increment="1"
+                                   FormatString="0"
+                                   Value="{Binding CharacterLevel}"/>
+                    <TextBlock Grid.Column="3"
+                               Text="Penalty"
+                               Foreground="#9999AA"
+                               VerticalAlignment="Center"/>
+                    <NumericUpDown Name="TreeResistancePenaltyInput"
+                                   Grid.Column="4"
+                                   Minimum="-60"
+                                   Maximum="0"
+                                   Increment="10"
+                                   FormatString="0"
+                                   Value="{Binding ResistancePenalty}"/>
+                </Grid>
+            </StackPanel>
+
+            <Border Grid.Row="1"
+                    Margin="8,0,8,7"
+                    Padding="8,5"
+                    Background="#342B18"
+                    BorderBrush="#806A30"
+                    BorderThickness="1"
+                    CornerRadius="3"
+                    IsVisible="{Binding HasPassivePreview}">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="{Binding PassivePreview.SidebarText}"
+                               Foreground="#E7C86C"
+                               FontSize="11"
+                               TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding PassivePreview.WarningText}"
+                               Foreground="#D99A69"
+                               FontSize="9"
+                               TextWrapping="Wrap"
+                               IsVisible="{Binding PassivePreview.HasWarning}"/>
+                </StackPanel>
+            </Border>
+
+            <ScrollViewer Grid.Row="2"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto"
+                          IsVisible="{Binding HasTreeCalculatedStats}">
+                <StackPanel Margin="10,0,10,12" Spacing="7">
+                    <ItemsControl Name="TreeCalculatedStatsList"
+                                  ItemsSource="{Binding TreeCalculatedStats.Stats}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:CalculatedStatMetricViewModel">
+                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6" MinHeight="18">
+                                    <TextBlock Text="{Binding Label}"
+                                               Foreground="#B8B8C5"
+                                               FontSize="12"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding Value}"
+                                               Foreground="#EEEEF2"
+                                               FontSize="12"
+                                               HorizontalAlignment="Right"/>
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding DeltaText}"
+                                               Foreground="#63D485"
+                                               FontSize="11"
+                                               IsVisible="{Binding IsPositiveChange}"/>
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding DeltaText}"
+                                               Foreground="#E56868"
+                                               FontSize="11"
+                                               IsVisible="{Binding IsNegativeChange}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Border Height="1" Background="#30303A" Margin="0,2"/>
+                    <TextBlock Text="{Binding TreeCalculatedStats.WarningText}"
+                               Foreground="#B59062"
+                               FontSize="9"
+                               TextWrapping="Wrap"
+                               IsVisible="{Binding TreeCalculatedStats.HasWarning}"/>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</UserControl>

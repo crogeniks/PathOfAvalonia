@@ -55,3 +55,22 @@ dmgTypeFlags = {Physical=0x01, Lightning=0x02, Cold=0x04,
 ## Breakdown (env.player.breakdown)
 
 Maps stat → nested formula-step table for UI display (e.g. `breakdown.TotalDPS = {base, incMult, final}`).
+
+## Avalonia native basic-stat contract
+
+`BasicCharacterStats` is a typed, non-DPS result containing level, attributes,
+life/mana/ES, armour/evasion/ward, life/mana regeneration, block, spell block,
+suppression, movement-speed modifier, and capped/uncapped resistances.
+
+`BasicResistance` preserves uncapped value, maximum, capped value, and overcap
+instead of collapsing the calculation to the displayed resistance. The result
+also carries `BasicStatCoverage`, including applied-line and unsupported
+relevant-line counts. This makes the experimental parser's boundary explicit.
+
+`ImportedBuild.CharacterLevel` and `ImportedBuild.ResistancePenalty` preserve
+calculation inputs from `<Build level>` and the configuration
+`resistancePenalty` input. They default to level 1 and the endgame -60% penalty
+when the source format does not provide them.
+
+Class base attributes live on `CharacterClassInfo`; PoE1 values match upstream
+tree class data and PoE2 values are loaded from each version's tree JSON.

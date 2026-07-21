@@ -57,6 +57,18 @@ normalized to those semantic slots, and each slot rejects the other flask type.
 import. It rebuilds cluster subgraphs and radius effects and prunes allocations
 that are no longer permitted by the replaced jewel.
 
+The native basic-stat calculator reads final `Armour:`, `Evasion Rating:`,
+`Energy Shield:`, `Ward:`, and shield block properties from equipped copied item
+text. Local flat/increased defence modifier lines on an item with the matching
+final property are not applied globally, preventing those local modifiers from
+being counted twice. Unconditional global attributes, pools, resistances, and
+supported defence modifiers are parsed from item body lines. Swap weapons follow
+the selected weapon set; flasks are excluded until activation/configuration state
+is represented. Saved PoB XML item text often omits final defence properties; in
+that case local armour-slot modifiers are conservatively excluded and the UI
+marks aggregate item defences (and shield block) as partial lower bounds until
+the versioned item-base database is ported.
+
 ## Quality & Catalysts
 
 - Quality scales base stats (armour/evasion/ES, physical weapon damage) by `(1 + q/100)`.

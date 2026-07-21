@@ -20,7 +20,7 @@ public partial class GameWorkspaceView : UserControl
             return;
         }
 
-        var root = this.FindControl<Grid>("TreeRoot")!;
+        var root = this.FindControl<Grid>("TreeCanvas")!;
         if (root.Children.Count == 1)
         {
             root.Children.Insert(0, new PassiveTreeView(vm.State.Tree, vm.State.Sprites, vm.ImageResolver));
