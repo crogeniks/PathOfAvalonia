@@ -83,6 +83,22 @@ public sealed partial class PassiveTreeView
         ctx.DrawEllipse(null, new Pen(BrushForAllocationSet(allocationSet), thickness), centre, rx, ry);
     }
 
+    private void DrawSearchHighlight(DrawingContext ctx, Node node)
+    {
+        if (!_vm.SearchResultNodeIds.Contains(node.Id))
+        {
+            return;
+        }
+
+        var centre = TreeToScreen(node.X, node.Y);
+        var half = node.Visual is not null
+            ? Poe2FrameHalfSize(node, string.Empty)
+            : new Size(NodeRadius, NodeRadius);
+        var radiusX = Math.Max(NodeRadius * _scale, half.Width * _scale) + Math.Max(3, 11 * _scale);
+        var radiusY = Math.Max(NodeRadius * _scale, half.Height * _scale) + Math.Max(3, 11 * _scale);
+        ctx.DrawEllipse(null, new Pen(SearchHighlightBrush, Math.Max(2, 6 * _scale)), centre, radiusX, radiusY);
+    }
+
     private static IBrush BrushForAllocationSet(PassiveAllocationSet allocationSet) => allocationSet switch
     {
         PassiveAllocationSet.WeaponSet1 => WeaponSet1Brush,

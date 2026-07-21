@@ -53,6 +53,18 @@ When Shift is held, `traceMode = true`; `tracePath` contains the sequence of nod
 - `searchStr`, `searchStrSaved`, `searchStrCached` + `searchStrResults` cache.
 - Case-insensitive name/stat match → highlighted overlay.
 
+### Avalonia search overlay
+
+The Avalonia tree places its search input in a persistent bottom-centre canvas
+overlay, independent of the collapsible tree controls. Terms are
+case-insensitive and all must match a node's name, stats, mastery effects, or
+type; quoted text is treated as one term. Matches receive a red outline, and
+the overlay reports the live match count. Class starts and non-selectable
+mastery decorations are omitted, matching PoB's exclusion. Unlike PoB's Lua
+pattern search and anoint-recipe (`oil:`) search, this initial port uses safe
+literal text matching because recipe data is not currently exposed by the
+domain model.
+
 ## Tooltips
 
 `AddNodeTooltip()` — name, stats, type (Notable/Keystone/Socket/Mastery), source mods. When comparing specs: colour-coded diff (red=worse, green=better). Mastery effect options listed for allocated mastery nodes.

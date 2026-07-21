@@ -156,6 +156,32 @@ public sealed class CoreUserJourneyHeadlessTests
     }
 
     [AvaloniaFact]
+    public void PassiveSearchHighlightsNodesByNameAndStats()
+    {
+        var workspace = CreateWorkspace(GameRegistry.CreatePoe1());
+        var view = new GameWorkspaceView { DataContext = workspace };
+        var window = Show(view);
+        try
+        {
+            Required<TextBox>(view, "PassiveSearchInput").Text = "strength";
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Contains(NormalNodeId, workspace.State.Tree.SearchResultNodeIds);
+            Assert.Equal(1, workspace.State.Tree.SearchResultCount);
+
+            Required<TextBox>(view, "PassiveSearchInput").Text = "connected passive";
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Contains(NormalNodeId, workspace.State.Tree.SearchResultNodeIds);
+            Assert.DoesNotContain(FirstClassStartNodeId, workspace.State.Tree.SearchResultNodeIds);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public void CalculationsTabShowsLiveBasicStatsAndEditsCharacterLevel()
     {
         var workspace = CreateWorkspace(GameRegistry.CreatePoe1());

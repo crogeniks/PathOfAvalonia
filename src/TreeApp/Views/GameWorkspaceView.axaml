@@ -154,6 +154,34 @@
                             </StackPanel>
                         </StackPanel>
                     </Border>
+                    <Border HorizontalAlignment="Center"
+                            VerticalAlignment="Bottom"
+                            Margin="12"
+                            Padding="10,8"
+                            Background="#DD1A1A24"
+                            CornerRadius="6"
+                            BorderBrush="#3A3A4A"
+                            BorderThickness="1"
+                            DataContext="{Binding DataContext.State.Tree, ElementName=Root}"
+                            x:DataType="vm:PassiveTreeViewModel">
+                        <Grid ColumnDefinitions="260,Auto,Auto" RowDefinitions="Auto,Auto">
+                            <TextBox Name="PassiveSearchInput"
+                                     Text="{Binding SearchText}"
+                                     PlaceholderText="Search passives…"/>
+                            <Button Grid.Column="1"
+                                    Content="Clear"
+                                    Margin="6,0,0,0"
+                                    Command="{Binding ClearSearchCommand}"
+                                    IsVisible="{Binding HasActiveSearch}"/>
+                            <TextBlock Grid.Row="1"
+                                       Grid.ColumnSpan="3"
+                                       Text="{Binding SearchResultCount, StringFormat='{}{0} matches highlighted'}"
+                                       Foreground="#F0594F"
+                                       FontSize="11"
+                                       Margin="2,4,0,0"
+                                       IsVisible="{Binding HasActiveSearch}"/>
+                        </Grid>
+                    </Border>
                     </Grid>
                 </Grid>
             </TabItem>

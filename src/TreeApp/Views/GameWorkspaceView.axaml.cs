@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Avalonia.Controls;
 using PathOfAvalonia.TreeApp.Controls;
 using PathOfAvalonia.TreeApp.ViewModels;
@@ -21,7 +22,7 @@ public partial class GameWorkspaceView : UserControl
         }
 
         var root = this.FindControl<Grid>("TreeCanvas")!;
-        if (root.Children.Count == 1)
+        if (!root.Children.OfType<PassiveTreeView>().Any())
         {
             root.Children.Insert(0, new PassiveTreeView(vm.State.Tree, vm.State.Sprites, vm.ImageResolver));
         }

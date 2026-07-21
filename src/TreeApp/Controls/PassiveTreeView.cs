@@ -95,6 +95,7 @@ public sealed partial class PassiveTreeView : Control
     private static readonly IBrush DiffAddedBrush = new SolidColorBrush(Color.FromArgb(0xF5, 0x00, 0xF0, 0x5A));
     private static readonly IBrush DiffChangedBrush = new SolidColorBrush(Color.FromArgb(0xC8, 0xA8, 0x5C, 0xFF));
     private static readonly IBrush DiffRemovedBrush = new SolidColorBrush(Color.FromArgb(0x95, 0xE5, 0x56, 0x56));
+    private static readonly IBrush SearchHighlightBrush = new SolidColorBrush(Color.FromRgb(0xF0, 0x59, 0x4F));
     private static readonly IPen NodeOutlinePen = new Pen(Brushes.Black, 1.5);
     // Cluster background disc layers (programmatic stand-in for the missing art asset).
     // Colors approximate the PoB golden-medallion aesthetic.
@@ -586,6 +587,7 @@ public sealed partial class PassiveTreeView : Control
             var onPath = _vm.HoverPathNodes.Contains(n.Id);
             DrawCurrentDiffHighlight(ctx, n);
             DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath, useClusterSocketFrame: true);
+            DrawSearchHighlight(ctx, n);
         }
 
         // Cluster subgraph nodes (only rendered when the jewel is active).
@@ -598,6 +600,7 @@ public sealed partial class PassiveTreeView : Control
             var isHover = _vm.HoverNodeId == n.Id;
             var onPath = _vm.HoverPathNodes.Contains(n.Id);
             DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath, useClusterSocketFrame: true);
+            DrawSearchHighlight(ctx, n);
         }
 
         // HUD: alloc count. The hovered node details are drawn as a tooltip below.

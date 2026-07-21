@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using PathOfAvalonia.TreeDomain;
 using PathOfAvalonia.TreeDomain.ClusterJewels;
 using PathOfAvalonia.TreeDomain.Import;
@@ -10,7 +12,7 @@ namespace PathOfAvalonia.TreeApp.ViewModels;
 
 // Mediates between PassiveTreeView (rendering) and PassiveSpec (domain state).
 // Owns hover state and all spec interactions so the Control stays pure rendering.
-public sealed class PassiveTreeViewModel
+public sealed partial class PassiveTreeViewModel : ObservableObject
 {
     private readonly PassiveSpec _spec;
     private int? _hoverNodeId;
@@ -19,6 +21,7 @@ public sealed class PassiveTreeViewModel
     private TreeDiff _diff = TreeDiff.Empty;
     private PassiveAllocationPreview _allocationPreview = PassiveAllocationPreview.None;
     private PassiveStatPreviewViewModel? _basicStatPreview;
+    private HashSet<int> _searchResultNodeIds = new();
 
     // Fired whenever visual state changes (hover update or spec change).
     // PassiveTreeView subscribes and calls InvalidateVisual().
@@ -39,6 +42,11 @@ public sealed class PassiveTreeViewModel
     public TreeDiff Diff => _diff;
     public PassiveAllocationPreview AllocationPreview => _allocationPreview;
     public PassiveStatPreviewViewModel? BasicStatPreview => _basicStatPreview;
+    public IReadOnlySet<int> SearchResultNodeIds => _searchResultNodeIds;
+    public int SearchResultCount => _searchResultNodeIds.Count;
+    public bool HasActiveSearch => !string.IsNullOrWhiteSpace(SearchText);
+
+    [ObservableProperty] private string _searchText = string.Empty;
     public Node? HoverNode
     {
         get
@@ -185,6 +193,93 @@ public sealed class PassiveTreeViewModel
 
     public void RemoveCluster(int socketId) => _spec.RemoveClusterJewel(socketId);
 
+    partial void OnSearchTextChanged(string value)
+    {
+        UpdateSearchResults(value);
+        OnPropertyChanged(nameof(HasActiveSearch));
+        RedrawRequested?.Invoke();
+    }
+
+    [RelayCommand]
+    private void ClearSearch() => SearchText = string.Empty;
+
+    private void UpdateSearchResults(string searchText)
+    {
+        _searchResultNodeIds = new HashSet<int>();
+        var terms = SearchTerms(searchText);
+        if (terms.Count > 0)
+        {
+            foreach (var node in _spec.Tree.Nodes.Values)
+            {
+                AddIfMatches(node, terms);
+            }
+            foreach (var cluster in _spec.ActiveSubgraphs.Values)
+            {
+                foreach (var node in cluster.Nodes)
+                {
+                    AddIfMatches(node, terms);
+                }
+            }
+        }
+
+        OnPropertyChanged(nameof(SearchResultNodeIds));
+        OnPropertyChanged(nameof(SearchResultCount));
+    }
+
+    private void AddIfMatches(Node node, IReadOnlyList<string> terms)
+    {
+        // PoB omits class starts and non-selectable mastery decorations from search.
+        if (node.Type == NodeType.ClassStart
+            || node is { Type: NodeType.Mastery, MasteryEffects: null })
+        {
+            return;
+        }
+
+        var searchableText = new List<string> { node.Name, node.Type.ToString() };
+        searchableText.AddRange(node.Stats);
+        if (node.MasteryEffects is not null)
+        {
+            searchableText.AddRange(node.MasteryEffects.SelectMany(effect => effect.Stats));
+        }
+
+        if (terms.All(term => searchableText.Any(text =>
+                text.Contains(term, StringComparison.OrdinalIgnoreCase))))
+        {
+            _searchResultNodeIds.Add(node.Id);
+        }
+    }
+
+    private static IReadOnlyList<string> SearchTerms(string searchText)
+    {
+        var terms = new List<string>();
+        var currentTerm = new System.Text.StringBuilder();
+        var inQuotes = false;
+        foreach (var character in searchText.Trim())
+        {
+            if (character == '"')
+            {
+                inQuotes = !inQuotes;
+            }
+            else if (char.IsWhiteSpace(character) && !inQuotes)
+            {
+                if (currentTerm.Length > 0)
+                {
+                    terms.Add(currentTerm.ToString());
+                    currentTerm.Clear();
+                }
+            }
+            else
+            {
+                currentTerm.Append(character);
+            }
+        }
+        if (currentTerm.Length > 0)
+        {
+            terms.Add(currentTerm.ToString());
+        }
+        return terms;
+    }
+
     private static int DefaultPassiveCount(ClusterJewelSize size) => size switch
     {
         ClusterJewelSize.Large => 8,
@@ -224,6 +319,7 @@ public sealed class PassiveTreeViewModel
         {
             _allocationPreview = PassiveAllocationPreview.None;
         }
+        UpdateSearchResults(SearchText);
         HoverPreviewChanged?.Invoke(_allocationPreview);
         RedrawRequested?.Invoke();
     }
