@@ -67,10 +67,10 @@ instead of collapsing the calculation to the displayed resistance. The result
 also carries `BasicStatCoverage`, including applied-line and unsupported
 relevant-line counts. This makes the experimental parser's boundary explicit.
 
-`ImportedBuild.CharacterLevel` and `ImportedBuild.ResistancePenalty` preserve
-calculation inputs from `<Build level>` and the configuration
-`resistancePenalty` input. They default to level 1 and the endgame -60% penalty
-when the source format does not provide them.
+`ImportedBuild.CharacterLevel` preserves the calculation level from
+`<Build level>` and defaults to level 1 when absent. Resistance penalty is not
+part of the native calculation contract: the calculator always applies the
+worst campaign penalty (-60%) and ignores saved `resistancePenalty` inputs.
 
 Class base attributes live on `CharacterClassInfo`; PoE1 values match upstream
 tree class data and PoE2 values are loaded from each version's tree JSON.

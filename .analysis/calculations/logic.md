@@ -44,14 +44,22 @@ It consumes a stable snapshot of:
 1. Effective stat lines from allocated passives (`PassiveSpec` applies mastery,
    radius/timeless jewel, PoE2 attribute-choice, and weapon-set selection first).
 2. The active equipment loadout and selected weapon set.
-3. Character level and resistance penalty imported from build XML or edited in
-   the Calculations UI.
+3. Character level imported from build XML or edited in the Calculations UI.
+
+Resistance penalty is deliberately not configurable. The native calculator
+always uses the worst campaign penalty (-60%) for both games.
 
 The calculator parses only unconditional basic-stat forms, evaluates attributes
 before their inherent life/mana/defence bonuses, then evaluates pools and basic
 defences. `EquipmentViewModel` refreshes the result after spec, equipment,
-level, penalty, loadout, or weapon-set changes. Saved `<PlayerStat>` values are
+level, loadout, or weapon-set changes. Saved `<PlayerStat>` values are
 retained as a comparison snapshot, not used as calculator inputs.
+
+After a passive-spec change, `PassiveSpec` counts allocated point-consuming
+nodes and `CharacterProgression` applies PoB's act/quest-point progression
+estimate. `EquipmentViewModel` raises the shared level to that minimum before
+recalculating. It does not lower the level after refunds; an imported level is
+also retained when it is already higher than the allocation minimum.
 
 Unsupported relevant lines are counted and surfaced as partial-coverage UI.
 Conditional effects, buffs, flasks, reservations, keystone flags/conversions,
@@ -66,8 +74,8 @@ lines are parsed. It never mutates `PassiveSpec`.
 
 `PassiveTreeViewModel` derives that overlay from the current hover target.
 `BuildWorkspaceState` coordinates it with `EquipmentViewModel`, which evaluates
-the projected totals against the same active items, level, penalty, and weapon
-set as the committed result. The projected rows and their deltas feed both the
+the projected totals against the same active items, level, fixed worst penalty,
+and weapon set as the committed result. The projected rows and their deltas feed both the
 tree sidebar and the passive tooltip. Leaving the node restores the committed
 totals immediately.
 

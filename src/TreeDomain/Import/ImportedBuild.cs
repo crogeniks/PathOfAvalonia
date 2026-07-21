@@ -26,7 +26,6 @@ public sealed record ImportedBuild(
     public int ActivePassiveTreeVariantIndex { get; init; }
     public int ActiveItemSetVariantIndex { get; init; }
     public int CharacterLevel { get; init; } = 1;
-    public int ResistancePenalty { get; init; } = -60;
     public string? RawXml { get; init; }
     public ImportedSkills Skills { get; init; } = ImportedSkills.Empty;
     public ImportedBuildMetrics Metrics { get; init; } = ImportedBuildMetrics.Empty;

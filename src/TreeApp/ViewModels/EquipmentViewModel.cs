@@ -19,7 +19,7 @@ public partial class EquipmentViewModel : ObservableObject
     private bool _synchronizingLoadout;
     private bool _synchronizingSlots;
     private bool _synchronizingTreeJewels;
-    private bool _synchronizingBuildConfiguration;
+    private bool _synchronizingCharacterLevel;
     private int? _editorItemId;
     private PassiveAllocationPreview _passiveAllocationPreview = PassiveAllocationPreview.None;
 
@@ -32,6 +32,7 @@ public partial class EquipmentViewModel : ObservableObject
             _spec.SpecChanged += OnSpecChanged;
         }
         RefreshEquipment(preserveSelectedItemId: null);
+        RaiseCharacterLevelForAllocations();
         RecalculateStats();
     }
 
@@ -125,9 +126,6 @@ public partial class EquipmentViewModel : ObservableObject
     public partial int CharacterLevel { get; set; } = 1;
 
     [ObservableProperty]
-    public partial int ResistancePenalty { get; set; } = -60;
-
-    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSkillGroups))]
     [NotifyPropertyChangedFor(nameof(HasContent))]
     public partial ObservableCollection<ImportedSkillGroupViewModel> SkillGroups { get; set; } = new();
@@ -167,10 +165,9 @@ public partial class EquipmentViewModel : ObservableObject
     public void LoadBuild(ImportedBuild build)
     {
         _workspace.Load(build);
-        _synchronizingBuildConfiguration = true;
-        CharacterLevel = build.CharacterLevel;
-        ResistancePenalty = build.ResistancePenalty;
-        _synchronizingBuildConfiguration = false;
+        _synchronizingCharacterLevel = true;
+        CharacterLevel = Math.Max(build.CharacterLevel, _spec?.MinimumCharacterLevelForAllocations() ?? 1);
+        _synchronizingCharacterLevel = false;
         Metrics = build.Metrics.Source != ImportedMetricSource.None || !string.IsNullOrWhiteSpace(build.Metrics.ErrorMessage)
             ? ImportedBuildMetricsViewModel.FromImported(build.Metrics)
             : null;
@@ -189,10 +186,9 @@ public partial class EquipmentViewModel : ObservableObject
     public void Clear()
     {
         _workspace.Reset();
-        _synchronizingBuildConfiguration = true;
+        _synchronizingCharacterLevel = true;
         CharacterLevel = 1;
-        ResistancePenalty = -60;
-        _synchronizingBuildConfiguration = false;
+        _synchronizingCharacterLevel = false;
         Metrics = null;
         _importedSkillSets = [];
         SkillSetOptions = new ObservableCollection<ImportedSkillSetOptionViewModel>();
@@ -223,7 +219,6 @@ public partial class EquipmentViewModel : ObservableObject
     public ImportedBuild ApplyToBuild(ImportedBuild build) => _workspace.ApplyTo(build) with
     {
         CharacterLevel = CharacterLevel,
-        ResistancePenalty = ResistancePenalty,
     };
 
     public void SetPassivePreview(PassiveAllocationPreview preview)
@@ -248,21 +243,7 @@ public partial class EquipmentViewModel : ObservableObject
             CharacterLevel = clamped;
             return;
         }
-        if (!_synchronizingBuildConfiguration)
-        {
-            NotifyEquipmentChanged();
-        }
-    }
-
-    partial void OnResistancePenaltyChanged(int value)
-    {
-        var clamped = Math.Clamp(value, -60, 0);
-        if (clamped != value)
-        {
-            ResistancePenalty = clamped;
-            return;
-        }
-        if (!_synchronizingBuildConfiguration)
+        if (!_synchronizingCharacterLevel)
         {
             NotifyEquipmentChanged();
         }
@@ -644,7 +625,26 @@ public partial class EquipmentViewModel : ObservableObject
             RefreshSlots();
             RefreshLibrary(SelectedLibraryItem?.ItemId);
         }
+        RaiseCharacterLevelForAllocations();
         RecalculateStats();
+    }
+
+    private void RaiseCharacterLevelForAllocations()
+    {
+        if (_spec is null)
+        {
+            return;
+        }
+
+        var minimumLevel = _spec.MinimumCharacterLevelForAllocations();
+        if (minimumLevel <= CharacterLevel)
+        {
+            return;
+        }
+
+        _synchronizingCharacterLevel = true;
+        CharacterLevel = minimumLevel;
+        _synchronizingCharacterLevel = false;
     }
 
     private void NotifyEquipmentChanged()
@@ -670,9 +670,8 @@ public partial class EquipmentViewModel : ObservableObject
             _spec,
             activeItems,
             CharacterLevel,
-            ResistancePenalty,
             SelectedWeaponSet);
-        CalculatedStats = BasicCharacterStatsViewModel.FromCalculated(current, ResistancePenalty);
+        CalculatedStats = BasicCharacterStatsViewModel.FromCalculated(current);
 
         if (_passiveAllocationPreview.IsEmpty)
         {
@@ -685,12 +684,10 @@ public partial class EquipmentViewModel : ObservableObject
                 _spec,
                 activeItems,
                 CharacterLevel,
-                ResistancePenalty,
                 SelectedWeaponSet,
                 _passiveAllocationPreview);
             TreeCalculatedStats = BasicCharacterStatsViewModel.FromCalculated(
                 projected,
-                ResistancePenalty,
                 current);
             PassivePreview = PassiveStatPreviewViewModel.From(
                 _passiveAllocationPreview,
@@ -800,18 +797,18 @@ public sealed class BasicCharacterStatsViewModel
     public string WarningText { get; }
     public bool HasWarning => !string.IsNullOrWhiteSpace(WarningText);
     public ObservableCollection<CalculatedStatMetricViewModel> Stats { get; }
+    public ObservableCollection<CalculatedStatGroupViewModel> StatGroups { get; }
     public ObservableCollection<CalculatedStatMetricViewModel> Changes { get; }
 
     private BasicCharacterStatsViewModel(
         BasicCharacterStats stats,
-        int resistancePenalty,
         BasicCharacterStats? baseline)
     {
         Values = stats;
         SourceText = baseline is null
             ? "Calculated locally from the current tree and equipment"
             : "Projected from the hovered passive change";
-        CoverageText = $"Level {stats.Level} · resistance penalty {resistancePenalty}% · {stats.Coverage.AppliedLineCount} basic-stat lines applied";
+        CoverageText = $"Level {stats.Level} · worst resistance penalty ({BasicStatCalculator.WorstResistancePenalty}%) · {stats.Coverage.AppliedLineCount} basic-stat lines applied";
         var warnings = new List<string>();
         if (stats.Coverage.UnsupportedRelevantLineCount > 0)
         {
@@ -830,77 +827,149 @@ public sealed class BasicCharacterStatsViewModel
 
         var rows = new List<CalculatedStatMetricViewModel>
         {
-            IntegerRow("Strength", stats.Strength, baseline?.Strength, "Attributes"),
-            IntegerRow("Dexterity", stats.Dexterity, baseline?.Dexterity, "Attributes"),
-            IntegerRow("Intelligence", stats.Intelligence, baseline?.Intelligence, "Attributes"),
-            IntegerRow("Total Life", stats.Life, baseline?.Life, "Pools"),
-            IntegerRow("Total Mana", stats.Mana, baseline?.Mana, "Pools"),
-            IntegerRow("Energy Shield", stats.EnergyShield, baseline?.EnergyShield, "Pools", stats.Coverage.HasIncompleteItemDefences),
-            DecimalRow("Life Regen", stats.LifeRegeneration, baseline?.LifeRegeneration, "Recovery"),
-            DecimalRow("Mana Regen", stats.ManaRegeneration, baseline?.ManaRegeneration, "Recovery"),
-            IntegerRow("Armour", stats.Armour, baseline?.Armour, "Defences", stats.Coverage.HasIncompleteItemDefences),
-            IntegerRow("Evasion", stats.Evasion, baseline?.Evasion, "Defences", stats.Coverage.HasIncompleteItemDefences),
+            IntegerRow("Strength", stats.Strength, baseline?.Strength, "Attributes", CalculatedStatTone.Strength),
+            IntegerRow("Dexterity", stats.Dexterity, baseline?.Dexterity, "Attributes", CalculatedStatTone.Dexterity),
+            IntegerRow("Intelligence", stats.Intelligence, baseline?.Intelligence, "Attributes", CalculatedStatTone.Intelligence),
+            IntegerRow("Total Life", stats.Life, baseline?.Life, "Pools", CalculatedStatTone.Life),
+            IntegerRow("Total Mana", stats.Mana, baseline?.Mana, "Pools", CalculatedStatTone.Mana),
+            IntegerRow(
+                "Energy Shield",
+                stats.EnergyShield,
+                baseline?.EnergyShield,
+                "Pools",
+                CalculatedStatTone.EnergyShield,
+                stats.Coverage.HasIncompleteItemDefences),
+            DecimalRow("Life Regen", stats.LifeRegeneration, baseline?.LifeRegeneration, "Recovery", CalculatedStatTone.Life),
+            DecimalRow("Mana Regen", stats.ManaRegeneration, baseline?.ManaRegeneration, "Recovery", CalculatedStatTone.Mana),
+            IntegerRow(
+                "Armour",
+                stats.Armour,
+                baseline?.Armour,
+                "Defences",
+                CalculatedStatTone.Armour,
+                stats.Coverage.HasIncompleteItemDefences),
+            IntegerRow(
+                "Evasion",
+                stats.Evasion,
+                baseline?.Evasion,
+                "Defences",
+                CalculatedStatTone.Evasion,
+                stats.Coverage.HasIncompleteItemDefences),
         };
         if (stats.Ward > 0 || baseline?.Ward > 0)
         {
-            rows.Add(IntegerRow("Ward", stats.Ward, baseline?.Ward, "Defences", stats.Coverage.HasIncompleteItemDefences));
+            rows.Add(IntegerRow(
+                "Ward",
+                stats.Ward,
+                baseline?.Ward,
+                "Defences",
+                CalculatedStatTone.Ward,
+                stats.Coverage.HasIncompleteItemDefences));
         }
         rows.AddRange(
         [
-            PercentRow("Block Chance", stats.BlockChance, baseline?.BlockChance, "Avoidance", stats.Coverage.HasIncompleteShieldBlock),
-            PercentRow("Spell Block Chance", stats.SpellBlockChance, baseline?.SpellBlockChance, "Avoidance"),
-            PercentRow("Spell Suppression", stats.SpellSuppressionChance, baseline?.SpellSuppressionChance, "Avoidance"),
-            ResistanceRow("Fire Resistance", stats.FireResistance, baseline?.FireResistance, "Resistances"),
-            ResistanceRow("Cold Resistance", stats.ColdResistance, baseline?.ColdResistance, "Resistances"),
-            ResistanceRow("Lightning Resistance", stats.LightningResistance, baseline?.LightningResistance, "Resistances"),
-            ResistanceRow("Chaos Resistance", stats.ChaosResistance, baseline?.ChaosResistance, "Resistances"),
-            SignedPercentRow("Movement Speed", stats.MovementSpeedModifier, baseline?.MovementSpeedModifier, "Movement"),
+            PercentRow(
+                "Block Chance",
+                stats.BlockChance,
+                baseline?.BlockChance,
+                "Avoidance",
+                CalculatedStatTone.Avoidance,
+                stats.Coverage.HasIncompleteShieldBlock),
+            PercentRow(
+                "Spell Block Chance",
+                stats.SpellBlockChance,
+                baseline?.SpellBlockChance,
+                "Avoidance",
+                CalculatedStatTone.Avoidance),
+            PercentRow(
+                "Spell Suppression",
+                stats.SpellSuppressionChance,
+                baseline?.SpellSuppressionChance,
+                "Avoidance",
+                CalculatedStatTone.Avoidance),
+            ResistanceRow(
+                "Fire Resistance",
+                stats.FireResistance,
+                baseline?.FireResistance,
+                "Resistances",
+                CalculatedStatTone.Fire),
+            ResistanceRow(
+                "Cold Resistance",
+                stats.ColdResistance,
+                baseline?.ColdResistance,
+                "Resistances",
+                CalculatedStatTone.Cold),
+            ResistanceRow(
+                "Lightning Resistance",
+                stats.LightningResistance,
+                baseline?.LightningResistance,
+                "Resistances",
+                CalculatedStatTone.Lightning),
+            ResistanceRow(
+                "Chaos Resistance",
+                stats.ChaosResistance,
+                baseline?.ChaosResistance,
+                "Resistances",
+                CalculatedStatTone.Chaos),
+            SignedPercentRow(
+                "Movement Speed",
+                stats.MovementSpeedModifier,
+                baseline?.MovementSpeedModifier,
+                "Movement",
+                CalculatedStatTone.Movement),
         ]);
         Stats = new ObservableCollection<CalculatedStatMetricViewModel>(rows);
+        StatGroups = new ObservableCollection<CalculatedStatGroupViewModel>(
+            rows.GroupBy(row => row.Group)
+                .Select(group => new CalculatedStatGroupViewModel(group.Key, group)));
         Changes = new ObservableCollection<CalculatedStatMetricViewModel>(rows.Where(row => row.HasChange));
     }
 
     public static BasicCharacterStatsViewModel FromCalculated(
         BasicCharacterStats stats,
-        int resistancePenalty,
         BasicCharacterStats? baseline = null) =>
-        new(stats, resistancePenalty, baseline);
+        new(stats, baseline);
 
     private static CalculatedStatMetricViewModel IntegerRow(
         string label,
         int value,
         int? baseline,
         string group,
+        CalculatedStatTone tone,
         bool partial = false) =>
-        Row(label, PartialNumber(value, partial), group, value - baseline, IntegerDelta(value, baseline));
+        Row(label, PartialNumber(value, partial), group, tone, value - baseline, IntegerDelta(value, baseline));
 
     private static CalculatedStatMetricViewModel DecimalRow(
         string label,
         double value,
         double? baseline,
-        string group) =>
-        Row(label, Decimal(value), group, value - baseline, DecimalDelta(value, baseline));
+        string group,
+        CalculatedStatTone tone) =>
+        Row(label, Decimal(value), group, tone, value - baseline, DecimalDelta(value, baseline));
 
     private static CalculatedStatMetricViewModel PercentRow(
         string label,
         int value,
         int? baseline,
         string group,
+        CalculatedStatTone tone,
         bool partial = false) =>
-        Row(label, PartialPercent(value, partial), group, value - baseline, IntegerDelta(value, baseline, "%"));
+        Row(label, PartialPercent(value, partial), group, tone, value - baseline, IntegerDelta(value, baseline, "%"));
 
     private static CalculatedStatMetricViewModel SignedPercentRow(
         string label,
         int value,
         int? baseline,
-        string group) =>
-        Row(label, SignedPercent(value), group, value - baseline, IntegerDelta(value, baseline, "%"));
+        string group,
+        CalculatedStatTone tone) =>
+        Row(label, SignedPercent(value), group, tone, value - baseline, IntegerDelta(value, baseline, "%"));
 
     private static CalculatedStatMetricViewModel ResistanceRow(
         string label,
         BasicResistance value,
         BasicResistance? baseline,
-        string group)
+        string group,
+        CalculatedStatTone tone)
     {
         var uncappedChange = baseline is null ? 0 : value.Uncapped - baseline.Uncapped;
         var maximumChange = baseline is null ? 0 : value.Maximum - baseline.Maximum;
@@ -917,6 +986,7 @@ public sealed class BasicCharacterStatsViewModel
             label,
             Resistance(value),
             group,
+            tone,
             uncappedChange != 0 ? uncappedChange : maximumChange,
             parts.Count == 0 ? string.Empty : $"({string.Join(", ", parts)})");
     }
@@ -925,11 +995,13 @@ public sealed class BasicCharacterStatsViewModel
         string label,
         string value,
         string group,
+        CalculatedStatTone tone,
         double? change,
         string deltaText) => new(
             label,
             value,
             group,
+            tone,
             deltaText,
             change > 0,
             change < 0);
@@ -967,11 +1039,66 @@ public sealed record CalculatedStatMetricViewModel(
     string Label,
     string Value,
     string Group,
+    CalculatedStatTone Tone,
     string DeltaText = "",
     bool IsPositiveChange = false,
     bool IsNegativeChange = false)
 {
     public bool HasChange => IsPositiveChange || IsNegativeChange;
+    public bool IsStrengthTone => Tone == CalculatedStatTone.Strength;
+    public bool IsDexterityTone => Tone == CalculatedStatTone.Dexterity;
+    public bool IsIntelligenceTone => Tone == CalculatedStatTone.Intelligence;
+    public bool IsLifeTone => Tone == CalculatedStatTone.Life;
+    public bool IsManaTone => Tone == CalculatedStatTone.Mana;
+    public bool IsEnergyShieldTone => Tone == CalculatedStatTone.EnergyShield;
+    public bool IsArmourTone => Tone == CalculatedStatTone.Armour;
+    public bool IsEvasionTone => Tone == CalculatedStatTone.Evasion;
+    public bool IsWardTone => Tone == CalculatedStatTone.Ward;
+    public bool IsAvoidanceTone => Tone == CalculatedStatTone.Avoidance;
+    public bool IsFireTone => Tone == CalculatedStatTone.Fire;
+    public bool IsColdTone => Tone == CalculatedStatTone.Cold;
+    public bool IsLightningTone => Tone == CalculatedStatTone.Lightning;
+    public bool IsChaosTone => Tone == CalculatedStatTone.Chaos;
+}
+
+public enum CalculatedStatTone
+{
+    Neutral,
+    Strength,
+    Dexterity,
+    Intelligence,
+    Life,
+    Mana,
+    EnergyShield,
+    Armour,
+    Evasion,
+    Ward,
+    Avoidance,
+    Fire,
+    Cold,
+    Lightning,
+    Chaos,
+    Movement,
+}
+
+public sealed class CalculatedStatGroupViewModel
+{
+    public CalculatedStatGroupViewModel(
+        string name,
+        IEnumerable<CalculatedStatMetricViewModel> stats)
+    {
+        Name = name;
+        Stats = new ObservableCollection<CalculatedStatMetricViewModel>(stats);
+    }
+
+    public string Name { get; }
+    public ObservableCollection<CalculatedStatMetricViewModel> Stats { get; }
+    public bool IsAttributesGroup => Name == "Attributes";
+    public bool IsPoolsGroup => Name == "Pools";
+    public bool IsRecoveryGroup => Name == "Recovery";
+    public bool IsDefencesGroup => Name == "Defences";
+    public bool IsAvoidanceGroup => Name == "Avoidance";
+    public bool IsResistancesGroup => Name == "Resistances";
 }
 
 public sealed class PassiveStatPreviewViewModel

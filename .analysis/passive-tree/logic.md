@@ -7,6 +7,13 @@
 - `DeallocNode(node)` — cascading: removes node + all dependents.
 - `BuildAllDependsAndPaths()` — rebuilds dependency/path graph after any change.
 
+The Avalonia port counts allocated non-ascendancy nodes after each spec change
+and estimates the minimum character level needed to fund them with campaign
+quest points. Committing an allocation raises the shared character level when
+necessary. Refunds never lower a manually selected or imported level. PoE2's
+paired weapon-set points reduce the required level only by the smaller number
+allocated to either weapon set, matching upstream `EstimatePlayerProgress()`.
+
 ## Path-Finding (BFS)
 
 `BuildPathFromNode(root)` (lines 889–928): BFS fills `node.path` array (ordered shortest path).

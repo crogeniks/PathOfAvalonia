@@ -15,7 +15,7 @@
         <ScrollViewer IsVisible="{Binding HasContent}">
             <StackPanel Spacing="12" Margin="12">
                 <StackPanel IsVisible="{Binding HasCalculatedStats}" Spacing="8">
-                    <Grid ColumnDefinitions="*,Auto,76,Auto,76" ColumnSpacing="8">
+                    <Grid ColumnDefinitions="*,Auto,100" ColumnSpacing="8">
                         <StackPanel>
                             <TextBlock Text="Basic stats"
                                        Foreground="#DDDDEE"
@@ -35,18 +35,8 @@
                                        Maximum="100"
                                        Increment="1"
                                        FormatString="0"
+                                       Foreground="#EEEEF2"
                                        Value="{Binding CharacterLevel}"/>
-                        <TextBlock Grid.Column="3"
-                                   Text="Res. penalty"
-                                   Foreground="#8888AA"
-                                   VerticalAlignment="Center"/>
-                        <NumericUpDown Name="ResistancePenaltyInput"
-                                       Grid.Column="4"
-                                       Minimum="-60"
-                                       Maximum="0"
-                                       Increment="10"
-                                       FormatString="0"
-                                       Value="{Binding ResistancePenalty}"/>
                     </Grid>
                     <TextBlock Text="{Binding CalculatedStats.CoverageText}"
                                Foreground="#8888AA"

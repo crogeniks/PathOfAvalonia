@@ -172,6 +172,7 @@ public sealed class CoreUserJourneyHeadlessTests
 
             Assert.True(RequiredVisual<ItemsControl>(view, "CalculatedStatsList").ItemCount > 0);
             var level = RequiredVisual<NumericUpDown>(view, "CharacterLevelInput");
+            Assert.True(level.Bounds.Width >= 96, "The level editor must leave room beside its spinner buttons.");
             level.Value = 10;
             Dispatcher.UIThread.RunJobs();
 
@@ -194,11 +195,43 @@ public sealed class CoreUserJourneyHeadlessTests
         {
             var sidebar = Required<BasicStatsSidebarView>(view, "TreeStatsSidebar");
             Assert.True(sidebar.IsVisible);
-            Assert.True(RequiredVisual<ItemsControl>(view, "TreeCalculatedStatsList").ItemCount > 0);
+            var calculatedStats = Assert.IsType<BasicCharacterStatsViewModel>(
+                workspace.State.Equipment.TreeCalculatedStats);
+            var statsList = RequiredVisual<ItemsControl>(view, "TreeCalculatedStatsList");
+            var previewSlot = RequiredVisual<Grid>(view, "PassivePreviewSlot");
+            var previewBox = RequiredVisual<Border>(view, "PassivePreviewBox");
+            Assert.Equal(
+                ["Attributes", "Pools", "Recovery", "Defences", "Avoidance", "Resistances", "Movement"],
+                calculatedStats.StatGroups.Select(group => group.Name));
+            Assert.Equal(calculatedStats.StatGroups.Count, statsList.ItemCount);
+            Assert.Equal(26, previewSlot.Bounds.Height);
+            Assert.False(previewBox.IsVisible);
+            Assert.True(
+                calculatedStats.Stats.Select(stat => stat.Tone).Distinct().Count() >= 10,
+                "The sidebar should expose distinct semantic tones for its stat values.");
+            Assert.True(
+                RequiredVisual<NumericUpDown>(view, "TreeCharacterLevelInput").Bounds.Width >= 96,
+                "The sidebar level editor must leave room beside its spinner buttons.");
             var baselineStrength = workspace.State.Equipment.CalculatedStats!.Values.Strength;
             var treeView = Assert.Single(view.GetVisualDescendants().OfType<PassiveTreeView>());
             Click(window, Required<Button>(view, "TreeControlsToggleButton"));
             _ = window.CaptureRenderedFrame();
+
+            var renderedStatRows = statsList.GetVisualDescendants()
+                .OfType<Border>()
+                .Where(border => border.DataContext is CalculatedStatMetricViewModel)
+                .ToArray();
+            Assert.Equal(calculatedStats.Stats.Count, renderedStatRows.Length);
+            Assert.All(renderedStatRows, row => Assert.True(row.Margin.Bottom >= 2));
+            var renderedValueColorCount = statsList.GetVisualDescendants()
+                .OfType<TextBlock>()
+                .Where(text => text.DataContext is CalculatedStatMetricViewModel stat && text.Text == stat.Value)
+                .Select(text => text.Foreground?.ToString())
+                .Distinct()
+                .Count();
+            Assert.True(renderedValueColorCount >= 10, "Semantic stat colors should reach the rendered values.");
+            var statsPositionBeforePreview = statsList.TranslatePoint(new Point(), sidebar);
+            Assert.NotNull(statsPositionBeforePreview);
 
             MoveToTreeNode(
                 window,
@@ -208,10 +241,24 @@ public sealed class CoreUserJourneyHeadlessTests
 
             Assert.DoesNotContain(NormalNodeId, workspace.State.Spec.AllocatedNodes);
             Assert.NotNull(workspace.State.Equipment.PassivePreview);
+            Assert.True(previewBox.IsVisible);
+            var statsPositionWithPreview = statsList.TranslatePoint(new Point(), sidebar);
+            Assert.NotNull(statsPositionWithPreview);
+            Assert.Equal(statsPositionBeforePreview.Value.Y, statsPositionWithPreview.Value.Y, precision: 3);
             Assert.Equal(baselineStrength + 10, workspace.State.Equipment.TreeCalculatedStats!.Values.Strength);
             Assert.Contains(
                 workspace.State.Equipment.PassivePreview!.Changes,
                 change => change.Label == "Strength" && change.DeltaText == "(+10)");
+
+            ClickTreeNode(
+                window,
+                treeView,
+                workspace.State.Spec.Tree.Nodes[NormalNodeId],
+                workspace.State.Spec.Tree.Bounds);
+
+            Assert.Contains(NormalNodeId, workspace.State.Spec.AllocatedNodes);
+            Assert.Equal(2, workspace.State.Equipment.CharacterLevel);
+            Assert.Equal(2, RequiredVisual<NumericUpDown>(view, "TreeCharacterLevelInput").Value);
         }
         finally
         {
@@ -421,14 +468,28 @@ public sealed class CoreUserJourneyHeadlessTests
 
     private static void MoveToTreeNode(Window window, Control treeView, Node node, TreeBounds bounds)
     {
+        window.MouseMove(TreeNodeWindowPoint(window, treeView, node, bounds));
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    private static void ClickTreeNode(Window window, Control treeView, Node node, TreeBounds bounds)
+    {
+        var point = TreeNodeWindowPoint(window, treeView, node, bounds);
+        window.MouseMove(point);
+        window.MouseDown(point, MouseButton.Left);
+        window.MouseUp(point, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    private static Point TreeNodeWindowPoint(Window window, Control treeView, Node node, TreeBounds bounds)
+    {
         var scale = Math.Min(treeView.Bounds.Width / bounds.Width, treeView.Bounds.Height / bounds.Height) * 0.95;
         var point = new Point(
             node.X * scale + treeView.Bounds.Width * 0.5 - bounds.CenterX * scale,
             node.Y * scale + treeView.Bounds.Height * 0.5 - bounds.CenterY * scale);
         var windowPoint = treeView.TranslatePoint(point, window);
         Assert.NotNull(windowPoint);
-        window.MouseMove(windowPoint.Value);
-        Dispatcher.UIThread.RunJobs();
+        return windowPoint.Value;
     }
 
     private sealed class StubWorkspaceFactory : IGameWorkspaceFactory

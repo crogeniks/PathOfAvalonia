@@ -52,6 +52,7 @@ public sealed record BasicCharacterStats(
 
 public static partial class BasicStatCalculator
 {
+    public const int WorstResistancePenalty = -60;
     private const int DefaultMaximumResistance = 75;
     private const int DefaultMaximumBlock = 75;
 
@@ -59,12 +60,10 @@ public static partial class BasicStatCalculator
         PassiveSpec spec,
         IEnumerable<ImportedItem> items,
         int level,
-        int resistancePenalty = -60,
         int activeWeaponSet = 1,
         PassiveAllocationPreview? passivePreview = null)
     {
         level = Math.Clamp(level, 1, 100);
-        resistancePenalty = Math.Clamp(resistancePenalty, -60, 0);
         activeWeaponSet = activeWeaponSet == 2 ? 2 : 1;
         var totals = new ModifierTotals();
         var coverage = new CoverageBuilder();
@@ -129,8 +128,8 @@ public static partial class BasicStatCalculator
         var spellBlock = Math.Clamp(Round(totals.Value(BasicStat.SpellBlockChance)), 0, maximumSpellBlock);
         var suppression = Math.Clamp(Round(totals.Value(BasicStat.SpellSuppressionChance)), 0, 100);
 
-        var elementalPenalty = resistancePenalty;
-        var chaosPenalty = isPoe2 ? 0 : resistancePenalty;
+        var elementalPenalty = WorstResistancePenalty;
+        var chaosPenalty = isPoe2 ? 0 : WorstResistancePenalty;
         var fire = Resistance(totals, BasicStat.FireResistance, BasicStat.MaximumFireResistance, elementalPenalty);
         var cold = Resistance(totals, BasicStat.ColdResistance, BasicStat.MaximumColdResistance, elementalPenalty);
         var lightning = Resistance(totals, BasicStat.LightningResistance, BasicStat.MaximumLightningResistance, elementalPenalty);

@@ -56,7 +56,7 @@ public sealed class BasicStatCalculatorTests
                 """),
         };
 
-        var result = BasicStatCalculator.Calculate(spec, items, level: 10, resistancePenalty: -60);
+        var result = BasicStatCalculator.Calculate(spec, items, level: 10);
 
         Assert.Equal(40, result.Strength);
         Assert.Equal(30, result.Dexterity);
@@ -93,7 +93,7 @@ public sealed class BasicStatCalculatorTests
         };
         var spec = CreateSpec([], GameId.PathOfExile2, classes);
 
-        var result = BasicStatCalculator.Calculate(spec, [], level: 10, resistancePenalty: -60);
+        var result = BasicStatCalculator.Calculate(spec, [], level: 10);
 
         Assert.Equal(150, result.Life);
         Assert.Equal(100, result.Mana);
@@ -140,6 +140,49 @@ public sealed class BasicStatCalculatorTests
         Assert.True(viewModel.CalculatedStats!.Values.Life > levelOneLife);
         Assert.Equal(10, viewModel.CalculatedStats.Values.Level);
         Assert.True(viewModel.IsDirty);
+    }
+
+    [Theory]
+    [InlineData(GameId.PathOfExile1, 0, 0, 0, 1)]
+    [InlineData(GameId.PathOfExile1, 1, 0, 0, 2)]
+    [InlineData(GameId.PathOfExile1, 11, 0, 0, 12)]
+    [InlineData(GameId.PathOfExile1, 12, 0, 0, 12)]
+    [InlineData(GameId.PathOfExile1, 23, 0, 0, 22)]
+    [InlineData(GameId.PathOfExile1, 122, 0, 0, 100)]
+    [InlineData(GameId.PathOfExile2, 1, 0, 0, 2)]
+    [InlineData(GameId.PathOfExile2, 12, 0, 0, 12)]
+    [InlineData(GameId.PathOfExile2, 13, 0, 0, 12)]
+    [InlineData(GameId.PathOfExile2, 2, 1, 1, 2)]
+    public void EstimatesMinimumLevelFromAllocatedPassivePoints(
+        GameId gameId,
+        int total,
+        int weaponSet1,
+        int weaponSet2,
+        int expectedLevel)
+    {
+        var level = CharacterProgression.MinimumLevel(
+            gameId,
+            new PassivePointUsage(total, weaponSet1, weaponSet2));
+
+        Assert.Equal(expectedLevel, level);
+    }
+
+    [Fact]
+    public void EquipmentViewModelRaisesLevelForAllocationsButDoesNotLowerItForRefunds()
+    {
+        var spec = CreateChainSpec();
+        var viewModel = new EquipmentViewModel(spec);
+
+        spec.AllocateMany([2, 3]);
+
+        Assert.Equal(3, viewModel.CharacterLevel);
+        Assert.Equal(3, viewModel.CalculatedStats!.Values.Level);
+
+        viewModel.CharacterLevel = 20;
+        spec.Toggle(2);
+
+        Assert.Equal(20, viewModel.CharacterLevel);
+        Assert.Equal(20, viewModel.CalculatedStats!.Values.Level);
     }
 
     [Fact]

@@ -68,8 +68,20 @@ smaller coverage level.
 
 The passive-tree workspace reserves a 286-pixel left column for locally
 calculated basic stats, corresponding to PoB's persistent build sidebar. It
-shares character level and resistance-penalty state with the Calculations tab.
-While a passive is hovered, the column displays projected totals and inline
+shares character level with the Calculations tab; both views always use the
+fixed worst resistance penalty. While a passive is hovered, the column displays projected totals and inline
 green/red deltas; no allocation is committed. Pointer exit restores the current
-build totals. Partial item-defence and unsupported-modifier warnings remain
-visible at the bottom of the column.
+build totals. The preview notice occupies a fixed-height, single-line slot even
+while hidden, so entering or leaving a node does not move the stat groups.
+Detailed partial-preview warnings remain in the passive tooltip. Partial
+item-defence and unsupported-modifier warnings remain visible at the bottom of
+the column.
+
+The sidebar groups rows under Attributes, Pools, Recovery, Defences, Avoidance,
+Resistances, and Movement headings. Compact separated row cards provide vertical
+rhythm, while values use semantic colors (including distinct attribute, pool,
+defence, and elemental-resistance tones) so adjacent totals remain scannable.
+
+When a passive click commits an allocation, the shared level is raised to PoB's
+estimated minimum for the allocated passive count. The level is intentionally
+one-way: refunding passives does not lower a higher manual or imported level.

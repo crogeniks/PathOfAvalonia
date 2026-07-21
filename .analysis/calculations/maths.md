@@ -114,8 +114,29 @@ final = round((intrinsicBase + Σ flat) × (1 + Σ increased / 100)
               × Π(1 + more / 100))
 ```
 
-PoE1 applies the configured penalty to elemental and chaos resistance; PoE2
-applies it only to elemental resistance and starts chaos at 0. Resistances retain
+The native calculator always applies the worst campaign penalty (-60%). PoE1
+applies it to elemental and chaos resistance; PoE2 applies it only to elemental
+resistance and starts chaos at 0. Resistances retain
 their uncapped total and clamp the display to the calculated maximum (hard cap
 90). Block and spell block currently use their supported base/increased values
 and clamp to their maximum; suppression clamps to 100.
+
+## Minimum level for passive allocations
+
+For `P` allocated non-ascendancy passive points, each act entry has a minimum
+level `M` and cumulative quest points `Q`:
+
+```text
+estimated level = min(max(P + 1 - Q, M), 100)
+```
+
+Entries are checked in campaign order until that estimate is no higher than
+the next act's minimum level. PoE1 uses `(M,Q)` entries `(1,0)`, `(12,2)`,
+`(22,4)`, `(32,6)`, `(40,7)`, `(44,9)`, `(50,12)`, `(54,15)`, `(60,18)`,
+`(64,20)`, and `(67,23)`.
+
+PoE2 uses `(1,0)`, `(12,4)`, `(28,8)`, `(44,12)`, `(51,16)`, `(64,22)`, and
+`(62,24)`, derived from its current quest-reward data. Before applying the
+formula it replaces `P` with `P - min(W1, W2)`, where `W1` and `W2` are the
+allocated weapon-set passive counts. This is PoB's treatment of paired
+weapon-set quest points.
