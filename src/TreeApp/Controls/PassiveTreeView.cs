@@ -477,8 +477,8 @@ public sealed partial class PassiveTreeView : Control
             }
             var isHover = _vm.HoverNodeId == n.Id;
             var onPath = _vm.HoverPathNodes.Contains(n.Id);
-            DrawCurrentDiffHighlight(ctx, n);
             DrawNode(ctx, n, allocated.Contains(n.Id), isHover || onPath, useClusterSocketFrame: true);
+            DrawCurrentDiffHighlight(ctx, n);
             DrawSearchHighlight(ctx, n);
         }
 
@@ -549,17 +549,33 @@ public sealed partial class PassiveTreeView : Control
     private void DrawDiffRing(DrawingContext ctx, Node node, IBrush brush, bool solidFill)
     {
         var centre = TreeToScreen(node.X, node.Y);
-        var half = node.Visual is not null
-            ? Poe2FrameHalfSize(node, string.Empty)
-            : new Size(NodeRadius, NodeRadius);
-        var rx = Math.Max(NodeRadius * _scale, half.Width * _scale * 0.94);
-        var ry = Math.Max(NodeRadius * _scale, half.Height * _scale * 0.94);
+        var half = DiffNodeHalfSize(node);
         var thickness = Math.Max(4.0, 15.0 * _scale);
+        var outwardGap = thickness * 0.65;
+        var rx = Math.Max(NodeRadius, half.Width) * _scale + outwardGap;
+        var ry = Math.Max(NodeRadius, half.Height) * _scale + outwardGap;
         ctx.DrawEllipse(solidFill ? new SolidColorBrush(Color.FromArgb(0x18, 0xE5, 0x56, 0x56)) : null,
             new Pen(brush, thickness),
             centre,
             rx,
             ry);
+    }
+
+    private static Size DiffNodeHalfSize(Node node)
+    {
+        if (node.Visual is not null)
+        {
+            return Poe2FrameHalfSize(node, string.Empty);
+        }
+
+        var radius = node.Type switch
+        {
+            NodeType.Notable or NodeType.JewelSocket => 58 * SpriteDisplayScale,
+            NodeType.Keystone or NodeType.ClassStart or NodeType.AscendancyStart => 84 * SpriteDisplayScale,
+            NodeType.Mastery => 65 * SpriteDisplayScale,
+            _ => 40 * SpriteDisplayScale,
+        };
+        return new Size(radius, radius);
     }
 
 }

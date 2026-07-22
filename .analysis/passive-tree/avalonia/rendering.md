@@ -257,6 +257,10 @@ canvas.Restore();
   - `{0,0,1}` modified (same alloc, different mastery effect / jewel socket)
   - neutral → no tint
 - Applied as `SetDrawColor` before drawing the node frame.
+- The Avalonia version uses explicit added/changed/removed rings. Current-node
+  rings are drawn after the node frame and outside the node-type-specific visual
+  radius so allocated/can-allocate frame art cannot occlude them as zoom changes.
+  Search rings remain above diff rings.
 
 ## 8. Zoom-Dependent Detail
 

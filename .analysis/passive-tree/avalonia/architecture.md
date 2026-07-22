@@ -197,9 +197,10 @@ TreeDrawOp.Render(ctx):
            canvas.DrawVertices(vertices, paint)
   4. Draw node icons  (atlas batched)
   5. Draw node frames (atlas batched)
-  6. Draw search highlights (only for matched nodes)
-  7. Draw jewel socket overlays (only if hover socket)
-  8. (Tooltip is a separate Avalonia control, not drawn here)
+  6. Draw tree-version diff rings (outside each node's visual radius)
+  7. Draw search highlights (only for matched nodes)
+  8. Draw jewel socket overlays (only if hover socket)
+  9. (Tooltip is a separate Avalonia control, not drawn here)
 ```
 
 Group connectors by atlas before drawing: the loop becomes ~6 batched `DrawVertices` calls instead of thousands of individual ones.
