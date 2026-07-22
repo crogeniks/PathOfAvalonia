@@ -9,6 +9,7 @@ Deeper, port-oriented analysis building on the Lua-level summaries in the parent
 | [`selection.md`](selection.md) | Allocation & deallocation rules as a C# state machine |
 | [`rendering.md`](rendering.md) | Per-frame draw loop mapped to Avalonia + SkiaSharp |
 | [`architecture.md`](architecture.md) | Synthesis — module split, lifecycle, threading, testing |
+| [`atlas.md`](atlas.md) | Atlas passive-tree domain boundary, assets, allocation, aggregation, and UI |
 
 **Reading order:** `build` → `assets` → `selection` → `rendering` → `architecture`.
 

@@ -11,5 +11,8 @@ public interface IGameAssetLayout
     IReadOnlyList<string> AdditionalSpriteDataPaths(string version) => [];
     TimelessJewelAssetPaths? TimelessJewelDataPaths(string version) => null;
     string BackgroundPath(string version);
+    string? AtlasTreeDataPath(string version) => null;
+    SpriteDataPaths? AtlasSpriteDataPaths(string version) => null;
+    string? AtlasBackgroundPath(string version) => null;
     string ResolveBitmapPath(string relativePath, string version) => relativePath;
 }

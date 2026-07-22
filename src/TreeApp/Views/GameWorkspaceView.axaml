@@ -7,55 +7,11 @@
              x:DataType="vm:GameWorkspaceViewModel">
     <Grid Background="#101018" RowDefinitions="48,*">
         <Border Background="#15151D" BorderBrush="#30303A" BorderThickness="0,0,0,1">
-            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" Margin="14,0" VerticalAlignment="Center">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="14,0" VerticalAlignment="Center">
                 <TextBlock Text="PathOfAvalonia" Foreground="#F0F0F4" FontWeight="SemiBold" VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="1" Text="{Binding GameName}" Foreground="#CFCFE0" Margin="18,0,0,0" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="2" Text="Tree" Foreground="#9090A0" Margin="12,0,6,0" VerticalAlignment="Center"
-                           IsVisible="{Binding HasTreeVersionOptions}"/>
-                <ComboBox Name="TreeVersionSelector"
-                          Grid.Column="3"
-                          Width="98"
-                          ItemsSource="{Binding TreeVersionOptions}"
-                          SelectedItem="{Binding SelectedTreeVersion}"
-                          IsVisible="{Binding HasTreeVersionOptions}"/>
-                <TextBlock Grid.Column="4" Text="Diff" Foreground="#9090A0" Margin="12,0,6,0" VerticalAlignment="Center"
-                           IsVisible="{Binding HasDiffVersionOptions}"/>
-                <ComboBox Name="DiffTreeVersionSelector"
-                          Grid.Column="5"
-                          Width="98"
-                          ItemsSource="{Binding DiffTreeVersionOptions}"
-                          SelectedItem="{Binding SelectedDiffTreeVersion}"
-                          IsVisible="{Binding HasDiffVersionOptions}"/>
-                <Button Name="DiffLegendButton"
-                        Grid.Column="6"
-                        Content="Legend"
-                        Margin="8,0,0,0"
-                        Padding="8,3"
-                        IsVisible="{Binding HasDiffVersionOptions}">
-                    <Button.Flyout>
-                        <Flyout>
-                            <Border Padding="10" Background="#1A1A24">
-                                <StackPanel Spacing="8">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Ellipse Width="12" Height="12" Fill="#00F05A"/>
-                                        <TextBlock Text="Added" Foreground="#EAEAEA"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Ellipse Width="12" Height="12" Fill="#A85CFF"/>
-                                        <TextBlock Text="Changed" Foreground="#EAEAEA"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Ellipse Width="12" Height="12" Fill="#E55656"/>
-                                        <TextBlock Text="Removed" Foreground="#EAEAEA"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
-                        </Flyout>
-                    </Button.Flyout>
-                </Button>
-                <TextBlock Grid.Column="7" Text="{Binding DiffSummary}" Foreground="#C6B36A" Margin="12,0,0,0" VerticalAlignment="Center"/>
                 <Button Name="ChangeGameButton"
-                        Grid.Column="8"
+                        Grid.Column="3"
                         Content="Change Game"
                         Command="{Binding BackToLandingCommand}"/>
             </Grid>
@@ -67,6 +23,53 @@
                                                  Grid.Column="0"
                                                  DataContext="{Binding State.Equipment}"/>
                     <Grid Name="TreeCanvas" Grid.Column="1">
+                    <Border HorizontalAlignment="Left" VerticalAlignment="Top"
+                            Margin="12" Padding="10,7"
+                            Background="#DD1A1A24" CornerRadius="6"
+                            BorderBrush="#3A3A4A" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <TextBlock Text="Tree" Foreground="#9090A0" VerticalAlignment="Center"
+                                       IsVisible="{Binding HasTreeVersionOptions}"/>
+                            <ComboBox Name="TreeVersionSelector"
+                                      Width="98"
+                                      ItemsSource="{Binding TreeVersionOptions}"
+                                      SelectedItem="{Binding SelectedTreeVersion}"
+                                      IsVisible="{Binding HasTreeVersionOptions}"/>
+                            <TextBlock Text="Diff" Foreground="#9090A0" Margin="5,0,0,0" VerticalAlignment="Center"
+                                       IsVisible="{Binding HasDiffVersionOptions}"/>
+                            <ComboBox Name="DiffTreeVersionSelector"
+                                      Width="98"
+                                      ItemsSource="{Binding DiffTreeVersionOptions}"
+                                      SelectedItem="{Binding SelectedDiffTreeVersion}"
+                                      IsVisible="{Binding HasDiffVersionOptions}"/>
+                            <Button Name="DiffLegendButton"
+                                    Content="Legend"
+                                    Padding="8,3"
+                                    IsVisible="{Binding HasDiffVersionOptions}">
+                                <Button.Flyout>
+                                    <Flyout>
+                                        <Border Padding="10" Background="#1A1A24">
+                                            <StackPanel Spacing="8">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Ellipse Width="12" Height="12" Fill="#00F05A"/>
+                                                    <TextBlock Text="Added" Foreground="#EAEAEA"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Ellipse Width="12" Height="12" Fill="#A85CFF"/>
+                                                    <TextBlock Text="Changed" Foreground="#EAEAEA"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Ellipse Width="12" Height="12" Fill="#E55656"/>
+                                                    <TextBlock Text="Removed" Foreground="#EAEAEA"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </Flyout>
+                                </Button.Flyout>
+                            </Button>
+                            <TextBlock Text="{Binding DiffSummary}" Foreground="#C6B36A" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
                     <Border HorizontalAlignment="Right" VerticalAlignment="Top"
                             Margin="12" Padding="10"
                             Background="#CC1A1A24" CornerRadius="6"
@@ -207,6 +210,162 @@
                                   DisplayMemberBinding="{Binding DisplayName}"/>
                     </StackPanel>
                     <local:BuildOutputView Grid.Row="1" DataContext="{Binding State.Equipment}"/>
+                </Grid>
+            </TabItem>
+            <TabItem Name="AtlasTreeTab" Header="Atlas Tree" IsVisible="{Binding HasAtlasTree}">
+                <Grid DataContext="{Binding Atlas}"
+                      x:DataType="vm:AtlasTreeViewModel"
+                      Background="#101018"
+                      ColumnDefinitions="330,*">
+                    <Border Grid.Column="0"
+                            Background="#15151D"
+                            BorderBrush="#30303A"
+                            BorderThickness="0,0,1,0"
+                            Padding="14">
+                        <Grid RowDefinitions="Auto,Auto,*">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel>
+                                    <TextBlock Text="Allocated Atlas modifiers"
+                                               Foreground="#F0F0F4"
+                                               FontWeight="Bold"
+                                               FontSize="16"/>
+                                    <TextBlock Text="{Binding PointUsage}"
+                                               Foreground="{Binding PointUsageBrush}"
+                                               Margin="0,3,0,0"/>
+                                </StackPanel>
+                                <Button Grid.Column="1"
+                                        Content="Reset"
+                                        Command="{Binding ResetCommand}"
+                                        VerticalAlignment="Top"/>
+                            </Grid>
+                            <TextBlock Grid.Row="1"
+                                       Text="Repeated numeric effects are summed across allocated nodes."
+                                       Foreground="#9090A0"
+                                       FontSize="11"
+                                       TextWrapping="Wrap"
+                                       Margin="0,10,0,8"/>
+                            <Grid Grid.Row="2">
+                                <TextBlock Text="Allocate nodes to see their combined effects."
+                                           Foreground="#777787"
+                                           TextWrapping="Wrap"
+                                           IsVisible="{Binding !HasAggregatedStats}"/>
+                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                              IsVisible="{Binding HasAggregatedStats}">
+                                    <ItemsControl ItemsSource="{Binding AggregatedStatGroups}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:AtlasAggregatedStatGroupViewModel">
+                                                <StackPanel Margin="0,0,0,12">
+                                                    <TextBlock Text="{Binding Type}"
+                                                               Foreground="#C6B36A"
+                                                               FontWeight="Bold"
+                                                               Margin="2,4,2,3"/>
+                                                    <ItemsControl ItemsSource="{Binding Stats}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="vm:AtlasAggregatedStatItemViewModel">
+                                                                <Border BorderBrush="#2B2B38"
+                                                                        BorderThickness="0,0,0,1"
+                                                                        Padding="2,7"
+                                                                        Opacity="{Binding Opacity}">
+                                                                    <TextBlock Text="{Binding Text}"
+                                                                               Foreground="#8D98FF"
+                                                                               TextWrapping="Wrap"/>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Grid>
+                        </Grid>
+                    </Border>
+                    <Grid Name="AtlasCanvas" Grid.Column="1">
+                        <Border HorizontalAlignment="Left"
+                                VerticalAlignment="Top"
+                                Margin="12"
+                                Padding="10,7"
+                                Background="#DD1A1A24"
+                                CornerRadius="6"
+                                BorderBrush="#3A3A4A"
+                                BorderThickness="1">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <TextBlock Text="Atlas" Foreground="#9090A0" VerticalAlignment="Center"/>
+                                <ComboBox Name="AtlasVersionSelector"
+                                          Width="98"
+                                          ItemsSource="{Binding VersionOptions}"
+                                          SelectedItem="{Binding SelectedVersion}"/>
+                                <TextBlock Text="Diff" Foreground="#9090A0" Margin="5,0,0,0" VerticalAlignment="Center"
+                                           IsVisible="{Binding HasDiffVersionOptions}"/>
+                                <ComboBox Name="AtlasDiffVersionSelector"
+                                          Width="98"
+                                          ItemsSource="{Binding DiffVersionOptions}"
+                                          SelectedItem="{Binding SelectedDiffVersion}"
+                                          IsVisible="{Binding HasDiffVersionOptions}"/>
+                                <Button Name="AtlasDiffLegendButton"
+                                        Content="Legend"
+                                        Padding="8,3"
+                                        IsVisible="{Binding HasDiffVersionOptions}">
+                                    <Button.Flyout>
+                                        <Flyout>
+                                            <Border Padding="10" Background="#1A1A24">
+                                                <StackPanel Spacing="8">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <Ellipse Width="12" Height="12" Fill="#00F05A"/>
+                                                        <TextBlock Text="Added" Foreground="#EAEAEA"/>
+                                                    </StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <Ellipse Width="12" Height="12" Fill="#A85CFF"/>
+                                                        <TextBlock Text="Changed" Foreground="#EAEAEA"/>
+                                                    </StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <Ellipse Width="12" Height="12" Fill="#E55656"/>
+                                                        <TextBlock Text="Removed" Foreground="#EAEAEA"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </Flyout>
+                                    </Button.Flyout>
+                                </Button>
+                                <TextBlock Text="{Binding DiffSummary}"
+                                           Foreground="#C6B36A"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding StatusMessage}"
+                                           Foreground="#E56868"
+                                           VerticalAlignment="Center"
+                                           MaxWidth="340"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </Border>
+                        <Border HorizontalAlignment="Center"
+                                VerticalAlignment="Bottom"
+                                Margin="12"
+                                Padding="10,8"
+                                Background="#DD1A1A24"
+                                CornerRadius="6"
+                                BorderBrush="#3A3A4A"
+                                BorderThickness="1"
+                                x:DataType="vm:AtlasTreeViewModel">
+                            <Grid ColumnDefinitions="260,Auto,Auto" RowDefinitions="Auto,Auto">
+                                <TextBox Name="AtlasSearchInput"
+                                         Text="{Binding SearchText}"
+                                         PlaceholderText="Search Atlas passives…"/>
+                                <Button Grid.Column="1"
+                                        Content="Clear"
+                                        Margin="6,0,0,0"
+                                        Command="{Binding ClearSearchCommand}"
+                                        IsVisible="{Binding HasActiveSearch}"/>
+                                <TextBlock Grid.Row="1"
+                                           Grid.ColumnSpan="3"
+                                           Text="{Binding SearchResultCount, StringFormat='{}{0} matches highlighted'}"
+                                           Foreground="#F0594F"
+                                           FontSize="11"
+                                           Margin="2,4,0,0"
+                                           IsVisible="{Binding HasActiveSearch}"/>
+                            </Grid>
+                        </Border>
+                    </Grid>
                 </Grid>
             </TabItem>
         </TabControl>

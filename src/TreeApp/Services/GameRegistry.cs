@@ -42,7 +42,8 @@ public sealed class GameRegistry
         new Poe1TreeLoader(),
         new Poe1ImportStrategy(),
         GameFeatureFlags.Poe1,
-        ["3.28.0", "3.29.0"]);
+        ["3.28.0", "3.29.0"],
+        ["3.29.0"]);
 
     public static GameDefinition CreatePoe2() => new(
         GameId.PathOfExile2,

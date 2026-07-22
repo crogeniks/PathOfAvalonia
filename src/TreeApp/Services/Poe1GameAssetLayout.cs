@@ -35,5 +35,17 @@ public sealed class Poe1GameAssetLayout : GameAssetLayoutBase
     public override string BackgroundPath(string version) =>
         IsGggTreeVersion(version) ? $"{VersionFolder(version)}/assets/background-3.png" : $"background_{VersionFileSuffix(version)}.png";
 
+    public override string AtlasTreeDataPath(string version) =>
+        $"{VersionFolder(version)}/Atlas/data.json";
+
+    public override SpriteDataPaths AtlasSpriteDataPaths(string version) =>
+        new(
+            SpriteDataKind.Poe1GggTree,
+            [AtlasTreeDataPath(version)],
+            $"{VersionFolder(version)}/Atlas/assets");
+
+    public override string AtlasBackgroundPath(string version) =>
+        $"{VersionFolder(version)}/Atlas/assets/background-3.png";
+
     private static bool IsGggTreeVersion(string version) => true;
 }

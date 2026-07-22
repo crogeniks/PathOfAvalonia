@@ -11,10 +11,13 @@ public sealed record GameDefinition(
     ITreeLoader TreeLoader,
     IImportStrategy ImportStrategy,
     GameFeatureFlags FeatureFlags,
-    IReadOnlyList<string>? AvailableTreeVersions = null)
+    IReadOnlyList<string>? AvailableTreeVersions = null,
+    IReadOnlyList<string>? AvailableAtlasTreeVersions = null)
 {
     public IReadOnlyList<string> TreeVersions =>
         AvailableTreeVersions is { Count: > 0 } ? AvailableTreeVersions : [DefaultTreeVersion];
+    public IReadOnlyList<string> AtlasTreeVersions =>
+        AvailableAtlasTreeVersions is { Count: > 0 } ? AvailableAtlasTreeVersions : [];
 }
 
 public interface ITreeLoader

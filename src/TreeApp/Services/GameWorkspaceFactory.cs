@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Input;
 using PathOfAvalonia.TreeApp.ViewModels;
@@ -34,7 +35,26 @@ public sealed class GameWorkspaceFactory(
         var treeTask = assets.LoadTreeAsync(game, treeVersion);
         var spritesTask = assets.LoadSpritesAsync(game, treeVersion);
         var timelessJewelDataTask = assets.LoadTimelessJewelDataAsync(game, treeVersion);
+        var atlasVersion = game.AtlasTreeVersions.Contains(treeVersion, StringComparer.Ordinal)
+            ? treeVersion
+            : game.AtlasTreeVersions.LastOrDefault();
+        var atlasTreeTask = atlasVersion is null ? null : assets.LoadAtlasTreeAsync(game, atlasVersion);
+        var atlasSpritesTask = atlasVersion is null ? null : assets.LoadAtlasSpritesAsync(game, atlasVersion);
         await Task.WhenAll(treeTask, spritesTask, timelessJewelDataTask);
+        if (atlasTreeTask is not null && atlasSpritesTask is not null)
+        {
+            try
+            {
+                await Task.WhenAll(atlasTreeTask, atlasSpritesTask);
+            }
+            catch
+            {
+                // Atlas is an optional PoE1 workspace. A missing or malformed
+                // Atlas bundle must not prevent the character build from opening.
+                atlasTreeTask = null;
+                atlasSpritesTask = null;
+            }
+        }
 
         var tree = await treeTask;
         var sprites = await spritesTask;
@@ -52,6 +72,17 @@ public sealed class GameWorkspaceFactory(
             state,
             game.ImportStrategy,
             new BuildPlannerFileService(storageProviderAccessor, buildPlannerExportService, buildPlannerImportService));
+        AtlasTreeViewModel? atlas = null;
+        if (atlasVersion is not null && atlasTreeTask is not null && atlasSpritesTask is not null)
+        {
+            atlas = new AtlasTreeViewModel(
+                game,
+                await atlasTreeTask,
+                await atlasSpritesTask,
+                new AtlasTreeImageAssetResolver(game, assets, assetLayouts, atlasVersion),
+                assets,
+                assetLayouts);
+        }
 
         return new GameWorkspaceViewModel(
             state,
@@ -60,6 +91,7 @@ public sealed class GameWorkspaceFactory(
             new TreeImageAssetResolver(game, assets, assetLayouts, treeVersion),
             assets,
             switchTreeVersion,
-            backToLandingCommand);
+            backToLandingCommand,
+            atlas);
     }
 }

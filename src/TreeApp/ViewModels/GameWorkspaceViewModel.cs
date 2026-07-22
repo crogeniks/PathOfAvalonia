@@ -25,7 +25,8 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
         ITreeImageAssetResolver imageResolver,
         IGameAssetService assets,
         Func<GameDefinition, string, Task> switchTreeVersion,
-        IRelayCommand backToLandingCommand)
+        IRelayCommand backToLandingCommand,
+        AtlasTreeViewModel? atlas = null)
     {
         State = state;
         TreeSelection = treeSelection;
@@ -34,6 +35,7 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
         _assets = assets;
         _switchTreeVersion = switchTreeVersion;
         BackToLandingCommand = backToLandingCommand;
+        Atlas = atlas;
         SelectedTreeVersion = state.Spec.Tree.Version;
         TreeVersionOptions = state.Game.TreeVersions;
         DiffTreeVersionOptions = [NoDiffVersion, .. state.Game.TreeVersions.Where(version => version != state.Spec.Tree.Version)];
@@ -41,6 +43,10 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
         _initialAllocatedCount = state.Spec.AllocatedNodes.Count;
         state.Spec.SpecChanged += () => OnPropertyChanged(nameof(IsDirty));
         state.Equipment.EquipmentChanged += () => OnPropertyChanged(nameof(IsDirty));
+        if (Atlas is not null)
+        {
+            Atlas.StateChanged += () => OnPropertyChanged(nameof(IsDirty));
+        }
     }
 
     public BuildWorkspaceState State { get; }
@@ -52,6 +58,8 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
     public BuildImportExportViewModel TreePanel => ImportExport;
     public ITreeImageAssetResolver ImageResolver { get; }
     public IRelayCommand BackToLandingCommand { get; }
+    public AtlasTreeViewModel? Atlas { get; }
+    public bool HasAtlasTree => Atlas is not null;
     public string GameName => State.Game.DisplayName;
     public string TreeVersion => State.Spec.Tree.Version;
     // Keep the current PoE1 tree visible even while it has only one version, so the
@@ -71,7 +79,8 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
         || State.Spec.ActiveSubgraphs.Count > 0
         || State.Spec.SocketedJewels.Count > 0
         || State.Spec.AttributeOverrides.Count > 0
-        || State.Equipment.IsDirty;
+        || State.Equipment.IsDirty
+        || Atlas?.IsDirty == true;
 
     [ObservableProperty] public partial string SelectedTreeVersion { get; set; } = string.Empty;
     [ObservableProperty] public partial string SelectedDiffTreeVersion { get; set; } = NoDiffVersion;

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using PathOfAvalonia.TreeDomain;
+using PathOfAvalonia.TreeDomain.Atlas;
 using PathOfAvalonia.TreeDomain.Jewels;
 
 namespace PathOfAvalonia.TreeApp.Services;
@@ -15,6 +16,10 @@ public interface IGameAssetService
 {
     Task<TreeModel> LoadTreeAsync(GameDefinition game, string? version = null);
     Task<SpriteMap> LoadSpritesAsync(GameDefinition game, string? version = null);
+    Task<AtlasTreeModel> LoadAtlasTreeAsync(GameDefinition game, string? version = null) =>
+        Task.FromException<AtlasTreeModel>(new NotSupportedException($"Atlas tree assets are not available for {game.DisplayName}."));
+    Task<SpriteMap> LoadAtlasSpritesAsync(GameDefinition game, string? version = null) =>
+        Task.FromException<SpriteMap>(new NotSupportedException($"Atlas tree assets are not available for {game.DisplayName}."));
     Task<TimelessJewelData?> LoadTimelessJewelDataAsync(GameDefinition game, string? version = null) =>
         Task.FromResult<TimelessJewelData?>(null);
     Stream OpenAsset(GameDefinition game, string relativePath);
@@ -35,6 +40,8 @@ public sealed class GameAssetService(GameRegistry games, IGameAssetLayoutRegistr
 {
     private readonly ConcurrentDictionary<GameAssetKey, Lazy<Task<TreeModel>>> _trees = new();
     private readonly ConcurrentDictionary<GameAssetKey, Lazy<Task<SpriteMap>>> _sprites = new();
+    private readonly ConcurrentDictionary<GameAssetKey, Lazy<Task<AtlasTreeModel>>> _atlasTrees = new();
+    private readonly ConcurrentDictionary<GameAssetKey, Lazy<Task<SpriteMap>>> _atlasSprites = new();
     private readonly ConcurrentDictionary<GameAssetKey, Lazy<Task<TimelessJewelData?>>> _timelessJewels = new();
 
     public Task<TreeModel> LoadTreeAsync(GameDefinition game, string? version = null)
@@ -52,6 +59,24 @@ public sealed class GameAssetService(GameRegistry games, IGameAssetLayoutRegistr
         return _sprites.GetOrAdd(key, static (assetKey, state) =>
             new Lazy<Task<SpriteMap>>(
                 () => Task.Run(() => state.LoadSprites(assetKey)),
+                LazyThreadSafetyMode.ExecutionAndPublication), this).Value;
+    }
+
+    public Task<AtlasTreeModel> LoadAtlasTreeAsync(GameDefinition game, string? version = null)
+    {
+        var key = new GameAssetKey(game.Id, version ?? game.DefaultTreeVersion);
+        return _atlasTrees.GetOrAdd(key, static (assetKey, state) =>
+            new Lazy<Task<AtlasTreeModel>>(
+                () => Task.Run(() => state.LoadAtlasTree(assetKey)),
+                LazyThreadSafetyMode.ExecutionAndPublication), this).Value;
+    }
+
+    public Task<SpriteMap> LoadAtlasSpritesAsync(GameDefinition game, string? version = null)
+    {
+        var key = new GameAssetKey(game.Id, version ?? game.DefaultTreeVersion);
+        return _atlasSprites.GetOrAdd(key, static (assetKey, state) =>
+            new Lazy<Task<SpriteMap>>(
+                () => Task.Run(() => state.LoadAtlasSprites(assetKey)),
                 LazyThreadSafetyMode.ExecutionAndPublication), this).Value;
     }
 
@@ -80,6 +105,15 @@ public sealed class GameAssetService(GameRegistry games, IGameAssetLayoutRegistr
         return tree;
     }
 
+    private AtlasTreeModel LoadAtlasTree(GameAssetKey key)
+    {
+        var game = GameDefinitionFor(key.GameId);
+        var path = layouts.Get(game.Id).AtlasTreeDataPath(key.Version)
+            ?? throw new NotSupportedException($"Atlas tree assets are not registered for {game.DisplayName}.");
+        using var stream = OpenAsset(game, path);
+        return new Poe1AtlasTreeLoader().Load(stream, key.Version, game.Id);
+    }
+
     private SpriteMap LoadSprites(GameAssetKey key)
     {
         var game = GameDefinitionFor(key.GameId);
@@ -104,6 +138,20 @@ public sealed class GameAssetService(GameRegistry games, IGameAssetLayoutRegistr
 
         using var stream = OpenAsset(game, spritePaths.Paths[0]);
         return AddSupplementalSprites(game, key.Version, SpriteMap.LoadFromJson(stream));
+    }
+
+    private SpriteMap LoadAtlasSprites(GameAssetKey key)
+    {
+        var game = GameDefinitionFor(key.GameId);
+        var spritePaths = layouts.Get(game.Id).AtlasSpriteDataPaths(key.Version)
+            ?? throw new NotSupportedException($"Atlas sprites are not registered for {game.DisplayName}.");
+        if (spritePaths.Kind != SpriteDataKind.Poe1GggTree)
+        {
+            throw new NotSupportedException($"Unsupported Atlas sprite format: {spritePaths.Kind}.");
+        }
+
+        using var treeStream = OpenAsset(game, spritePaths.Paths[0]);
+        return SpriteMap.LoadPoe1FromGggTree(treeStream, spritePaths.AssetPrefix!);
     }
 
     private SpriteMap AddSupplementalSprites(GameDefinition game, string version, SpriteMap sprites)
@@ -183,4 +231,20 @@ public sealed class TreeImageAssetResolver(
 
     public Bitmap? LoadJewelRadiusBitmap(string relativePath) =>
         LoadBitmap($"JewelRadius/{relativePath}") ?? assets.LoadSharedBitmap($"JewelRadius/{relativePath}");
+}
+
+public sealed class AtlasTreeImageAssetResolver(
+    GameDefinition game,
+    IGameAssetService assets,
+    IGameAssetLayoutRegistry layouts,
+    string version) : ITreeImageAssetResolver
+{
+    public Bitmap? LoadBitmap(string relativePath) =>
+        assets.LoadBitmap(game, relativePath, version);
+
+    public Bitmap? LoadBackground(string treeVersion)
+    {
+        var path = layouts.Get(game.Id).AtlasBackgroundPath(version);
+        return path is null ? null : assets.LoadBitmap(game, path, version);
+    }
 }

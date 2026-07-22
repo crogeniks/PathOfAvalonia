@@ -11,6 +11,9 @@ public abstract class GameAssetLayoutBase : IGameAssetLayout
     public virtual IReadOnlyList<string> AdditionalSpriteDataPaths(string version) => [];
     public virtual TimelessJewelAssetPaths? TimelessJewelDataPaths(string version) => null;
     public abstract string BackgroundPath(string version);
+    public virtual string? AtlasTreeDataPath(string version) => null;
+    public virtual SpriteDataPaths? AtlasSpriteDataPaths(string version) => null;
+    public virtual string? AtlasBackgroundPath(string version) => null;
     public virtual string ResolveBitmapPath(string relativePath, string version) => relativePath;
 
     protected static string VersionFolder(string version) => version.Replace('.', '_');
