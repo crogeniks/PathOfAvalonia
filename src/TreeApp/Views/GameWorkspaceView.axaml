@@ -18,91 +18,111 @@
         </Border>
         <TabControl Name="WorkspaceTabs" Grid.Row="1" Background="#101018">
             <TabItem Header="Passive Tree">
-                <Grid Name="TreeRoot" Background="#101018" ColumnDefinitions="286,*">
+                <Grid Name="TreeRoot" Background="#101018" ColumnDefinitions="286,*" RowDefinitions="*,Auto">
                     <local:BasicStatsSidebarView Name="TreeStatsSidebar"
                                                  Grid.Column="0"
                                                  DataContext="{Binding State.Equipment}"/>
                     <Grid Name="TreeCanvas" Grid.Column="1">
-                    <Border HorizontalAlignment="Left" VerticalAlignment="Top"
-                            Margin="12" Padding="10,7"
-                            Background="#DD1A1A24" CornerRadius="6"
-                            BorderBrush="#3A3A4A" BorderThickness="1">
-                        <StackPanel Orientation="Horizontal" Spacing="7">
-                            <TextBlock Text="Tree" Foreground="#9090A0" VerticalAlignment="Center"
-                                       IsVisible="{Binding HasTreeVersionOptions}"/>
-                            <ComboBox Name="TreeVersionSelector"
-                                      Width="98"
-                                      ItemsSource="{Binding TreeVersionOptions}"
-                                      SelectedItem="{Binding SelectedTreeVersion}"
-                                      IsVisible="{Binding HasTreeVersionOptions}"/>
-                            <TextBlock Text="Diff" Foreground="#9090A0" Margin="5,0,0,0" VerticalAlignment="Center"
-                                       IsVisible="{Binding HasDiffVersionOptions}"/>
-                            <ComboBox Name="DiffTreeVersionSelector"
-                                      Width="98"
-                                      ItemsSource="{Binding DiffTreeVersionOptions}"
-                                      SelectedItem="{Binding SelectedDiffTreeVersion}"
-                                      IsVisible="{Binding HasDiffVersionOptions}"/>
-                            <Button Name="DiffLegendButton"
-                                    Content="Legend"
-                                    Padding="8,3"
-                                    IsVisible="{Binding HasDiffVersionOptions}">
-                                <Button.Flyout>
-                                    <Flyout>
-                                        <Border Padding="10" Background="#1A1A24">
-                                            <StackPanel Spacing="8">
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <Ellipse Width="12" Height="12" Fill="#00F05A"/>
-                                                    <TextBlock Text="Added" Foreground="#EAEAEA"/>
-                                                </StackPanel>
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <Ellipse Width="12" Height="12" Fill="#A85CFF"/>
-                                                    <TextBlock Text="Changed" Foreground="#EAEAEA"/>
-                                                </StackPanel>
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <Ellipse Width="12" Height="12" Fill="#E55656"/>
-                                                    <TextBlock Text="Removed" Foreground="#EAEAEA"/>
-                                                </StackPanel>
-                                            </StackPanel>
-                                        </Border>
-                                    </Flyout>
-                                </Button.Flyout>
-                            </Button>
-                            <TextBlock Text="{Binding DiffSummary}" Foreground="#C6B36A" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Border>
-                    <Border HorizontalAlignment="Right" VerticalAlignment="Top"
-                            Margin="12" Padding="10"
-                            Background="#CC1A1A24" CornerRadius="6"
-                            BorderBrush="#3A3A4A" BorderThickness="1">
-                        <StackPanel Orientation="Vertical"
-                                    Spacing="6"
-                                    DataContext="{Binding TreeSelection}"
-                                    x:DataType="vm:TreeSelectionViewModel">
-                            <Button Name="TreeControlsToggleButton"
-                                    Content="{Binding TreeControlsToggleText}"
-                                    Command="{Binding ToggleTreeControlsCommand}"
-                                    HorizontalAlignment="Right"/>
-                            <StackPanel Name="TreeControlsPanel"
-                                        Orientation="Vertical"
-                                        Spacing="6"
-                                        Width="360"
-                                        IsVisible="{Binding IsTreeControlsExpanded}">
-                                <TextBlock Text="Class" Foreground="#EAEAEA" FontWeight="Bold"/>
-                                <ComboBox Name="ClassSelector"
-                                          ItemsSource="{Binding ClassNames}"
-                                          SelectedIndex="{Binding SelectedClassIndex}"
-                                          HorizontalAlignment="Stretch"/>
-                                <TextBlock Text="Ascendancy" Foreground="#EAEAEA" FontWeight="Bold"
-                                           Margin="0,6,0,0"/>
-                                <ComboBox Name="AscendancySelector"
-                                          ItemsSource="{Binding AscendancyNames}"
-                                          SelectedItem="{Binding SelectedAscendancyName}"
-                                          HorizontalAlignment="Stretch"/>
-                                <StackPanel DataContext="{Binding DataContext.ImportExport, ElementName=Root}"
+                    </Grid>
+                    <Border Name="PassiveTreeToolbar"
+                            Grid.Row="1"
+                            Grid.ColumnSpan="2"
+                            Background="#15151D"
+                            BorderBrush="#30303A"
+                            BorderThickness="0,1,0,0"
+                            Padding="12,8">
+                        <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
+                            <WrapPanel Grid.Row="0" Orientation="Horizontal" ItemHeight="32">
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="6"
+                                            Margin="0,0,12,0"
+                                            DataContext="{Binding TreeSelection}"
+                                            x:DataType="vm:TreeSelectionViewModel">
+                                    <TextBlock Text="Class" Foreground="#9090A0" VerticalAlignment="Center"/>
+                                    <ComboBox Name="ClassSelector" Width="130"
+                                              ItemsSource="{Binding ClassNames}"
+                                              SelectedIndex="{Binding SelectedClassIndex}"/>
+                                    <TextBlock Text="Ascendancy" Foreground="#9090A0" VerticalAlignment="Center"/>
+                                    <ComboBox Name="AscendancySelector" Width="150"
+                                              ItemsSource="{Binding AscendancyNames}"
+                                              SelectedItem="{Binding SelectedAscendancyName}"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="6"
+                                            Margin="0,0,12,0"
+                                            DataContext="{Binding ImportExport}"
                                             x:DataType="vm:BuildImportExportViewModel"
-                                            Spacing="6">
+                                            IsVisible="{Binding HasPassiveTreeVariants}">
+                                    <TextBlock Text="Passive tree" Foreground="#9090A0" VerticalAlignment="Center"/>
+                                    <ComboBox Name="PassiveTreeVariantSelector"
+                                              Width="180"
+                                              ItemsSource="{Binding PassiveTreeVariantOptions}"
+                                              SelectedIndex="{Binding SelectedPassiveTreeVariantIndex}"
+                                              DisplayMemberBinding="{Binding DisplayName}"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,8,0">
+                                    <TextBlock Text="Search" Foreground="#9090A0" VerticalAlignment="Center"/>
+                                    <TextBox Name="PassiveSearchInput"
+                                             Width="220"
+                                             Text="{Binding State.Tree.SearchText}"
+                                             PlaceholderText="Search passives…"/>
+                                    <Button Content="Clear"
+                                            Command="{Binding State.Tree.ClearSearchCommand}"
+                                            IsVisible="{Binding State.Tree.HasActiveSearch}"/>
+                                    <TextBlock Text="{Binding State.Tree.SearchResultCount, StringFormat='{}{0} matches'}"
+                                               Foreground="#F0594F"
+                                               FontSize="11"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding State.Tree.HasActiveSearch}"/>
+                                </StackPanel>
+                            </WrapPanel>
+                            <WrapPanel Grid.Row="1" Orientation="Horizontal" ItemHeight="32">
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,8,0">
+                                <TextBlock Text="Tree" Foreground="#9090A0" VerticalAlignment="Center"
+                                           IsVisible="{Binding HasTreeVersionOptions}"/>
+                                <ComboBox Name="TreeVersionSelector"
+                                          Width="98"
+                                          ItemsSource="{Binding TreeVersionOptions}"
+                                          SelectedItem="{Binding SelectedTreeVersion}"
+                                          IsVisible="{Binding HasTreeVersionOptions}"/>
+                                <TextBlock Text="Diff" Foreground="#9090A0" Margin="5,0,0,0" VerticalAlignment="Center"
+                                           IsVisible="{Binding HasDiffVersionOptions}"/>
+                                <ComboBox Name="DiffTreeVersionSelector"
+                                          Width="98"
+                                          ItemsSource="{Binding DiffTreeVersionOptions}"
+                                          SelectedItem="{Binding SelectedDiffTreeVersion}"
+                                          IsVisible="{Binding HasDiffVersionOptions}"/>
+                                <Button Name="DiffLegendButton"
+                                        Content="Legend"
+                                        Padding="8,3"
+                                        IsVisible="{Binding HasDiffVersionOptions}">
+                                    <Button.Flyout>
+                                        <Flyout>
+                                            <Border Padding="10" Background="#1A1A24">
+                                                <StackPanel Spacing="8">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8"><Ellipse Width="12" Height="12" Fill="#00F05A"/><TextBlock Text="Added" Foreground="#EAEAEA"/></StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Spacing="8"><Ellipse Width="12" Height="12" Fill="#A85CFF"/><TextBlock Text="Changed" Foreground="#EAEAEA"/></StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Spacing="8"><Ellipse Width="12" Height="12" Fill="#E55656"/><TextBlock Text="Removed" Foreground="#EAEAEA"/></StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </Flyout>
+                                    </Button.Flyout>
+                                </Button>
+                                <TextBlock Text="{Binding DiffSummary}" Foreground="#C6B36A" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <Button Name="ImportFlyoutButton"
+                                        Content="Import"
+                                        DataContext="{Binding ImportExport}"
+                                        x:DataType="vm:BuildImportExportViewModel">
+                                    <Button.Flyout>
+                                        <Flyout>
+                                            <Border Width="360"
+                                                    Padding="12"
+                                                    Background="#1A1A24"
+                                                    DataContext="{Binding DataContext.ImportExport, ElementName=Root}"
+                                                    x:DataType="vm:BuildImportExportViewModel">
+                                                <StackPanel Spacing="6">
                                 <TextBlock Text="Import build" Foreground="#EAEAEA" FontWeight="Bold"
-                                           Margin="0,6,0,0"
                                            IsVisible="{Binding IsImportSupported}"/>
                                 <TextBlock Text="{Binding ImportPrompt}"
                                            Foreground="#AAAACC" FontSize="11"
@@ -135,16 +155,6 @@
                                             IsVisible="{Binding SupportsBuildPlannerExport}"
                                             IsEnabled="{Binding CanExportBuildPlanner}"/>
                                 </StackPanel>
-                                <TextBlock Text="Passive tree"
-                                           Foreground="#EAEAEA"
-                                           FontWeight="Bold"
-                                           Margin="0,6,0,0"
-                                           IsVisible="{Binding HasPassiveTreeVariants}"/>
-                                <ComboBox ItemsSource="{Binding PassiveTreeVariantOptions}"
-                                          SelectedIndex="{Binding SelectedPassiveTreeVariantIndex}"
-                                          DisplayMemberBinding="{Binding DisplayName}"
-                                          HorizontalAlignment="Stretch"
-                                          IsVisible="{Binding HasPassiveTreeVariants}"/>
                                 <TextBlock Text="{Binding UnsupportedImportStatus}"
                                            Foreground="#AAAACC"
                                            TextWrapping="Wrap"
@@ -153,39 +163,14 @@
                                            Text="{Binding ImportStatus}"
                                            Foreground="{Binding ImportStatusForeground}"
                                            TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-                    <Border HorizontalAlignment="Center"
-                            VerticalAlignment="Bottom"
-                            Margin="12"
-                            Padding="10,8"
-                            Background="#DD1A1A24"
-                            CornerRadius="6"
-                            BorderBrush="#3A3A4A"
-                            BorderThickness="1"
-                            DataContext="{Binding DataContext.State.Tree, ElementName=Root}"
-                            x:DataType="vm:PassiveTreeViewModel">
-                        <Grid ColumnDefinitions="260,Auto,Auto" RowDefinitions="Auto,Auto">
-                            <TextBox Name="PassiveSearchInput"
-                                     Text="{Binding SearchText}"
-                                     PlaceholderText="Search passives…"/>
-                            <Button Grid.Column="1"
-                                    Content="Clear"
-                                    Margin="6,0,0,0"
-                                    Command="{Binding ClearSearchCommand}"
-                                    IsVisible="{Binding HasActiveSearch}"/>
-                            <TextBlock Grid.Row="1"
-                                       Grid.ColumnSpan="3"
-                                       Text="{Binding SearchResultCount, StringFormat='{}{0} matches highlighted'}"
-                                       Foreground="#F0594F"
-                                       FontSize="11"
-                                       Margin="2,4,0,0"
-                                       IsVisible="{Binding HasActiveSearch}"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </Flyout>
+                                    </Button.Flyout>
+                                </Button>
+                            </WrapPanel>
                         </Grid>
                     </Border>
-                    </Grid>
                 </Grid>
             </TabItem>
             <TabItem Name="EquipmentTab" Header="Equipment" IsEnabled="{Binding SupportsEquipment}">
@@ -216,7 +201,8 @@
                 <Grid DataContext="{Binding Atlas}"
                       x:DataType="vm:AtlasTreeViewModel"
                       Background="#101018"
-                      ColumnDefinitions="330,*">
+                      ColumnDefinitions="330,*"
+                      RowDefinitions="*,Auto">
                     <Border Grid.Column="0"
                             Background="#15151D"
                             BorderBrush="#30303A"
@@ -281,16 +267,34 @@
                             </Grid>
                         </Grid>
                     </Border>
-                    <Grid Name="AtlasCanvas" Grid.Column="1">
-                        <Border HorizontalAlignment="Left"
-                                VerticalAlignment="Top"
-                                Margin="12"
-                                Padding="10,7"
-                                Background="#DD1A1A24"
-                                CornerRadius="6"
-                                BorderBrush="#3A3A4A"
-                                BorderThickness="1">
-                            <StackPanel Orientation="Horizontal" Spacing="7">
+                    <Grid Name="AtlasCanvas" Grid.Column="1"/>
+                    <Border Name="AtlasTreeToolbar"
+                            Grid.Row="1"
+                            Grid.ColumnSpan="2"
+                            Background="#15151D"
+                            BorderBrush="#30303A"
+                            BorderThickness="0,1,0,0"
+                            Padding="12,8">
+                        <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
+                            <WrapPanel Grid.Row="0" Orientation="Horizontal" ItemHeight="32">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="Search" Foreground="#9090A0" VerticalAlignment="Center"/>
+                                    <TextBox Name="AtlasSearchInput"
+                                             Width="260"
+                                             Text="{Binding SearchText}"
+                                             PlaceholderText="Search Atlas passives…"/>
+                                    <Button Content="Clear"
+                                            Command="{Binding ClearSearchCommand}"
+                                            IsVisible="{Binding HasActiveSearch}"/>
+                                    <TextBlock Text="{Binding SearchResultCount, StringFormat='{}{0} matches'}"
+                                               Foreground="#F0594F"
+                                               FontSize="11"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding HasActiveSearch}"/>
+                                </StackPanel>
+                            </WrapPanel>
+                            <WrapPanel Grid.Row="1" Orientation="Horizontal" ItemHeight="32">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
                                 <TextBlock Text="Atlas" Foreground="#9090A0" VerticalAlignment="Center"/>
                                 <ComboBox Name="AtlasVersionSelector"
                                           Width="98"
@@ -336,36 +340,10 @@
                                            VerticalAlignment="Center"
                                            MaxWidth="340"
                                            TextTrimming="CharacterEllipsis"/>
-                            </StackPanel>
-                        </Border>
-                        <Border HorizontalAlignment="Center"
-                                VerticalAlignment="Bottom"
-                                Margin="12"
-                                Padding="10,8"
-                                Background="#DD1A1A24"
-                                CornerRadius="6"
-                                BorderBrush="#3A3A4A"
-                                BorderThickness="1"
-                                x:DataType="vm:AtlasTreeViewModel">
-                            <Grid ColumnDefinitions="260,Auto,Auto" RowDefinitions="Auto,Auto">
-                                <TextBox Name="AtlasSearchInput"
-                                         Text="{Binding SearchText}"
-                                         PlaceholderText="Search Atlas passives…"/>
-                                <Button Grid.Column="1"
-                                        Content="Clear"
-                                        Margin="6,0,0,0"
-                                        Command="{Binding ClearSearchCommand}"
-                                        IsVisible="{Binding HasActiveSearch}"/>
-                                <TextBlock Grid.Row="1"
-                                           Grid.ColumnSpan="3"
-                                           Text="{Binding SearchResultCount, StringFormat='{}{0} matches highlighted'}"
-                                           Foreground="#F0594F"
-                                           FontSize="11"
-                                           Margin="2,4,0,0"
-                                           IsVisible="{Binding HasActiveSearch}"/>
-                            </Grid>
-                        </Border>
-                    </Grid>
+                                </StackPanel>
+                            </WrapPanel>
+                        </Grid>
+                    </Border>
                 </Grid>
             </TabItem>
         </TabControl>

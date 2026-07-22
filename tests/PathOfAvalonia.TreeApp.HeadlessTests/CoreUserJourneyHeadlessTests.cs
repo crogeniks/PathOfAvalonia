@@ -128,7 +128,7 @@ public sealed class CoreUserJourneyHeadlessTests
     }
 
     [AvaloniaFact]
-    public void TreeControlsStayBoundToTheWorkspaceAndCanYieldCanvasSpace()
+    public void PassiveTreeToolbarKeepsControlsBoundBelowTheCanvas()
     {
         var workspace = CreateWorkspace(GameRegistry.CreatePoe1());
         var view = new GameWorkspaceView { DataContext = workspace };
@@ -143,10 +143,9 @@ public sealed class CoreUserJourneyHeadlessTests
             Assert.Contains(SecondClassStartNodeId, workspace.State.Spec.AllocatedNodes);
             Assert.DoesNotContain(FirstClassStartNodeId, workspace.State.Spec.AllocatedNodes);
 
-            Click(window, Required<Button>(view, "TreeControlsToggleButton"));
-
-            Assert.False(Required<StackPanel>(view, "TreeControlsPanel").IsVisible);
-            Assert.Equal("Show controls", Required<Button>(view, "TreeControlsToggleButton").Content);
+            var toolbar = Required<Border>(view, "PassiveTreeToolbar");
+            var canvas = Required<Grid>(view, "TreeCanvas");
+            Assert.True(toolbar.Bounds.Top >= canvas.Bounds.Bottom);
             Assert.Single(view.GetVisualDescendants().OfType<PassiveTreeView>());
         }
         finally
@@ -240,7 +239,6 @@ public sealed class CoreUserJourneyHeadlessTests
                 "The sidebar level editor must leave room beside its spinner buttons.");
             var baselineStrength = workspace.State.Equipment.CalculatedStats!.Values.Strength;
             var treeView = Assert.Single(view.GetVisualDescendants().OfType<PassiveTreeView>());
-            Click(window, Required<Button>(view, "TreeControlsToggleButton"));
             _ = window.CaptureRenderedFrame();
 
             var renderedStatRows = statsList.GetVisualDescendants()
@@ -306,9 +304,10 @@ public sealed class CoreUserJourneyHeadlessTests
         var window = Show(view);
         try
         {
+            OpenImportFlyout(view);
             Required<TextBox>(view, "ImportInput").Text = "test-build";
             Dispatcher.UIThread.RunJobs();
-            Click(window, Required<Button>(view, "ImportButton"));
+            workspace.ImportExport.ImportCommand.Execute(null);
 
             Assert.Contains(NormalNodeId, workspace.State.Spec.AllocatedNodes);
             Assert.Equal("Vivid Loop", Assert.Single(Assert.Single(workspace.State.Equipment.Groups).Items).Name);
@@ -324,7 +323,7 @@ public sealed class CoreUserJourneyHeadlessTests
 
             tabs.SelectedIndex = 0;
             Dispatcher.UIThread.RunJobs();
-            Click(window, Required<Button>(view, "ClearButton"));
+            workspace.ImportExport.ClearCommand.Execute(null);
 
             Assert.Equal([FirstClassStartNodeId], workspace.State.Spec.AllocatedNodes.Order());
             Assert.Empty(workspace.State.Equipment.Groups);
@@ -340,6 +339,14 @@ public sealed class CoreUserJourneyHeadlessTests
     private const int FirstClassStartNodeId = 1;
     private const int NormalNodeId = 2;
     private const int SecondClassStartNodeId = 3;
+
+    private static void OpenImportFlyout(GameWorkspaceView view)
+    {
+        var button = Required<Button>(view, "ImportFlyoutButton");
+        Assert.NotNull(button.Flyout);
+        button.Flyout.ShowAt(button);
+        Dispatcher.UIThread.RunJobs();
+    }
 
     private static ShellViewModel CreateShell() => new(
         new GameRegistry(),

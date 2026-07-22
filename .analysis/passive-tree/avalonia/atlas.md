@@ -90,9 +90,10 @@ context is preserved.
 ## Version and diff placement
 
 Character tree version/diff controls live inside the Passive Tree tab rather
-than the application header. Atlas owns a separate version/diff selector inside
-the Atlas Tree tab. `GameDefinition.AtlasTreeVersions` lists only versions with
-bundled Atlas data; adding 3.28 consists of adding its bundle and registering
-the version. Atlas version migration retains still-present connected node IDs,
-and `AtlasTreeDiff` compares Atlas nodes without passing through character-tree
-diff types.
+than the application header. Atlas owns a separate version/diff selector in a
+fixed two-row toolbar at the bottom of the Atlas Tree tab, with search on the
+first row and version/diff controls on the second. `GameDefinition.AtlasTreeVersions`
+lists only versions with bundled Atlas data; adding 3.28 consists of adding its
+bundle and registering the version. Atlas version migration retains still-present
+connected node IDs, and `AtlasTreeDiff` compares Atlas nodes without passing
+through character-tree diff types.

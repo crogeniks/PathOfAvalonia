@@ -53,10 +53,13 @@ When Shift is held, `traceMode = true`; `tracePath` contains the sequence of nod
 - `searchStr`, `searchStrSaved`, `searchStrCached` + `searchStrResults` cache.
 - Case-insensitive name/stat match → highlighted overlay.
 
-### Avalonia search overlay
+### Avalonia bottom toolbar
 
-The Avalonia tree places its search input in a persistent bottom-centre canvas
-overlay, independent of the collapsible tree controls. Terms are
+The Avalonia tree places class, ascendancy, passive-tree variant selection,
+search, and version comparison in a fixed two-row toolbar below the tree
+canvas; these controls do not float over the rendered tree. The import workflow
+is available from the toolbar's **Import** button and opens in a flyout so the
+tree keeps its full canvas area when importing is not in progress. Terms are
 case-insensitive and all must match a node's name, stats, mastery effects, or
 type; quoted text is treated as one term. Matches receive a red outline, and
 the overlay reports the live match count. Class starts and non-selectable
