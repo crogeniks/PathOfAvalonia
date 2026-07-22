@@ -49,6 +49,15 @@ spriteMap["Art/2DArt/.../dualwield.png"]["normalActive"] = {
 
 A single atlas holds hundreds of icons; a sprite is identified by **(logical path, state)**.
 
+Starting with the PoE1 3.29 tree, a coordinate object may contain parallel
+integer arrays instead of scalar `x`, `y`, `w`, and `h` values. The known case
+is `tattooActiveEffect` for `HinekoraPassiveBG.png`: the first tuple retains the
+legacy-sized effect, while a second tuple describes a larger variant. The
+current `SpriteMap` API exposes one rectangle and normalises this shape to the
+first tuple, while validating that all four arrays are non-empty and have equal
+lengths. When PoE1 tattoo-effect rendering is ported, it should retain and pick
+the appropriate tuple based on the target node type/size.
+
 ## 3. Per-Zoom-Level Assets
 
 Assets are provided at multiple pre-rendered scales, keyed by scale factor — e.g. `0.1246`, `0.2109`, `0.2972`, `0.3835`, `1.0`. PoB picks `data[0.3835]` as the default and falls back to `data[1]` if missing (`PassiveTree.lua:263–269`).

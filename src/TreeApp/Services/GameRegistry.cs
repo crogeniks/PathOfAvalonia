@@ -37,12 +37,12 @@ public sealed class GameRegistry
         GameId.PathOfExile1,
         "Path of Exile",
         "PoE1",
-        "3.28.0",
+        "3.29.0",
         "Assets/PoE1",
         new Poe1TreeLoader(),
         new Poe1ImportStrategy(),
         GameFeatureFlags.Poe1,
-        ["3.28.0"]);
+        ["3.28.0", "3.29.0"]);
 
     public static GameDefinition CreatePoe2() => new(
         GameId.PathOfExile2,

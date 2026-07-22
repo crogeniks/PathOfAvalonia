@@ -35,5 +35,5 @@ public sealed class Poe1GameAssetLayout : GameAssetLayoutBase
     public override string BackgroundPath(string version) =>
         IsGggTreeVersion(version) ? $"{VersionFolder(version)}/assets/background-3.png" : $"background_{VersionFileSuffix(version)}.png";
 
-    private static bool IsGggTreeVersion(string version) => version == "3.28.0";
+    private static bool IsGggTreeVersion(string version) => true;
 }

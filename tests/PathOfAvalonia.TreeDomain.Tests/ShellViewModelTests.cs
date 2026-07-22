@@ -31,14 +31,14 @@ public sealed class ShellViewModelTests
     }
 
     [Fact]
-    public void Poe1ExposesItsTreeVersionSelectorBeforeMultipleTreesAreAvailable()
+    public void Poe1ExposesItsAvailableTreeVersions()
     {
         var vm = CreateViewModel(new StubSettings { LastGameId = GameId.PathOfExile1 });
         var workspace = vm.ActiveWorkspace!;
 
         Assert.True(workspace.HasTreeVersionOptions);
-        Assert.Equal(["3.28.0"], workspace.TreeVersionOptions);
-        Assert.False(workspace.HasDiffVersionOptions);
+        Assert.Equal(["3.28.0", "3.29.0"], workspace.TreeVersionOptions);
+        Assert.True(workspace.HasDiffVersionOptions);
     }
 
     [Fact]

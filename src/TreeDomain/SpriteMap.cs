@@ -93,7 +93,7 @@ public sealed class SpriteMap
                 Height = atlas.H,
                 Coords = atlas.Coords.ToDictionary(
                     pair => pair.Key,
-                    pair => new SpriteRect(pair.Value.X, pair.Value.Y, pair.Value.W, pair.Value.H),
+                    pair => pair.Value.ToSpriteRect(),
                     StringComparer.Ordinal),
             };
         }
@@ -131,7 +131,85 @@ public sealed class SpriteMap
         [JsonPropertyName("filename")] public string Filename { get; set; } = string.Empty;
         [JsonPropertyName("w")] public int W { get; set; }
         [JsonPropertyName("h")] public int H { get; set; }
-        [JsonPropertyName("coords")] public Dictionary<string, RectDto> Coords { get; set; } = new();
+        [JsonPropertyName("coords")] public Dictionary<string, Poe1GggRectDto> Coords { get; set; } = new();
+    }
+
+    private sealed class Poe1GggRectDto
+    {
+        [JsonPropertyName("x")] public IntOrArrayDto X { get; set; }
+        [JsonPropertyName("y")] public IntOrArrayDto Y { get; set; }
+        [JsonPropertyName("w")] public IntOrArrayDto W { get; set; }
+        [JsonPropertyName("h")] public IntOrArrayDto H { get; set; }
+
+        public SpriteRect ToSpriteRect()
+        {
+            var count = X.Count;
+            if (count == 0 || Y.Count != count || W.Count != count || H.Count != count)
+            {
+                throw new JsonException("PoE1 sprite coordinate arrays must be non-empty and have matching lengths.");
+            }
+
+            // GGG 3.29 can provide multiple size-specific rectangles for one logical
+            // sprite. SpriteMap currently exposes one rectangle, and the first tuple
+            // is the legacy-sized variant used by existing rendering.
+            return new SpriteRect(X[0], Y[0], W[0], H[0]);
+        }
+    }
+
+    [JsonConverter(typeof(IntOrArrayDtoJsonConverter))]
+    private readonly record struct IntOrArrayDto(IReadOnlyList<int>? Values)
+    {
+        public int Count => Values?.Count ?? 0;
+        public int this[int index] => Values![index];
+    }
+
+    private sealed class IntOrArrayDtoJsonConverter : JsonConverter<IntOrArrayDto>
+    {
+        public override IntOrArrayDto Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.Number)
+            {
+                return new IntOrArrayDto([reader.GetInt32()]);
+            }
+
+            if (reader.TokenType != JsonTokenType.StartArray)
+            {
+                throw new JsonException("PoE1 sprite coordinate must be an integer or an integer array.");
+            }
+
+            var values = new List<int>();
+            while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+            {
+                if (reader.TokenType != JsonTokenType.Number)
+                {
+                    throw new JsonException("PoE1 sprite coordinate array values must be integers.");
+                }
+                values.Add(reader.GetInt32());
+            }
+
+            if (reader.TokenType != JsonTokenType.EndArray)
+            {
+                throw new JsonException("PoE1 sprite coordinate array was not terminated.");
+            }
+
+            return new IntOrArrayDto(values);
+        }
+
+        public override void Write(Utf8JsonWriter writer, IntOrArrayDto value, JsonSerializerOptions options)
+        {
+            if (value.Count == 1)
+            {
+                writer.WriteNumberValue(value[0]);
+                return;
+            }
+
+            writer.WriteStartArray();
+            foreach (var item in value.Values ?? [])
+            {
+                writer.WriteNumberValue(item);
+            }
+            writer.WriteEndArray();
+        }
     }
 
     private sealed class AtlasDto

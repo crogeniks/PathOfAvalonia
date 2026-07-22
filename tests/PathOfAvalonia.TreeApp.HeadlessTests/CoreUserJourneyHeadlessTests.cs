@@ -97,7 +97,7 @@ public sealed class CoreUserJourneyHeadlessTests
         try
         {
             Assert.True(Required<ComboBox>(poe1View, "TreeVersionSelector").IsVisible);
-            Assert.False(Required<ComboBox>(poe1View, "DiffTreeVersionSelector").IsVisible);
+            Assert.True(Required<ComboBox>(poe1View, "DiffTreeVersionSelector").IsVisible);
             Assert.False(Required<Button>(poe1View, "ImportBuildPlannerButton").IsVisible);
             Assert.False(Required<Button>(poe1View, "ExportBuildPlannerButton").IsVisible);
             Assert.True(Required<TabItem>(poe1View, "EquipmentTab").IsEnabled);
