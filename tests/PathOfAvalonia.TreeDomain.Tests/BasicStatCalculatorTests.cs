@@ -244,10 +244,12 @@ public sealed class BasicStatCalculatorTests
     {
         var spec = CreateChainSpec();
 
-        var allocation = spec.PreviewAllocationChange(3);
+        var path = spec.HoverPathTo(3);
+        var allocation = spec.PreviewAllocationChange(3, path);
 
         Assert.Equal(PassiveAllocationPreviewKind.Allocate, allocation.Kind);
         Assert.Equal([2, 3], allocation.NodeIds.Order());
+        Assert.Same(path.NodeIds, allocation.NodeIds);
         Assert.DoesNotContain(2, spec.AllocatedNodes);
         Assert.DoesNotContain(3, spec.AllocatedNodes);
 

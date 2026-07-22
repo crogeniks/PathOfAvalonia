@@ -58,11 +58,14 @@ Current PoB seed ranges:
 
 PathOfAvalonia parses the active PoB item variant into
 `TimelessJewelSpec { type, seed, conqueror, conquerorId }`. The app asset
-service inflates all six LUTs once on its existing background loading path and
-shares the immutable `TimelessJewelData` with the workspace. When radius
-effects rebuild, `PassiveSpec` resolves and caches the effective nodes for the
-active seed. Rendering and tooltips therefore read cached names, icons, and
-stats without mutating `TreeModel` or decompressing data on the UI thread.
+service loads the definitions and node mapping on its background loading path,
+but supplies lazy stream factories for the six compressed LUTs. Only the LUT
+for a jewel family actually resolved by the build is opened and inflated; the
+result is then retained by the shared `TimelessJewelData`. When radius effects
+rebuild, `PassiveSpec` resolves and caches the effective nodes for the active
+seed. Rendering and tooltips therefore read cached names, icons, stats, and
+conquered-node membership without mutating `TreeModel` or scanning every active
+radius effect per node.
 
 As in PoB's `ModParser`, the active seed modifier and named conqueror are the
 source of truth for the jewel family. This also supports items created by
@@ -87,7 +90,14 @@ Mods parse through `ModParser` as usual. `ItemsTab` shows abyss jewels in their 
 
 ## Radius Integration
 
-`PassiveTree` pre-computes `socket.nodesInRadius[radiusIndex]` (small=800, medium=1200, large=1500 in tree units). `PassiveSpec` iterates these for every equipped jewel on tree refresh.
+`PassiveTree` pre-computes `socket.nodesInRadius[radiusIndex]` (small=800,
+medium=1200, large=1500 in tree units). PathOfAvalonia stores the equivalent
+immutable socket and keystone memberships in a weak, tree-scoped cache, so
+multiple builds over the same `TreeModel` do not repeat the source × radius ×
+node calculation. `PassiveSpec` rebuilds active radius effects only when an
+allocation change touches a socket, keystone, Oracle allocation passive, or an
+already-active effect source; ordinary passive allocation does not reparse
+every socketed jewel.
 
 ## UI Controls
 

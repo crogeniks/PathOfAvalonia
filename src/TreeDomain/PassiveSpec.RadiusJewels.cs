@@ -5,8 +5,16 @@ namespace PathOfAvalonia.TreeDomain;
 
 public sealed partial class PassiveSpec
 {
+    private readonly HashSet<int> _timelessConqueredNodeIds = new();
+    private readonly HashSet<int> _radiusAllocatableNodeIds = new();
+    private readonly Dictionary<int, EffectiveNodeView> _effectiveNodeCache = new();
+
     public EffectiveNodeView EffectiveNode(int nodeId)
     {
+        if (_effectiveNodeCache.TryGetValue(nodeId, out var cached))
+        {
+            return cached;
+        }
         if (!TryGetNode(nodeId, out var node) || node is null)
         {
             throw new KeyNotFoundException($"Node {nodeId} is not present in the passive tree.");
@@ -54,24 +62,25 @@ public sealed partial class PassiveSpec
             }
         }
 
-        return new EffectiveNodeView(node, effectiveName, effectiveIcon, stats, replacesNode, conqueror is not null, conqueror, affectedBy);
+        var result = new EffectiveNodeView(node, effectiveName, effectiveIcon, stats, replacesNode, conqueror is not null, conqueror, affectedBy);
+        _effectiveNodeCache[nodeId] = result;
+        return result;
     }
 
     public bool IsAllocatedByRadiusJewel(int nodeId) =>
-        _activeRadiusEffects.Any(effect =>
-            effect.AllowsUnconnectedAllocation
-            && EffectAffectsNode(effect, nodeId));
+        _radiusAllocatableNodeIds.Contains(nodeId);
 
     public bool IsConqueredByTimelessJewel(int nodeId) =>
-        _activeRadiusEffects.Any(effect =>
-            effect.TimelessJewel is not null
-            && EffectAffectsNode(effect, nodeId));
+        _timelessConqueredNodeIds.Contains(nodeId);
 
     private void RebuildActiveRadiusEffects()
     {
         RebuildForbiddenJewelAllocations();
         _activeRadiusEffects.Clear();
         _activeJewelRadii.Clear();
+        _timelessConqueredNodeIds.Clear();
+        _radiusAllocatableNodeIds.Clear();
+        _effectiveNodeCache.Clear();
         if (!Features.SupportsPassiveTreeJewels)
         {
             return;
@@ -110,6 +119,32 @@ public sealed partial class PassiveSpec
         }
 
         AddOracleKeystoneAllocationRadii();
+        RebuildDerivedRadiusEffectCaches();
+    }
+
+    private void RebuildDerivedRadiusEffectCaches()
+    {
+        foreach (var effect in _activeRadiusEffects)
+        {
+            var sourceId = effect.AlternateCenterNodeId ?? effect.SocketNodeId;
+            var memberships = effect.AlternateCenterNodeId is null
+                ? _socketRadiusMembership
+                : _keystoneRadiusMembership;
+            if (!memberships.TryGetValue(sourceId, out var membership)
+                || !membership.NodesByRadiusIndex.TryGetValue(effect.RadiusIndex, out var nodeIds))
+            {
+                continue;
+            }
+
+            if (effect.TimelessJewel is not null)
+            {
+                _timelessConqueredNodeIds.UnionWith(nodeIds);
+            }
+            if (effect.AllowsUnconnectedAllocation)
+            {
+                _radiusAllocatableNodeIds.UnionWith(nodeIds);
+            }
+        }
     }
 
     private RadiusJewelEffect ResolveTimelessNodeEffects(RadiusJewelEffect effect)
@@ -177,9 +212,25 @@ public sealed partial class PassiveSpec
 
     private bool IsAllocatedOracleKeystoneAllocationNode(Node node) =>
         _allocated.Contains(node.Id)
-        && CanAllocateNodeRules(node)
+        && IsOracleKeystoneAllocationNode(node);
+
+    private bool IsOracleKeystoneAllocationNode(Node node) =>
+        CanAllocateNodeRules(node)
         && node.AscendancyName == "Oracle"
         && node.Stats.Any(stat => stat.Contains("Non-Keystone Passive Skills in Medium Radius of allocated Keystone Passive Skills can be allocated without being connected to your tree", StringComparison.OrdinalIgnoreCase));
+
+    private bool AllocationChangeAffectsRadiusEffects(int nodeId)
+    {
+        if (_activeRadiusEffects.Any(effect => effect.SocketNodeId == nodeId))
+        {
+            return true;
+        }
+
+        return TryGetNode(nodeId, out var node)
+            && node is not null
+            && (node.Type is NodeType.JewelSocket or NodeType.Keystone
+                || (Tree.GameId == GameId.PathOfExile2 && IsOracleKeystoneAllocationNode(node)));
+    }
 
     private static JewelRadiusVisualStyle VisualStyle(RadiusJewelEffect effect, JewelRadiusBand band)
     {

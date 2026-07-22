@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -20,7 +21,9 @@ public sealed partial class PassiveTreeView : Control
     private ContextMenu? _masteryMenu;
     // One Bitmap per unique atlas filename (multiple atlas keys share a file).
     private readonly Dictionary<string, Bitmap> _atlasBitmaps = new();
+    private readonly HashSet<string> _missingAtlasFiles = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Bitmap?> _jewelRadiusBitmaps = new();
+    private readonly IReadOnlyList<Connector> _drawableBaseConnectors;
 
     // View transform (tree-space → screen-space): screen = tree * scale + offset
     private double _scale = 0.05;
@@ -34,14 +37,16 @@ public sealed partial class PassiveTreeView : Control
     // Pan state
     private bool _panning;
     private Point _panStartScreen;
-    private Point _lastPointerPosition;
-    private Point _lastTooltipRedrawPosition;
+    private Point _tooltipAnchorPosition;
     private double _panStartOffX, _panStartOffY;
     private bool _panMoved;
 
     // Bitmaps are decoded per view and are owned exclusively by this control.
     // Sprite metadata remains shared through the workspace asset registry.
     private Bitmap? _bgTile;
+    private ImageBrush? _bgTileBrush;
+    private string? _cachedHudText;
+    private FormattedText? _cachedHud;
     private bool _isSubscribedToRedraw;
     private const double BgTileScreen = 98; // tile size in screen-px (matches PoB asset, no zoom scaling)
 
@@ -66,14 +71,19 @@ public sealed partial class PassiveTreeView : Control
     private static readonly double HitRsqMastery = Sq(65 * SpriteDisplayScale);
     private static readonly double HitMaxRadius = 90 * SpriteDisplayScale;
     private static double Sq(double x) => x * x;
-    private static double DistanceSquared(Point a, Point b) => Sq(a.X - b.X) + Sq(a.Y - b.Y);
 
     // Cached brushes / pens
+    private static readonly Color AllocatedColor = Color.FromRgb(0xff, 0xc8, 0x4a);
+    private static readonly Color WeaponSet1Color = Color.FromRgb(0xE8, 0x3A, 0x3A);
+    private static readonly Color WeaponSet2Color = Color.FromRgb(0x66, 0xE3, 0x78);
+    private static readonly Color ConnectorColor = Color.FromArgb(0x55, 0x40, 0x40, 0x48);
+    private static readonly Color RequiredPathConnectorColor = Color.FromArgb(0x8A, 0x4D, 0xA9, 0xD8);
+    private static readonly Color HoverPathColor = Color.FromArgb(0x80, 0xff, 0xc8, 0x4a);
     private static readonly IBrush BgBrush = new SolidColorBrush(Color.FromRgb(0x10, 0x10, 0x18));
     private static readonly IBrush NormalBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x60));
-    private static readonly IBrush AllocatedBrush = new SolidColorBrush(Color.FromRgb(0xff, 0xc8, 0x4a));
-    private static readonly IBrush WeaponSet1Brush = new SolidColorBrush(Color.FromRgb(0xE8, 0x3A, 0x3A));
-    private static readonly IBrush WeaponSet2Brush = new SolidColorBrush(Color.FromRgb(0x66, 0xE3, 0x78));
+    private static readonly IBrush AllocatedBrush = new SolidColorBrush(AllocatedColor);
+    private static readonly IBrush WeaponSet1Brush = new SolidColorBrush(WeaponSet1Color);
+    private static readonly IBrush WeaponSet2Brush = new SolidColorBrush(WeaponSet2Color);
     private static readonly IBrush TooltipFillBrush = new SolidColorBrush(Color.FromArgb(0xEE, 0x06, 0x08, 0x0B));
     private static readonly IBrush TooltipHeaderBrush = new SolidColorBrush(Color.FromArgb(0xEE, 0x39, 0x2B, 0x16));
     private static readonly IBrush TooltipBorderBrush = new SolidColorBrush(Color.FromRgb(0xA8, 0x76, 0x22));
@@ -83,9 +93,6 @@ public sealed partial class PassiveTreeView : Control
     private static readonly IBrush TooltipFlavourBrush = new SolidColorBrush(Color.FromRgb(0xD2, 0x84, 0x2E));
     private static readonly IBrush TooltipPositiveBrush = new SolidColorBrush(Color.FromRgb(0x63, 0xD4, 0x85));
     private static readonly IBrush TooltipNegativeBrush = new SolidColorBrush(Color.FromRgb(0xE5, 0x68, 0x68));
-    private static readonly IBrush ConnectorBrush = new SolidColorBrush(Color.FromArgb(0x55, 0x40, 0x40, 0x48));
-    private static readonly IBrush RequiredPathConnectorBrush = new SolidColorBrush(Color.FromArgb(0x8A, 0x4D, 0xA9, 0xD8));
-    private static readonly IBrush HoverPathBrush = new SolidColorBrush(Color.FromArgb(0x80, 0xff, 0xc8, 0x4a));
     private static readonly IBrush Poe2NormalFrameBrush = new SolidColorBrush(Color.FromArgb(0xE0, 0x4E, 0x46, 0x35));
     private static readonly IBrush Poe2NotableFrameBrush = new SolidColorBrush(Color.FromArgb(0xF0, 0x8C, 0x75, 0x42));
     private static readonly IBrush Poe2SocketFrameBrush = new SolidColorBrush(Color.FromArgb(0xE0, 0x70, 0x82, 0x28));
@@ -110,6 +117,13 @@ public sealed partial class PassiveTreeView : Control
         _vm = vm;
         _sprites = sprites;
         _assetResolver = assetResolver;
+        _drawableBaseConnectors = vm.Tree.Connectors
+            .Where(connector =>
+                vm.Tree.Nodes.TryGetValue(connector.FromId, out var from)
+                && vm.Tree.Nodes.TryGetValue(connector.ToId, out var to)
+                && IsDrawableBaseNode(from)
+                && IsDrawableBaseNode(to))
+            .ToArray();
         ClipToBounds = true;
         Focusable = true;
     }
@@ -123,8 +137,15 @@ public sealed partial class PassiveTreeView : Control
             _isSubscribedToRedraw = true;
         }
 
-        _bgTile ??= _assetResolver.LoadBackground(_vm.Tree.Version);
-        LoadAtlasBitmaps();
+        if (_bgTile is null && _assetResolver.LoadBackground(_vm.Tree.Version) is { } background)
+        {
+            _bgTile = background;
+            _bgTileBrush = new ImageBrush(background)
+            {
+                Stretch = Stretch.Fill,
+                TileMode = TileMode.Tile,
+            };
+        }
         InvalidateVisual();
     }
 
@@ -147,6 +168,7 @@ public sealed partial class PassiveTreeView : Control
             bitmap.Dispose();
         }
         _atlasBitmaps.Clear();
+        _missingAtlasFiles.Clear();
 
         foreach (var bitmap in _jewelRadiusBitmaps.Values)
         {
@@ -156,21 +178,7 @@ public sealed partial class PassiveTreeView : Control
 
         _bgTile?.Dispose();
         _bgTile = null;
-    }
-
-    private void LoadAtlasBitmaps()
-    {
-        foreach (var atlas in _sprites.Atlases.Values)
-        {
-            if (_atlasBitmaps.ContainsKey(atlas.File))
-            {
-                continue;
-            }
-            if (_assetResolver.LoadBitmap(atlas.File) is { } bitmap)
-            {
-                _atlasBitmaps[atlas.File] = bitmap;
-            }
-        }
+        _bgTileBrush = null;
     }
 
     private void EnsureViewInitialised()
@@ -228,103 +236,14 @@ public sealed partial class PassiveTreeView : Control
 
         // Draw connectors: base tree first, then cluster subgraph connectors.
         var allocated = _vm.AllocatedNodes;
-        var connThick = Math.Max(0.5, ConnectorThicknessTree * _scale);
-        var connPen = new Pen(ConnectorBrush, connThick);
-        var requiredPathConnPen = new Pen(RequiredPathConnectorBrush, connThick);
-        var connActivePen = new Pen(AllocatedBrush, connThick);
-        var connWeaponSet1Pen = new Pen(WeaponSet1Brush, connThick);
-        var connWeaponSet2Pen = new Pen(WeaponSet2Brush, connThick);
-        var connHoverPen = new Pen(HoverPathBrush, connThick);
-        var pathEdges = _vm.HoverPath.Edges;
-
-        foreach (var c in _vm.Tree.Connectors)
-        {
-            if (ShouldDrawBaseConnector(c))
-            {
-                DrawConnector(c);
-            }
-        }
-
-        foreach (var sub in activeClusters.Values)
-        {
-            foreach (var c in sub.Connectors)
-            {
-                DrawConnector(c);
-            }
-        }
+        DrawConnectors(ctx, activeClusters, visibleTree, allocated);
 
         DrawNodesAndHud(ctx, visibleTree);
-        return;
-
-        bool ShouldDrawBaseConnector(Connector c)
-        {
-            return _vm.Tree.Nodes.TryGetValue(c.FromId, out var from)
-                && _vm.Tree.Nodes.TryGetValue(c.ToId, out var to)
-                && IsDrawableBaseNode(from)
-                && IsDrawableBaseNode(to)
-                && ConnectorIntersects(c, visibleTree);
-        }
-
-        void DrawConnector(Connector c)
-        {
-            if (!ConnectorIntersects(c, visibleTree))
-            {
-                return;
-            }
-            var key = (Math.Min(c.FromId, c.ToId), Math.Max(c.FromId, c.ToId));
-            IPen pen;
-            if (allocated.Contains(c.FromId) && allocated.Contains(c.ToId))
-            {
-                pen = ConnectorAllocationPen(c.FromId, c.ToId);
-            }
-            else if (pathEdges.Contains(key))
-            {
-                pen = connHoverPen;
-            }
-            else
-            {
-                pen = c.RequiredAllocatedNodeId is null ? connPen : requiredPathConnPen;
-            }
-
-            switch (c)
-            {
-                case LineConnector lc:
-                    ctx.DrawLine(pen, TreeToScreen(lc.X1, lc.Y1), TreeToScreen(lc.X2, lc.Y2));
-                    break;
-                case ArcConnector ac:
-                    DrawArc(ctx, pen, ac);
-                    break;
-            }
-        }
-
-        IPen ConnectorAllocationPen(int fromId, int toId)
-        {
-            var fromSet = _vm.AllocationSetOf(fromId);
-            var toSet = _vm.AllocationSetOf(toId);
-            if (fromSet == toSet)
-            {
-                return fromSet switch
-                {
-                    PassiveAllocationSet.WeaponSet1 => connWeaponSet1Pen,
-                    PassiveAllocationSet.WeaponSet2 => connWeaponSet2Pen,
-                    _ => connActivePen,
-                };
-            }
-            if (fromSet == PassiveAllocationSet.Normal)
-            {
-                return toSet == PassiveAllocationSet.WeaponSet1 ? connWeaponSet1Pen : connWeaponSet2Pen;
-            }
-            if (toSet == PassiveAllocationSet.Normal)
-            {
-                return fromSet == PassiveAllocationSet.WeaponSet1 ? connWeaponSet1Pen : connWeaponSet2Pen;
-            }
-            return connActivePen;
-        }
     }
 
     private void DrawBackgroundTile(DrawingContext ctx)
     {
-        if (_bgTile is null)
+        if (_bgTileBrush is null)
         {
             return;
         }
@@ -333,13 +252,8 @@ public sealed partial class PassiveTreeView : Control
         // fills outward from there.
         var dx = ((_offsetX % BgTileScreen) + BgTileScreen) % BgTileScreen - BgTileScreen;
         var dy = ((_offsetY % BgTileScreen) + BgTileScreen) % BgTileScreen - BgTileScreen;
-        var brush = new ImageBrush(_bgTile)
-        {
-            Stretch = Stretch.Fill,
-            TileMode = TileMode.Tile,
-            DestinationRect = new RelativeRect(dx, dy, BgTileScreen, BgTileScreen, RelativeUnit.Absolute),
-        };
-        ctx.FillRectangle(brush, new Rect(Bounds.Size));
+        _bgTileBrush.DestinationRect = new RelativeRect(dx, dy, BgTileScreen, BgTileScreen, RelativeUnit.Absolute);
+        ctx.FillRectangle(_bgTileBrush, new Rect(Bounds.Size));
     }
 
     private void DrawActiveJewelRadii(DrawingContext ctx, Rect visibleTree)
@@ -462,28 +376,6 @@ public sealed partial class PassiveTreeView : Control
             JewelRadiusVisualStyle.OracleKeystoneCentered => new SolidColorBrush(Color.FromArgb(0x55, 0xA8, 0x78, 0xD8)),
             _ => new SolidColorBrush(Color.FromArgb(0xB0, 0x66, 0xFF, 0xCC)),
         };
-
-    private void DrawArc(DrawingContext ctx, IPen pen, ArcConnector ac)
-    {
-        // Endpoints in tree-space, then mapped to screen.
-        var a0 = ac.StartAngle;
-        var a1 = ac.StartAngle + ac.SweepAngle;
-        var p0 = TreeToScreen(ac.Cx + Math.Sin(a0) * ac.Radius, ac.Cy - Math.Cos(a0) * ac.Radius);
-        var p1 = TreeToScreen(ac.Cx + Math.Sin(a1) * ac.Radius, ac.Cy - Math.Cos(a1) * ac.Radius);
-        var rScreen = ac.Radius * _scale;
-        var isLargeArc = Math.Abs(ac.SweepAngle) > Math.PI;
-        // Increasing PoB angle = clockwise in screen space (Y-down).
-        var sweepDir = ac.SweepAngle >= 0 ? SweepDirection.Clockwise : SweepDirection.CounterClockwise;
-
-        var geo = new StreamGeometry();
-        using (var g = geo.Open())
-        {
-            g.BeginFigure(p0, isFilled: false);
-            g.ArcTo(p1, new Size(rScreen, rScreen), 0, isLargeArc, sweepDir);
-            g.EndFigure(isClosed: false);
-        }
-        ctx.DrawGeometry(brush: null, pen: pen, geometry: geo);
-    }
 
     private static bool ConnectorIntersects(Connector connector, Rect visibleTree) =>
         connector switch
@@ -609,9 +501,13 @@ public sealed partial class PassiveTreeView : Control
             ? $" diff +{diff.AddedCount} ~{diff.ChangedCount} -{diff.RemovedCount}"
             : string.Empty;
         var hud = $"v{_vm.Tree.Version} • allocated: {allocated.Count}{diffText}";
-        var ft = new FormattedText(hud, System.Globalization.CultureInfo.CurrentCulture,
-            FlowDirection.LeftToRight, Typeface.Default, 14, Brushes.White);
-        ctx.DrawText(ft, new Point(8, 8));
+        if (_cachedHudText != hud)
+        {
+            _cachedHudText = hud;
+            _cachedHud = new FormattedText(hud, System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight, Typeface.Default, 14, Brushes.White);
+        }
+        ctx.DrawText(_cachedHud!, new Point(8, 8));
         DrawNodeTooltip(ctx);
     }
 

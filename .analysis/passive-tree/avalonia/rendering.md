@@ -303,6 +303,21 @@ Everything else (text layout, input focus, scrolling) is off the critical path.
 
 Budget target: <4 ms per frame on a 2019 laptop for a 2500-node tree. That leaves plenty of headroom for tooltip layout and Avalonia's compositor.
 
+### Current port hot-path decisions
+
+`PassiveTreeView` submits all visible line and arc connectors as one
+`ICustomDrawOperation`. The operation leases the Skia canvas, applies the
+tree-to-screen transform once, and issues `DrawLine`/`DrawArc` calls using six
+reused paints. Its allocation/allocation-set/cluster snapshots are rebuilt only
+when the view model's visual revision changes, so pan frames do not rebuild
+connector state or allocate Avalonia geometries.
+
+Node sprites remain Avalonia bitmap draws for now, but atlas files are lazy per
+view and PoE2 circular icon clips use the value-type rounded-rectangle clip
+path. Tooltip text layout is cached by node, visual revision, and available
+width. The tooltip is anchored when the hovered node changes; pointer motion
+inside the same node neither reshapes text nor invalidates the full tree.
+
 ## 12. Animations
 
 Only one: **jewel ring rotation**, driven by `GetTime()`. Gated by `main.showAnimations`. No tweening, no hover pulse, no allocation flash. Allocation state is a hard swap of sprite.

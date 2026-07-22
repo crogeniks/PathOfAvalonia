@@ -84,6 +84,19 @@ public sealed class JewelRadiusTests
     }
 
     [Fact]
+    public void RadiusMembershipIsSharedBySpecsUsingTheSameImmutableTree()
+    {
+        var tree = LoadPoe1Tree();
+
+        var first = RadiusMembership.ForTree(tree);
+        var second = RadiusMembership.ForTree(tree);
+
+        Assert.Same(first, second);
+        Assert.Same(first.Sockets, second.Sockets);
+        Assert.Same(first.Keystones, second.Keystones);
+    }
+
+    [Fact]
     public void SocketedUnallocatedRadiusJewelHasOverlayButNoActiveRadius()
     {
         var spec = LoadPoe1Spec();

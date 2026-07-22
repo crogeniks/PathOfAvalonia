@@ -63,7 +63,6 @@ public sealed partial class PassiveTreeView
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         var p = e.GetPosition(this);
-        _lastPointerPosition = p;
         if (_panning)
         {
             UpdatePan(p);
@@ -73,13 +72,8 @@ public sealed partial class PassiveTreeView
         var hit = HitTest(p);
         if (hit != _vm.HoverNodeId)
         {
-            _lastTooltipRedrawPosition = p;
+            _tooltipAnchorPosition = p;
             _vm.SetHover(hit);
-        }
-        else if (hit is not null && DistanceSquared(p, _lastTooltipRedrawPosition) > 16)
-        {
-            _lastTooltipRedrawPosition = p;
-            InvalidateVisual();
         }
     }
 
@@ -96,7 +90,6 @@ public sealed partial class PassiveTreeView
     {
         var props = e.GetCurrentPoint(this).Properties;
         var p = e.GetPosition(this);
-        _lastPointerPosition = p;
         if (props.IsLeftButtonPressed)
         {
             BeginPan(e, p);
@@ -171,12 +164,14 @@ public sealed partial class PassiveTreeView
             return;
         }
 
-        var hit = HitTest(e.GetPosition(this));
+        var pointerPosition = e.GetPosition(this);
+        var hit = HitTest(pointerPosition);
         if (hit is not { } id)
         {
             return;
         }
 
+        _tooltipAnchorPosition = pointerPosition;
         _vm.SetHover(id);
         if (_vm.Tree.GameId == GameId.PathOfExile1
             && !_vm.IsAllocated(id)

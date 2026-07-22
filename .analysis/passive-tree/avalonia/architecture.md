@@ -60,6 +60,14 @@ result is returned to the tree view model for tooltip rendering. The same
 projected view model backs `BasicStatsSidebarView`, so the sidebar and tooltip
 cannot drift to different hover calculations.
 
+Within a composed workspace, `BuildWorkspaceState` is also the single
+`PassiveSpec.SpecChanged` coordinator. The tree and equipment view models keep
+their direct subscriptions for standalone/test use, but detach them when added
+to a workspace. The coordinator refreshes the hover path first, then performs
+one equipment/stat refresh with that preview, and finally publishes the public
+hover notification. This avoids calculating once with a stale preview and a
+second time after the tree subscriber runs.
+
 ## 2. Type Catalogue
 
 ### Domain

@@ -15,7 +15,7 @@ public sealed class TimelessJewelData
     private readonly int _notableNodeCount;
     private readonly IReadOnlyDictionary<int, NodeIndexEntry> _nodeIndices;
     private readonly IReadOnlyDictionary<TimelessJewelType, IReadOnlyDictionary<byte, int>> _localIds;
-    private readonly IReadOnlyDictionary<TimelessJewelType, byte[]> _lookups;
+    private readonly IReadOnlyDictionary<TimelessJewelType, LazyLookup> _lookups;
     private readonly int[] _gloriousNodeOffsets;
 
     public static TimelessJewelData Empty { get; } = new(
@@ -26,7 +26,7 @@ public sealed class TimelessJewelData
         0,
         new Dictionary<int, NodeIndexEntry>(),
         new Dictionary<TimelessJewelType, IReadOnlyDictionary<byte, int>>(),
-        new Dictionary<TimelessJewelType, byte[]>());
+        new Dictionary<TimelessJewelType, LazyLookup>());
 
     public bool IsEmpty => _lookups.Count == 0;
 
@@ -38,7 +38,7 @@ public sealed class TimelessJewelData
         int notableNodeCount,
         IReadOnlyDictionary<int, NodeIndexEntry> nodeIndices,
         IReadOnlyDictionary<TimelessJewelType, IReadOnlyDictionary<byte, int>> localIds,
-        IReadOnlyDictionary<TimelessJewelType, byte[]> lookups)
+        IReadOnlyDictionary<TimelessJewelType, LazyLookup> lookups)
     {
         _additionOffset = additionOffset;
         _additions = additions;
@@ -57,6 +57,27 @@ public sealed class TimelessJewelData
         Stream mappingStream,
         IReadOnlyDictionary<TimelessJewelType, Stream> compressedLookups)
     {
+        var lookupFactories = new Dictionary<TimelessJewelType, Func<Stream>>();
+        foreach (var (type, compressedStream) in compressedLookups)
+        {
+            using var compressed = new MemoryStream();
+            compressedStream.CopyTo(compressed);
+            var bytes = compressed.ToArray();
+            lookupFactories[type] = () => new MemoryStream(bytes, writable: false);
+        }
+
+        return Load(definitionsStream, mappingStream, lookupFactories);
+    }
+
+    /// <summary>
+    /// Loads the small timeless-jewel metadata immediately and opens/decompresses
+    /// each large lookup only when that jewel family is first resolved.
+    /// </summary>
+    public static TimelessJewelData Load(
+        Stream definitionsStream,
+        Stream mappingStream,
+        IReadOnlyDictionary<TimelessJewelType, Func<Stream>> compressedLookupFactories)
+    {
         var definitions = JsonSerializer.Deserialize<DefinitionsDto>(definitionsStream, JsonOptions)
             ?? throw new InvalidDataException("Timeless jewel definitions JSON was null.");
         var mapping = JsonSerializer.Deserialize<MappingDto>(mappingStream, JsonOptions)
@@ -70,14 +91,9 @@ public sealed class TimelessJewelData
             pair => (IReadOnlyDictionary<byte, int>)pair.Value.ToDictionary(
                 value => byte.Parse(value.Key, CultureInfo.InvariantCulture),
                 value => value.Value));
-        var lookups = new Dictionary<TimelessJewelType, byte[]>();
-        foreach (var (type, compressedStream) in compressedLookups)
-        {
-            using var inflater = new ZLibStream(compressedStream, CompressionMode.Decompress, leaveOpen: true);
-            using var uncompressed = new MemoryStream();
-            inflater.CopyTo(uncompressed);
-            lookups[type] = uncompressed.ToArray();
-        }
+        var lookups = compressedLookupFactories.ToDictionary(
+            pair => pair.Key,
+            pair => new LazyLookup(pair.Value));
 
         return new TimelessJewelData(
             definitions.AdditionOffset,
@@ -248,11 +264,12 @@ public sealed class TimelessJewelData
     {
         operations = [];
         if (!TryGetLookupSeed(jewel, out var lookupSeed)
-            || !_lookups.TryGetValue(jewel.Type, out var lookup)
+            || !_lookups.TryGetValue(jewel.Type, out var lazyLookup)
             || !_nodeIndices.TryGetValue(nodeId, out var nodeIndex))
         {
             return false;
         }
+        var lookup = lazyLookup.Value;
 
         var minSeed = MinSeed(jewel.Type);
         var seedSize = MaxSeed(jewel.Type) - minSeed + 1;
@@ -486,6 +503,41 @@ public sealed class TimelessJewelData
     };
 
     private sealed record NodeIndexEntry(int Index, int Size);
+
+    private sealed class LazyLookup(Func<Stream> openCompressed)
+    {
+        private readonly object _gate = new();
+        private Func<Stream>? _openCompressed = openCompressed;
+        private byte[]? _value;
+
+        public byte[] Value
+        {
+            get
+            {
+                if (Volatile.Read(ref _value) is { } existing)
+                {
+                    return existing;
+                }
+
+                lock (_gate)
+                {
+                    if (_value is not null)
+                    {
+                        return _value;
+                    }
+
+                    using var compressed = _openCompressed!();
+                    using var inflater = new ZLibStream(compressed, CompressionMode.Decompress);
+                    using var uncompressed = new MemoryStream();
+                    inflater.CopyTo(uncompressed);
+                    _value = uncompressed.ToArray();
+                    _openCompressed = null;
+                    return _value;
+                }
+            }
+        }
+    }
+
     private sealed record TimelessNodeTemplate(
         string Id,
         string Name,

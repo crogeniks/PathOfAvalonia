@@ -16,6 +16,12 @@ public sealed partial class PassiveSpec
         {
             return false;
         }
+        if (item is not null
+            && _socketedJewels.TryGetValue(socketNodeId, out var existing)
+            && (ReferenceEquals(existing, item) || existing == item))
+        {
+            return false;
+        }
 
         if (item is null)
         {
@@ -37,7 +43,7 @@ public sealed partial class PassiveSpec
                 return false;
             }
 
-            SetClusterJewel(
+            if (!SetClusterJewelCore(
                 socketNodeId,
                 new ClusterJewelSpec(
                     socketNodeId,
@@ -46,7 +52,10 @@ public sealed partial class PassiveSpec
                     cluster.SocketCount,
                     cluster.NotableNames,
                     cluster.KeystoneName,
-                    cluster.SmallPassiveStats));
+                    cluster.SmallPassiveStats)))
+            {
+                return false;
+            }
         }
         else
         {

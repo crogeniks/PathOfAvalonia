@@ -22,6 +22,8 @@ public partial class EquipmentViewModel : ObservableObject
     private bool _synchronizingCharacterLevel;
     private int? _editorItemId;
     private PassiveAllocationPreview _passiveAllocationPreview = PassiveAllocationPreview.None;
+    private HashSet<int> _visibleJewelSocketIds = [];
+    private BasicCharacterStats? _currentCalculatedStats;
 
     public EquipmentViewModel(PassiveSpec? spec = null)
     {
@@ -232,7 +234,10 @@ public partial class EquipmentViewModel : ObservableObject
         }
 
         _passiveAllocationPreview = preview;
-        RecalculateStats();
+        // Hover changes do not mutate the spec, equipment, level, or weapon set.
+        // Reuse the current side of the comparison and calculate only the
+        // projected allocation state.
+        RecalculateStats(recalculateCurrent: false);
     }
 
     partial void OnCharacterLevelChanged(int value)
@@ -505,6 +510,7 @@ public partial class EquipmentViewModel : ObservableObject
                 jewelSocketIds.Add(node.Id);
             }
         }
+        _visibleJewelSocketIds = jewelSocketIds;
         definitions.AddRange(jewelSocketIds.Order().Select((id, index) => EquipmentSlotCatalog.Jewel(id, index)));
 
         var slots = new List<EquipmentSlotViewModel>();
@@ -620,13 +626,65 @@ public partial class EquipmentViewModel : ObservableObject
 
     private void OnSpecChanged()
     {
-        if (!_synchronizingTreeJewels)
+        RefreshForSpecChange(_passiveAllocationPreview);
+    }
+
+    internal void UseCoordinatedSpecChanges()
+    {
+        if (_spec is not null)
+        {
+            _spec.SpecChanged -= OnSpecChanged;
+        }
+    }
+
+    internal void RefreshForSpecChange(PassiveAllocationPreview preview)
+    {
+        _passiveAllocationPreview = preview;
+        if (!_synchronizingTreeJewels && VisibleJewelSocketIdsChanged())
         {
             RefreshSlots();
             RefreshLibrary(SelectedLibraryItem?.ItemId);
         }
         RaiseCharacterLevelForAllocations();
         RecalculateStats();
+    }
+
+    private bool VisibleJewelSocketIdsChanged()
+    {
+        if (_spec is null)
+        {
+            return _visibleJewelSocketIds.Count != 0;
+        }
+
+        var currentCount = 0;
+        foreach (var node in _spec.Tree.Nodes.Values)
+        {
+            if (node.Type == NodeType.JewelSocket
+                && node.Name != "Charm Socket"
+                && _spec.IsAllocated(node.Id))
+            {
+                currentCount++;
+                if (!_visibleJewelSocketIds.Contains(node.Id))
+                {
+                    return true;
+                }
+            }
+        }
+        foreach (var subgraph in _spec.ActiveSubgraphs.Values)
+        {
+            foreach (var node in subgraph.Nodes)
+            {
+                if (node.Type == NodeType.JewelSocket && _spec.IsAllocated(node.Id))
+                {
+                    currentCount++;
+                    if (!_visibleJewelSocketIds.Contains(node.Id))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        return currentCount != _visibleJewelSocketIds.Count;
     }
 
     private void RaiseCharacterLevelForAllocations()
@@ -654,10 +712,11 @@ public partial class EquipmentViewModel : ObservableObject
         EquipmentChanged?.Invoke();
     }
 
-    private void RecalculateStats()
+    private void RecalculateStats(bool recalculateCurrent = true)
     {
         if (_spec is null)
         {
+            _currentCalculatedStats = null;
             CalculatedStats = null;
             TreeCalculatedStats = null;
             PassivePreview = null;
@@ -666,12 +725,16 @@ public partial class EquipmentViewModel : ObservableObject
         }
 
         var activeItems = _workspace.ActiveItems().ToArray();
-        var current = BasicStatCalculator.Calculate(
-            _spec,
-            activeItems,
-            CharacterLevel,
-            SelectedWeaponSet);
-        CalculatedStats = BasicCharacterStatsViewModel.FromCalculated(current);
+        if (recalculateCurrent || _currentCalculatedStats is null)
+        {
+            _currentCalculatedStats = BasicStatCalculator.Calculate(
+                _spec,
+                activeItems,
+                CharacterLevel,
+                SelectedWeaponSet);
+            CalculatedStats = BasicCharacterStatsViewModel.FromCalculated(_currentCalculatedStats);
+        }
+        var current = _currentCalculatedStats;
 
         if (_passiveAllocationPreview.IsEmpty)
         {

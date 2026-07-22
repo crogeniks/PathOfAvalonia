@@ -11,6 +11,8 @@ namespace PathOfAvalonia.TreeApp.Controls;
 
 public sealed partial class PassiveTreeView
 {
+    private TooltipLayout? _cachedTooltipLayout;
+
     private void DrawNodeTooltip(DrawingContext ctx)
     {
         if (_vm.HoverNode is not { } node)
@@ -18,28 +20,47 @@ public sealed partial class PassiveTreeView
             return;
         }
 
-        if (node.Type == NodeType.JewelSocket && _vm.SocketedJewelAt(node.Id) is { } socketedJewel)
+        var maxWidth = AvailableTooltipWidth();
+        if (_cachedTooltipLayout is not { } layout
+            || layout.NodeId != node.Id
+            || layout.VisualRevision != _vm.VisualRevision
+            || layout.MaxWidth != maxWidth)
         {
-            DrawItemTooltip(ctx, ItemViewModel.FromImported(socketedJewel));
-            return;
+            layout = node.Type == NodeType.JewelSocket && _vm.SocketedJewelAt(node.Id) is { } socketedJewel
+                ? BuildItemTooltip(node.Id, ItemViewModel.FromImported(socketedJewel), maxWidth)
+                : BuildNodeTooltip(node, maxWidth);
+            _cachedTooltipLayout = layout;
         }
 
+        DrawTooltip(ctx, layout);
+    }
+
+    private TooltipLayout BuildNodeTooltip(Node node, double maxWidth)
+    {
         var effective = _vm.EffectiveNode(node.Id);
         var paddingX = 12.0;
         var paddingY = 9.0;
-        var maxWidth = AvailableTooltipWidth();
         var contentWidth = TooltipContentWidth(effective.EffectiveName, 20, Typeface.Default, paddingX, maxWidth);
         var titleLines = CreateWrappedText(effective.EffectiveName, contentWidth, 20, TooltipTitleBrush, Typeface.Default);
         var lines = BuildTooltipLines(node, effective, contentWidth);
 
-        DrawTooltip(ctx, titleLines, [], lines, contentWidth, paddingX, paddingY, maxWidth, TooltipBorderBrush);
+        return new TooltipLayout(
+            node.Id,
+            _vm.VisualRevision,
+            maxWidth,
+            titleLines,
+            [],
+            lines,
+            contentWidth,
+            paddingX,
+            paddingY,
+            TooltipBorderBrush);
     }
 
-    private void DrawItemTooltip(DrawingContext ctx, ItemViewModel item)
+    private TooltipLayout BuildItemTooltip(int nodeId, ItemViewModel item, double maxWidth)
     {
         var paddingX = 12.0;
         var paddingY = 9.0;
-        var maxWidth = AvailableTooltipWidth();
         var contentWidth = TooltipContentWidth(item.Name, 20, Typeface.Default, paddingX, maxWidth);
         if (item.HasSeparateName)
         {
@@ -51,41 +72,53 @@ public sealed partial class PassiveTreeView
             : [];
         var lines = BuildItemTooltipLines(item, contentWidth);
 
-        DrawTooltip(ctx, titleLines, subtitleLines, lines, contentWidth, paddingX, paddingY, maxWidth, item.BorderBrush);
+        return new TooltipLayout(
+            nodeId,
+            _vm.VisualRevision,
+            maxWidth,
+            titleLines,
+            subtitleLines,
+            lines,
+            contentWidth,
+            paddingX,
+            paddingY,
+            item.BorderBrush);
     }
 
-    private void DrawTooltip(
-        DrawingContext ctx,
-        IReadOnlyList<FormattedText> titleLines,
-        IReadOnlyList<FormattedText> subtitleLines,
-        List<TooltipLine> bodyLines,
-        double contentWidth,
-        double paddingX,
-        double paddingY,
-        double maxWidth,
-        IBrush borderBrush)
+    private void DrawTooltip(DrawingContext ctx, TooltipLayout layout)
     {
-        var width = TooltipWidth(contentWidth, paddingX, maxWidth, titleLines, subtitleLines, bodyLines);
-        var headerHeight = TooltipHeaderHeight(titleLines, subtitleLines);
-        var height = TooltipHeight(headerHeight, paddingY, bodyLines);
+        var width = TooltipWidth(
+            layout.ContentWidth,
+            layout.PaddingX,
+            layout.MaxWidth,
+            layout.TitleLines,
+            layout.SubtitleLines,
+            layout.BodyLines);
+        var headerHeight = TooltipHeaderHeight(layout.TitleLines, layout.SubtitleLines);
+        var height = TooltipHeight(headerHeight, layout.PaddingY, layout.BodyLines);
         var rect = PlaceTooltip(width, height);
 
         ctx.FillRectangle(TooltipFillBrush, rect);
         ctx.FillRectangle(TooltipHeaderBrush, new Rect(rect.X, rect.Y, rect.Width, headerHeight));
-        ctx.DrawRectangle(null, new Pen(borderBrush, 1.5), rect);
-        ctx.DrawLine(new Pen(borderBrush, 1), new Point(rect.X, rect.Y + headerHeight), new Point(rect.Right, rect.Y + headerHeight));
+        ctx.DrawRectangle(null, new Pen(layout.BorderBrush, 1.5), rect);
+        ctx.DrawLine(new Pen(layout.BorderBrush, 1), new Point(rect.X, rect.Y + headerHeight), new Point(rect.Right, rect.Y + headerHeight));
 
-        DrawCenteredTextLines(ctx, titleLines, subtitleLines, rect.X, rect.Y, rect.Width, headerHeight);
-        DrawTooltipBody(ctx, bodyLines, rect.X + paddingX, rect.Y + headerHeight + paddingY, rect.Width - paddingX * 2);
+        DrawCenteredTextLines(ctx, layout.TitleLines, layout.SubtitleLines, rect.X, rect.Y, rect.Width, headerHeight);
+        DrawTooltipBody(
+            ctx,
+            layout.BodyLines,
+            rect.X + layout.PaddingX,
+            rect.Y + headerHeight + layout.PaddingY,
+            rect.Width - layout.PaddingX * 2);
     }
 
     private Rect PlaceTooltip(double width, double height)
     {
-        var x = _lastPointerPosition.X + 18;
-        var y = _lastPointerPosition.Y + 18;
+        var x = _tooltipAnchorPosition.X + 18;
+        var y = _tooltipAnchorPosition.Y + 18;
         if (x + width > Bounds.Width - 8)
         {
-            x = _lastPointerPosition.X - width - 18;
+            x = _tooltipAnchorPosition.X - width - 18;
         }
         if (y + height > Bounds.Height - 8)
         {
@@ -585,4 +618,16 @@ public sealed partial class PassiveTreeView
     }
 
     private readonly record struct WrappedTextLine(string Text, IReadOnlyList<TextSpan> Underlines);
+
+    private sealed record TooltipLayout(
+        int NodeId,
+        long VisualRevision,
+        double MaxWidth,
+        IReadOnlyList<FormattedText> TitleLines,
+        IReadOnlyList<FormattedText> SubtitleLines,
+        List<TooltipLine> BodyLines,
+        double ContentWidth,
+        double PaddingX,
+        double PaddingY,
+        IBrush BorderBrush);
 }

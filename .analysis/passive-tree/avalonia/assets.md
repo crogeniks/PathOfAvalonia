@@ -221,10 +221,13 @@ tree parsing and sprite-map conversion happen once on a background thread even
 when a workspace load and a diff request overlap. The resulting tree and sprite
 metadata is shared; it contains no Avalonia bitmap handles.
 
-`PassiveTreeView` owns its decoded `Bitmap` instances. It loads those only when
-attached to the visual tree, unsubscribes from `RedrawRequested`, and disposes
-all atlas, jewel-radius, and background bitmaps when detached. A later attach
-creates a fresh view-owned bitmap set from the shared metadata.
+`PassiveTreeView` owns its decoded `Bitmap` instances. The background loads when
+the view attaches, while an atlas file is decoded only when the first visible
+sprite from that file is requested. Multiple logical atlas keys that name the
+same file share one view-owned bitmap. Missing files are negatively cached for
+the attachment lifetime. The view unsubscribes from `RedrawRequested` and
+disposes atlas, jewel-radius, and background bitmaps when detached; a later
+attach creates a fresh view-owned bitmap set from the shared metadata.
 
 ## 11. Source Map
 

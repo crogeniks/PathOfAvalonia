@@ -1,9 +1,13 @@
 namespace PathOfAvalonia.TreeDomain.Jewels;
 
+using System.Runtime.CompilerServices;
+
 public sealed record RadiusMembership(
     int SourceNodeId,
     IReadOnlyDictionary<int, IReadOnlySet<int>> NodesByRadiusIndex)
 {
+    private static readonly ConditionalWeakTable<TreeModel, Lazy<RadiusMembershipCache>> TreeCaches = new();
+
     public bool Contains(int radiusIndex, int nodeId) =>
         NodesByRadiusIndex.TryGetValue(radiusIndex, out var nodes) && nodes.Contains(nodeId);
 
@@ -19,6 +23,25 @@ public sealed record RadiusMembership(
         var sources = tree.Nodes.Values.Where(n => n.Type == NodeType.Keystone);
         return Build(tree, table, sources, excludeSockets: true);
     }
+
+    /// <summary>
+    /// Returns the immutable radius memberships shared by every spec over the
+    /// same loaded tree. Computing these tables is proportional to the product
+    /// of radius sources and tree nodes, so rebuilding them per open build is
+    /// unnecessarily expensive.
+    /// </summary>
+    public static RadiusMembershipCache ForTree(TreeModel tree) =>
+        TreeCaches.GetValue(
+            tree,
+            static model => new Lazy<RadiusMembershipCache>(
+                () =>
+                {
+                    var table = JewelRadiusTable.For(model.GameId, model.Version);
+                    return new RadiusMembershipCache(
+                        BuildForSockets(model, table),
+                        BuildForKeystones(model, table));
+                },
+                LazyThreadSafetyMode.ExecutionAndPublication)).Value;
 
     private static IReadOnlyDictionary<int, RadiusMembership> Build(
         TreeModel tree,
@@ -80,3 +103,7 @@ public sealed record RadiusMembership(
         return true;
     }
 }
+
+public sealed record RadiusMembershipCache(
+    IReadOnlyDictionary<int, RadiusMembership> Sockets,
+    IReadOnlyDictionary<int, RadiusMembership> Keystones);

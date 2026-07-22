@@ -171,38 +171,34 @@ public sealed partial class PassiveTreeView
 
     private bool DrawPoe2FrameSprite(DrawingContext ctx, NodeVisual visual, Node node, bool allocated, bool hover, Point screen)
     {
-        foreach (var frame in SelectPoe2FrameCandidates(visual, node.Type, allocated, hover))
+        if (allocated
+            && !string.IsNullOrWhiteSpace(visual.AllocatedFrame)
+            && DrawPoe2Sprite(ctx, "poe2Frames", visual.AllocatedFrame, screen, Poe2FrameHalfSize(node, visual.AllocatedFrame)))
         {
-            if (DrawPoe2Sprite(ctx, "poe2Frames", frame, screen, Poe2FrameHalfSize(node, frame)))
-            {
-                return true;
-            }
+            return true;
+        }
+        if (hover
+            && !string.IsNullOrWhiteSpace(visual.HoverFrame)
+            && DrawPoe2Sprite(ctx, "poe2Frames", visual.HoverFrame, screen, Poe2FrameHalfSize(node, visual.HoverFrame)))
+        {
+            return true;
+        }
+        if (!string.IsNullOrWhiteSpace(visual.UnallocatedFrame)
+            && DrawPoe2Sprite(ctx, "poe2Frames", visual.UnallocatedFrame, screen, Poe2FrameHalfSize(node, visual.UnallocatedFrame)))
+        {
+            return true;
+        }
+        if (Poe2DefaultFrameKey(node.Type, allocated, hover) is { } stateFrame
+            && DrawPoe2Sprite(ctx, "poe2Frames", stateFrame, screen, Poe2FrameHalfSize(node, stateFrame)))
+        {
+            return true;
+        }
+        if (Poe2DefaultFrameKey(node.Type, allocated: false, hover: false) is { } baseFrame
+            && DrawPoe2Sprite(ctx, "poe2Frames", baseFrame, screen, Poe2FrameHalfSize(node, baseFrame)))
+        {
+            return true;
         }
         return false;
-    }
-
-    private static IEnumerable<string> SelectPoe2FrameCandidates(NodeVisual visual, NodeType type, bool allocated, bool hover)
-    {
-        if (allocated && !string.IsNullOrWhiteSpace(visual.AllocatedFrame))
-        {
-            yield return visual.AllocatedFrame;
-        }
-        if (hover && !string.IsNullOrWhiteSpace(visual.HoverFrame))
-        {
-            yield return visual.HoverFrame;
-        }
-        if (!string.IsNullOrWhiteSpace(visual.UnallocatedFrame))
-        {
-            yield return visual.UnallocatedFrame;
-        }
-        if (Poe2DefaultFrameKey(type, allocated, hover) is { } stateFrame)
-        {
-            yield return stateFrame;
-        }
-        if (Poe2DefaultFrameKey(type, allocated: false, hover: false) is { } baseFrame)
-        {
-            yield return baseFrame;
-        }
     }
 
     private bool DrawPoe2VectorFrame(DrawingContext ctx, Node node, bool allocated, bool hover, Point centre)
@@ -274,12 +270,12 @@ public sealed partial class PassiveTreeView
         }
 
         var clipRadius = clipRadiusTree * _scale;
-        var clip = new EllipseGeometry(new Rect(
+        var clip = new RoundedRect(new Rect(
             centre.X - clipRadius,
             centre.Y - clipRadius,
             clipRadius * 2,
-            clipRadius * 2));
-        using (ctx.PushGeometryClip(clip))
+            clipRadius * 2), clipRadius);
+        using (ctx.PushClip(clip))
         {
             return DrawPoe2Sprite(ctx, "poe2NodeIcons", spriteKey, centre, halfSizeTree);
         }
@@ -347,13 +343,25 @@ public sealed partial class PassiveTreeView
         bitmap = null!;
         spriteRect = default;
         if (!_sprites.Atlases.TryGetValue(atlasKey, out var atlas)
-            || !atlas.Coords.TryGetValue(spriteKey, out spriteRect)
-            || !_atlasBitmaps.TryGetValue(atlas.File, out bitmap!))
+            || !atlas.Coords.TryGetValue(spriteKey, out spriteRect))
         {
             return false;
         }
 
-        return true;
+        if (!_atlasBitmaps.TryGetValue(atlas.File, out bitmap!)
+            && !_missingAtlasFiles.Contains(atlas.File)
+            && _assetResolver.LoadBitmap(atlas.File) is { } loaded)
+        {
+            bitmap = loaded;
+            _atlasBitmaps[atlas.File] = loaded;
+        }
+
+        if (bitmap is null)
+        {
+            _missingAtlasFiles.Add(atlas.File);
+        }
+
+        return bitmap is not null;
     }
 
     private static void DrawSpriteImage(DrawingContext ctx, Bitmap bitmap, SpriteRect spriteRect, Rect dst)

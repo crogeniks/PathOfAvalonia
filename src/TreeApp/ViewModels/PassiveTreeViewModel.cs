@@ -15,9 +15,9 @@ namespace PathOfAvalonia.TreeApp.ViewModels;
 public sealed partial class PassiveTreeViewModel : ObservableObject
 {
     private readonly PassiveSpec _spec;
+    private readonly IReadOnlyDictionary<int, string> _baseSearchIndex;
     private int? _hoverNodeId;
     private HoverPath _hoverPath = HoverPath.Empty;
-    private HashSet<int> _hoverPathNodes = new();
     private TreeDiff _diff = TreeDiff.Empty;
     private PassiveAllocationPreview _allocationPreview = PassiveAllocationPreview.None;
     private PassiveStatPreviewViewModel? _basicStatPreview;
@@ -31,6 +31,7 @@ public sealed partial class PassiveTreeViewModel : ObservableObject
     public PassiveTreeViewModel(PassiveSpec spec)
     {
         _spec = spec;
+        _baseSearchIndex = BuildSearchIndex(spec.Tree.Nodes.Values);
         _spec.SpecChanged += OnSpecChanged;
     }
 
@@ -38,13 +39,14 @@ public sealed partial class PassiveTreeViewModel : ObservableObject
     public IReadOnlySet<int> AllocatedNodes => _spec.AllocatedNodes;
     public int? HoverNodeId => _hoverNodeId;
     public HoverPath HoverPath => _hoverPath;
-    public HashSet<int> HoverPathNodes => _hoverPathNodes;
+    public IReadOnlySet<int> HoverPathNodes => _hoverPath.NodeIds;
     public TreeDiff Diff => _diff;
     public PassiveAllocationPreview AllocationPreview => _allocationPreview;
     public PassiveStatPreviewViewModel? BasicStatPreview => _basicStatPreview;
     public IReadOnlySet<int> SearchResultNodeIds => _searchResultNodeIds;
     public int SearchResultCount => _searchResultNodeIds.Count;
     public bool HasActiveSearch => !string.IsNullOrWhiteSpace(SearchText);
+    public long VisualRevision { get; private set; }
 
     [ObservableProperty] private string _searchText = string.Empty;
     public Node? HoverNode
@@ -143,24 +145,23 @@ public sealed partial class PassiveTreeViewModel : ObservableObject
         }
         _hoverNodeId = nodeId;
         _hoverPath = nodeId is { } id ? _spec.HoverPathTo(id) : HoverPath.Empty;
-        _hoverPathNodes = new HashSet<int>(_hoverPath.Nodes);
         _allocationPreview = nodeId is { } previewNodeId
-            ? _spec.PreviewAllocationChange(previewNodeId)
+            ? _spec.PreviewAllocationChange(previewNodeId, _hoverPath)
             : PassiveAllocationPreview.None;
         HoverPreviewChanged?.Invoke(_allocationPreview);
-        RedrawRequested?.Invoke();
+        RequestRedraw();
     }
 
     public void SetBasicStatPreview(PassiveStatPreviewViewModel? preview)
     {
         _basicStatPreview = preview;
-        RedrawRequested?.Invoke();
+        RequestRedraw();
     }
 
     public void SetDiff(TreeDiff? diff)
     {
         _diff = diff ?? TreeDiff.Empty;
-        RedrawRequested?.Invoke();
+        RequestRedraw();
     }
 
     public void ToggleNode(int id) => _spec.Toggle(id);
@@ -197,7 +198,7 @@ public sealed partial class PassiveTreeViewModel : ObservableObject
     {
         UpdateSearchResults(value);
         OnPropertyChanged(nameof(HasActiveSearch));
-        RedrawRequested?.Invoke();
+        RequestRedraw();
     }
 
     [RelayCommand]
@@ -209,15 +210,21 @@ public sealed partial class PassiveTreeViewModel : ObservableObject
         var terms = SearchTerms(searchText);
         if (terms.Count > 0)
         {
-            foreach (var node in _spec.Tree.Nodes.Values)
+            foreach (var (nodeId, searchableText) in _baseSearchIndex)
             {
-                AddIfMatches(node, terms);
+                if (Matches(searchableText, terms))
+                {
+                    _searchResultNodeIds.Add(nodeId);
+                }
             }
             foreach (var cluster in _spec.ActiveSubgraphs.Values)
             {
                 foreach (var node in cluster.Nodes)
                 {
-                    AddIfMatches(node, terms);
+                    if (IsSearchable(node) && Matches(SearchableText(node), terms))
+                    {
+                        _searchResultNodeIds.Add(node.Id);
+                    }
                 }
             }
         }
@@ -226,28 +233,32 @@ public sealed partial class PassiveTreeViewModel : ObservableObject
         OnPropertyChanged(nameof(SearchResultCount));
     }
 
-    private void AddIfMatches(Node node, IReadOnlyList<string> terms)
+    private static IReadOnlyDictionary<int, string> BuildSearchIndex(IEnumerable<Node> nodes)
     {
-        // PoB omits class starts and non-selectable mastery decorations from search.
-        if (node.Type == NodeType.ClassStart
-            || node is { Type: NodeType.Mastery, MasteryEffects: null })
+        var result = new Dictionary<int, string>();
+        foreach (var node in nodes)
         {
-            return;
+            if (IsSearchable(node))
+            {
+                result[node.Id] = SearchableText(node);
+            }
         }
-
-        var searchableText = new List<string> { node.Name, node.Type.ToString() };
-        searchableText.AddRange(node.Stats);
-        if (node.MasteryEffects is not null)
-        {
-            searchableText.AddRange(node.MasteryEffects.SelectMany(effect => effect.Stats));
-        }
-
-        if (terms.All(term => searchableText.Any(text =>
-                text.Contains(term, StringComparison.OrdinalIgnoreCase))))
-        {
-            _searchResultNodeIds.Add(node.Id);
-        }
+        return result;
     }
+
+    // PoB omits class starts and non-selectable mastery decorations from search.
+    private static bool IsSearchable(Node node) =>
+        node.Type != NodeType.ClassStart
+        && node is not { Type: NodeType.Mastery, MasteryEffects: null };
+
+    private static string SearchableText(Node node) => string.Join(
+        '\n',
+        new[] { node.Name, node.Type.ToString() }
+            .Concat(node.Stats)
+            .Concat(node.MasteryEffects?.SelectMany(effect => effect.Stats) ?? []));
+
+    private static bool Matches(string searchableText, IReadOnlyList<string> terms) =>
+        terms.All(term => searchableText.Contains(term, StringComparison.OrdinalIgnoreCase));
 
     private static IReadOnlyList<string> SearchTerms(string searchText)
     {
@@ -308,19 +319,37 @@ public sealed partial class PassiveTreeViewModel : ObservableObject
 
     private void OnSpecChanged()
     {
+        RefreshForSpecChange(publishHoverPreview: true);
+    }
+
+    internal void UseCoordinatedSpecChanges() => _spec.SpecChanged -= OnSpecChanged;
+
+    internal PassiveAllocationPreview RefreshForSpecChange(bool publishHoverPreview)
+    {
         // Hover path may be invalidated by the allocation change — recompute.
         if (_hoverNodeId is { } id)
         {
             _hoverPath = _spec.HoverPathTo(id);
-            _hoverPathNodes = new HashSet<int>(_hoverPath.Nodes);
-            _allocationPreview = _spec.PreviewAllocationChange(id);
+            _allocationPreview = _spec.PreviewAllocationChange(id, _hoverPath);
         }
         else
         {
             _allocationPreview = PassiveAllocationPreview.None;
         }
         UpdateSearchResults(SearchText);
-        HoverPreviewChanged?.Invoke(_allocationPreview);
+        if (publishHoverPreview)
+        {
+            HoverPreviewChanged?.Invoke(_allocationPreview);
+        }
+        RequestRedraw();
+        return _allocationPreview;
+    }
+
+    internal void PublishHoverPreview() => HoverPreviewChanged?.Invoke(_allocationPreview);
+
+    private void RequestRedraw()
+    {
+        VisualRevision++;
         RedrawRequested?.Invoke();
     }
 }

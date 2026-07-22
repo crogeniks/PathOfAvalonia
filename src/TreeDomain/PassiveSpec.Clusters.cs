@@ -36,12 +36,18 @@ public sealed partial class PassiveSpec
     // Passing null for spec removes any existing cluster at that socket.
     public void SetClusterJewel(int socketId, ClusterJewelSpec? spec)
     {
+        _ = SetClusterJewelCore(socketId, spec);
+        RebuildActiveRadiusEffects();
+        SpecChanged?.Invoke();
+    }
+
+    private bool SetClusterJewelCore(int socketId, ClusterJewelSpec? spec)
+    {
         RemoveClusterRecursive(socketId);
 
         if (spec is null || !TryGetNode(socketId, out var socket) || socket is null || !CanInsertCluster(socketId, spec.Size))
         {
-            SpecChanged?.Invoke();
-            return;
+            return false;
         }
 
         var lineageIdBase = ResolveClusterLineageIdBase(socket);
@@ -58,8 +64,7 @@ public sealed partial class PassiveSpec
         var entranceNode = subgraph.NodesById[subgraph.EntranceNodeId];
         AddOverlayLink(socket.Id, entranceNode.Id);
 
-        RebuildActiveRadiusEffects();
-        SpecChanged?.Invoke();
+        return true;
     }
 
     public void RemoveClusterJewel(int socketId)
@@ -101,7 +106,6 @@ public sealed partial class PassiveSpec
 
         _activeSubgraphs.Remove(socketId);
         _socketedJewels.Remove(socketId);
-        RebuildActiveRadiusEffects();
         return true;
     }
 

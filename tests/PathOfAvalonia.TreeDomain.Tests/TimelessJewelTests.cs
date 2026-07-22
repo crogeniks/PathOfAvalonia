@@ -9,6 +9,32 @@ public sealed class TimelessJewelTests
 {
     private static readonly Lazy<TimelessJewelData> Data = new(LoadTimelessJewelData);
 
+    [Fact]
+    public void LookupStreamsRemainUnopenedUntilTheirJewelTypeIsResolved()
+    {
+        using var definitions = new MemoryStream("""
+            { "additionOffset": 96, "additions": [], "replacements": [] }
+            """u8.ToArray());
+        using var mapping = new MemoryStream("""
+            { "size": 1, "sizeNotable": 1, "nodes": {}, "localIds": {} }
+            """u8.ToArray());
+        var openCount = 0;
+        var data = TimelessJewelData.Load(
+            definitions,
+            mapping,
+            new Dictionary<TimelessJewelType, Func<Stream>>
+            {
+                [TimelessJewelType.GloriousVanity] = () =>
+                {
+                    openCount++;
+                    return Stream.Null;
+                },
+            });
+
+        Assert.False(data.IsEmpty);
+        Assert.Equal(0, openCount);
+    }
+
     [Theory]
     [InlineData("Glorious Vanity", "Bathed in the blood of 100 sacrificed in the name of Doryani", TimelessJewelType.GloriousVanity, 100, TimelessConqueror.Vaal, "3")]
     [InlineData("Lethal Pride", "Commanded leadership over 10000 warriors under Kaom", TimelessJewelType.LethalPride, 10000, TimelessConqueror.Karui, "1")]

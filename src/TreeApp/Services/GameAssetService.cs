@@ -72,7 +72,12 @@ public sealed class GameAssetService(GameRegistry games, IGameAssetLayoutRegistr
     {
         var game = GameDefinitionFor(key.GameId);
         using var stream = OpenAsset(game, layouts.Get(game.Id).TreeDataPath(key.Version));
-        return game.TreeLoader.Load(stream, key.Version, game.Id);
+        var tree = game.TreeLoader.Load(stream, key.Version, game.Id);
+        // Radius memberships are immutable tree data. Build the shared cache on
+        // this loader task rather than making the first UI-created spec pay the
+        // source × radius × node cost.
+        _ = RadiusMembership.ForTree(tree);
+        return tree;
     }
 
     private SpriteMap LoadSprites(GameAssetKey key)
@@ -118,22 +123,12 @@ public sealed class GameAssetService(GameRegistry games, IGameAssetLayoutRegistr
             ?? throw new InvalidOperationException($"No timeless jewel assets are registered for {game.DisplayName} {key.Version}.");
         using var definitions = OpenAsset(game, paths.Definitions);
         using var mapping = OpenAsset(game, paths.Mapping);
-        var lookups = new Dictionary<TimelessJewelType, Stream>();
-        try
+        var lookupFactories = new Dictionary<TimelessJewelType, Func<Stream>>();
+        foreach (var (type, path) in paths.Lookups)
         {
-            foreach (var (type, path) in paths.Lookups)
-            {
-                lookups[type] = OpenAsset(game, path);
-            }
-            return TimelessJewelData.Load(definitions, mapping, lookups);
+            lookupFactories[type] = () => OpenAsset(game, path);
         }
-        finally
-        {
-            foreach (var stream in lookups.Values)
-            {
-                stream.Dispose();
-            }
-        }
+        return TimelessJewelData.Load(definitions, mapping, lookupFactories);
     }
 
     private GameDefinition GameDefinitionFor(GameId gameId) => games.Get(gameId);

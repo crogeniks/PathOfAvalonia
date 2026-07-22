@@ -95,7 +95,10 @@ public sealed partial class PassiveSpec
             return;
         }
         _allocated.Add(id);
-        RebuildActiveRadiusEffects();
+        if (AllocationChangeAffectsRadiusEffects(id))
+        {
+            RebuildActiveRadiusEffects();
+        }
         SpecChanged?.Invoke();
     }
 
@@ -104,7 +107,18 @@ public sealed partial class PassiveSpec
     /// mutating the spec. Unallocated nodes include their queued path; allocated
     /// nodes include every dependent that would be disconnected by the refund.
     /// </summary>
-    public PassiveAllocationPreview PreviewAllocationChange(int id)
+    public PassiveAllocationPreview PreviewAllocationChange(int id) =>
+        PreviewAllocationChangeCore(id, precomputedPath: null);
+
+    /// <summary>
+    /// Describes an allocation change while reusing a hover path already computed
+    /// for the same target. UI hover handling otherwise performs the full-tree BFS
+    /// twice for every newly-hovered unallocated node.
+    /// </summary>
+    public PassiveAllocationPreview PreviewAllocationChange(int id, HoverPath precomputedPath) =>
+        PreviewAllocationChangeCore(id, precomputedPath);
+
+    private PassiveAllocationPreview PreviewAllocationChangeCore(int id, HoverPath? precomputedPath)
     {
         if (_forbiddenJewelAllocatedNodes.Contains(id)
             || (_classStartNodeByIndex.TryGetValue(_selectedClassIndex, out var startId) && startId == id)
@@ -122,13 +136,16 @@ public sealed partial class PassiveSpec
                 _socketedJewels.ContainsKey(id));
         }
 
-        var path = HoverPathTo(id);
+        var path = precomputedPath is { IsEmpty: false }
+            && precomputedPath.Nodes[^1] == id
+                ? precomputedPath
+                : HoverPathTo(id);
         return path.IsEmpty
             ? PassiveAllocationPreview.None
             : new PassiveAllocationPreview(
                 id,
                 PassiveAllocationPreviewKind.Allocate,
-                path.Nodes.ToHashSet(),
+                path.NodeIds,
                 _socketedJewels.ContainsKey(id));
     }
 
@@ -145,7 +162,10 @@ public sealed partial class PassiveSpec
             _masterySelections.Remove(removedNodeId);
             _allocationSets.Remove(removedNodeId);
         }
-        RebuildActiveRadiusEffects();
+        if (removedNodeIds.Any(AllocationChangeAffectsRadiusEffects))
+        {
+            RebuildActiveRadiusEffects();
+        }
         if (wasActiveRadiusSocket)
         {
             PruneInvalidRadiusOnlyAllocations();
@@ -249,6 +269,7 @@ public sealed partial class PassiveSpec
     public void AllocateMany(IEnumerable<int> ids)
     {
         var changed = false;
+        var radiusEffectsChanged = false;
         foreach (var id in ids)
         {
             if (TryGetNode(id, out var node)
@@ -258,11 +279,15 @@ public sealed partial class PassiveSpec
                 && _allocated.Add(id))
             {
                 changed = true;
+                radiusEffectsChanged |= AllocationChangeAffectsRadiusEffects(id);
             }
         }
         if (changed)
         {
-            RebuildActiveRadiusEffects();
+            if (radiusEffectsChanged)
+            {
+                RebuildActiveRadiusEffects();
+            }
             SpecChanged?.Invoke();
         }
     }
@@ -465,5 +490,6 @@ public sealed partial class PassiveSpec
 public sealed record HoverPath(IReadOnlyList<int> Nodes, IReadOnlySet<(int Min, int Max)> Edges)
 {
     public static readonly HoverPath Empty = new(Array.Empty<int>(), new HashSet<(int, int)>());
+    public IReadOnlySet<int> NodeIds { get; } = Nodes as IReadOnlySet<int> ?? Nodes.ToHashSet();
     public bool IsEmpty => Nodes.Count == 0;
 }
