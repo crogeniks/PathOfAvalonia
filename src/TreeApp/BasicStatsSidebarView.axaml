@@ -86,7 +86,7 @@
                                Foreground="#8EA6D8"
                                FontSize="10"/>
                 </StackPanel>
-                <Grid ColumnDefinitions="Auto,100,*" ColumnSpacing="6">
+                <Grid ColumnDefinitions="Auto,120,*" ColumnSpacing="6">
                     <TextBlock Text="Level"
                                Foreground="#9999AA"
                                VerticalAlignment="Center"/>
