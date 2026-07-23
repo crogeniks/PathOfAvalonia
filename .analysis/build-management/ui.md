@@ -23,3 +23,12 @@
 - Tab switcher buttons (one per viewMode).
 - Stat readout populated via `AddDisplayStatList()`.
 - Import code input/output field (base64 deflate).
+
+## PathOfAvalonia workspace header
+
+The fixed workspace header contains an editable build name plus Save, Save As,
+saved-build selection, Open, New, and Delete controls. Save updates the current
+record; Save As creates a new stable id. Status text reports local storage
+results and an unsaved-change indicator is driven by character, equipment, name,
+or Atlas mutations. For PoE1 the same save action includes Atlas allocations, so
+the Atlas tab does not maintain a second, drifting file identity.

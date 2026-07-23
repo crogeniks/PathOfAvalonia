@@ -25,6 +25,7 @@ public partial class App : Application
         sc.AddSingleton<GameRegistry>();
         sc.AddSingleton<IUserSettingsService, UserSettingsService>();
         sc.AddSingleton<IUserPathService, UserPathService>();
+        sc.AddSingleton<IBuildLibraryService, BuildLibraryService>();
         sc.AddSingleton<IBuildPlannerPathService, BuildPlannerPathService>();
         sc.AddSingleton<ITextFileSaveService, TextFileSaveService>();
         sc.AddSingleton<ITextFileOpenService, TextFileOpenService>();

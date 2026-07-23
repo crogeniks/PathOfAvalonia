@@ -5,15 +5,67 @@
              x:Class="PathOfAvalonia.TreeApp.Views.GameWorkspaceView"
              x:Name="Root"
              x:DataType="vm:GameWorkspaceViewModel">
-    <Grid Background="#101018" RowDefinitions="48,*">
+    <Grid Background="#101018" RowDefinitions="82,*">
         <Border Background="#15151D" BorderBrush="#30303A" BorderThickness="0,0,0,1">
-            <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="14,0" VerticalAlignment="Center">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto"
+                  RowDefinitions="40,40"
+                  Margin="14,0">
                 <TextBlock Text="PathOfAvalonia" Foreground="#F0F0F4" FontWeight="SemiBold" VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="1" Text="{Binding GameName}" Foreground="#CFCFE0" Margin="18,0,0,0" VerticalAlignment="Center"/>
                 <Button Name="ChangeGameButton"
                         Grid.Column="3"
                         Content="Change Game"
-                        Command="{Binding BackToLandingCommand}"/>
+                        Command="{Binding BackToLandingCommand}"
+                        VerticalAlignment="Center"/>
+                <Grid Grid.Row="1"
+                      Grid.ColumnSpan="4"
+                      ColumnDefinitions="Auto,180,Auto,Auto,18,220,Auto,Auto,Auto,*,Auto"
+                      ColumnSpacing="7"
+                      VerticalAlignment="Center">
+                    <TextBlock Text="Build" Foreground="#9090A0" VerticalAlignment="Center"/>
+                    <TextBox Name="BuildNameInput"
+                             Grid.Column="1"
+                             Text="{Binding BuildName}"
+                             PlaceholderText="Build name"/>
+                    <Button Name="SaveBuildButton"
+                            Grid.Column="2"
+                            Content="Save"
+                            Command="{Binding SaveBuildCommand}"/>
+                    <Button Name="SaveBuildAsButton"
+                            Grid.Column="3"
+                            Content="Save As"
+                            Command="{Binding SaveBuildAsCommand}"/>
+                    <ComboBox Name="SavedBuildSelector"
+                              Grid.Column="5"
+                              ItemsSource="{Binding SavedBuildOptions}"
+                              SelectedItem="{Binding SelectedSavedBuild}"
+                              DisplayMemberBinding="{Binding Name}"
+                              PlaceholderText="Saved builds"/>
+                    <Button Name="OpenSavedBuildButton"
+                            Grid.Column="6"
+                            Content="Open"
+                            Command="{Binding OpenSavedBuildCommand}"
+                            IsEnabled="{Binding HasSavedBuildSelection}"/>
+                    <Button Name="NewBuildButton"
+                            Grid.Column="7"
+                            Content="New"
+                            Command="{Binding NewBuildCommand}"/>
+                    <Button Name="DeleteSavedBuildButton"
+                            Grid.Column="8"
+                            Content="Delete"
+                            Command="{Binding RequestDeleteSavedBuildCommand}"
+                            IsEnabled="{Binding CanDeleteSavedBuild}"/>
+                    <TextBlock Grid.Column="9"
+                               Text="{Binding BuildStatus}"
+                               Foreground="#AFAFC3"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Grid.Column="10"
+                               Text="Unsaved changes"
+                               Foreground="#E0A060"
+                               VerticalAlignment="Center"
+                               IsVisible="{Binding IsDirty}"/>
+                </Grid>
             </Grid>
         </Border>
         <TabControl Name="WorkspaceTabs" Grid.Row="1" Background="#101018">
@@ -347,5 +399,34 @@
                 </Grid>
             </TabItem>
         </TabControl>
+        <Border Grid.RowSpan="2"
+                IsVisible="{Binding IsConfirmingBuildDelete}"
+                Background="#AA000000">
+            <Border Width="440"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Padding="18"
+                    Background="#1A1A24"
+                    BorderBrush="#4A4A58"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="{Binding BuildToDeleteName, StringFormat='Delete saved build “{0}” from this device?'}"
+                               Foreground="#F0F0F0"
+                               TextWrapping="Wrap"
+                               FontSize="15"/>
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                Spacing="8">
+                        <Button Name="CancelDeleteSavedBuildButton"
+                                Content="Cancel"
+                                Command="{Binding CancelDeleteSavedBuildCommand}"/>
+                        <Button Name="ConfirmDeleteSavedBuildButton"
+                                Content="Delete"
+                                Command="{Binding ConfirmDeleteSavedBuildCommand}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
     </Grid>
 </UserControl>

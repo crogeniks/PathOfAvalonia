@@ -107,6 +107,29 @@ public sealed partial class BuildImportExportViewModel : ObservableObject
         catch (Exception ex) { ResetVariantState(); SetError($"Import failed: {ex.Message}"); }
     }
 
+    public ImportedBuild CaptureBuild()
+    {
+        var build = _lastImportedBuild ?? new ImportedBuild(
+            ClassId: 0,
+            AscendClassId: 0,
+            SecondaryAscendClassId: 0,
+            NodeHashes: [],
+            ClusterNodeHashes: [],
+            MasterySelections: new Dictionary<int, int>(),
+            TreeVersion: _state.Spec.Tree.Version,
+            Source: "PathOfAvalonia local build");
+        build = _state.Equipment.ApplyToBuild(build);
+        return _state.Spec.CreateBuildSnapshot(build);
+    }
+
+    public void RestoreBuild(ImportedBuild build)
+    {
+        ApplyImportedBuild(build);
+        SetSuccess($"Loaded local build: {_lastImportResult!.Applied} nodes applied, {_lastImportResult.Skipped} skipped");
+    }
+
+    public void ClearBuild() => Clear();
+
     [RelayCommand]
     private void Clear()
     {

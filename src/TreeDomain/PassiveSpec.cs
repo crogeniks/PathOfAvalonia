@@ -37,6 +37,7 @@ public sealed partial class PassiveSpec
 
     public IReadOnlyDictionary<int, ClusterSubgraph> ActiveSubgraphs => _activeSubgraphs;
     public IReadOnlyDictionary<int, ImportedItem> SocketedJewels => _socketedJewels;
+    public IReadOnlyDictionary<int, int> MasterySelections => _masterySelections;
     public IReadOnlyDictionary<int, AttributeNodeOverride> AttributeOverrides => _attributeOverrides;
     public IReadOnlyDictionary<int, PassiveAllocationSet> AllocationSets => _allocationSets;
     public IReadOnlyList<JewelRadiusVisual> ActiveJewelRadii => _activeJewelRadii;

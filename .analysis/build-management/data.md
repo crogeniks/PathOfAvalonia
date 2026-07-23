@@ -51,3 +51,17 @@
 ## Shared State
 
 Shared item pool and shared item-set pool live under `main.sharedItemList` / `main.sharedItemSetList`, persisted to a companion XML next to build files.
+
+## PathOfAvalonia saved-build envelope
+
+Local saves live under `<config>/PathOfAvalonia/builds/<guid>.json` as a
+versioned envelope. Each record contains its stable id, display name, game,
+character-tree version, `ImportedBuild` snapshot, optional Atlas-tree version,
+Atlas node ids, and last-updated time. Filenames use only generated ids, so user
+build names never participate in path construction. Writes use a same-directory
+temporary file followed by replacement; unreadable or corrupt entries are
+ignored when listing without being deleted.
+
+The parsed `ImportedItem.Text` projection is omitted from JSON and rebuilt from
+the persisted raw item text on load. This avoids duplicating derived item data.
+`settings.json` stores `lastBuildId` so the last saved workspace can be restored.

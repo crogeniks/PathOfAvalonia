@@ -24,7 +24,9 @@ public sealed class GameWorkspaceFactory(
     IGameAssetLayoutRegistry assetLayouts,
     IBuildPlannerExportService buildPlannerExportService,
     IBuildPlannerImportService buildPlannerImportService,
-    IStorageProviderAccessor storageProviderAccessor) : IGameWorkspaceFactory
+    IStorageProviderAccessor storageProviderAccessor,
+    IBuildLibraryService? buildLibrary = null,
+    IUserSettingsService? settings = null) : IGameWorkspaceFactory
 {
     public async Task<GameWorkspaceViewModel> CreateAsync(
         GameDefinition game,
@@ -92,6 +94,8 @@ public sealed class GameWorkspaceFactory(
             assets,
             switchTreeVersion,
             backToLandingCommand,
-            atlas);
+            atlas,
+            buildLibrary,
+            settings);
     }
 }

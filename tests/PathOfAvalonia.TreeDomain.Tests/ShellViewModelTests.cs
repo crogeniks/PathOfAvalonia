@@ -5,6 +5,7 @@ using Moq;
 using PathOfAvalonia.TreeApp.Services;
 using PathOfAvalonia.TreeApp.ViewModels;
 using PathOfAvalonia.TreeDomain;
+using PathOfAvalonia.TreeDomain.Import;
 using Xunit;
 
 namespace PathOfAvalonia.TreeDomain.Tests;
@@ -28,6 +29,37 @@ public sealed class ShellViewModelTests
         Assert.Equal(ShellPage.Workspace, vm.CurrentPage);
         Assert.Equal(GameId.PathOfExile2, vm.ActiveWorkspace!.Workspace.Game.Id);
         Assert.True(vm.ActiveWorkspace.TreePanel.IsImportSupported);
+    }
+
+    [Fact]
+    public void RestoresLastSavedBuildAtStartup()
+    {
+        var id = Guid.NewGuid();
+        var settings = new StubSettings
+        {
+            LastGameId = GameId.PathOfExile1,
+            LastBuildId = id,
+        };
+        var savedBuild = new SavedBuild(
+            id,
+            "Saved Scion",
+            GameId.PathOfExile1,
+            "3.29.0",
+            new ImportedBuild(0, 0, 0, [2], [], new Dictionary<int, int>(), "3.29.0", "test"),
+            null,
+            [],
+            DateTimeOffset.UtcNow);
+
+        var vm = new ShellViewModel(
+            new GameRegistry(),
+            CreateWorkspaceFactory(),
+            settings,
+            new StaticBuildLibrary(savedBuild));
+
+        Assert.Equal(ShellPage.Workspace, vm.CurrentPage);
+        Assert.Equal("Saved Scion", vm.ActiveWorkspace!.BuildName);
+        Assert.Contains(2, vm.ActiveWorkspace.State.Spec.AllocatedNodes);
+        Assert.False(vm.ActiveWorkspace.IsDirty);
     }
 
     [Fact]
@@ -71,6 +103,7 @@ public sealed class ShellViewModelTests
     private sealed class StubSettings : IUserSettingsService
     {
         public GameId? LastGameId { get; set; }
+        public Guid? LastBuildId { get; set; }
         public string? Poe2BuildPlannerDirectory { get; set; }
         public bool Saved { get; private set; }
         public void Save() => Saved = true;
@@ -142,5 +175,21 @@ public sealed class ShellViewModelTests
         public Bitmap? LoadBitmap(GameDefinition game, string relativePath, string? version = null) => null;
 
         public Bitmap? LoadSharedBitmap(string relativePath) => null;
+    }
+
+    private sealed class StaticBuildLibrary(SavedBuild savedBuild) : IBuildLibraryService
+    {
+        public Task<IReadOnlyList<SavedBuildSummary>> ListAsync(GameId? gameId = null, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<SavedBuildSummary>>([
+                new(savedBuild.Id, savedBuild.Name, savedBuild.GameId, savedBuild.TreeVersion, savedBuild.UpdatedAt),
+            ]);
+
+        public Task<SavedBuild?> LoadAsync(Guid id, CancellationToken cancellationToken = default) =>
+            Task.FromResult<SavedBuild?>(id == savedBuild.Id ? savedBuild : null);
+
+        public Task<SavedBuild> SaveAsync(SavedBuild build, CancellationToken cancellationToken = default) =>
+            Task.FromResult(build);
+
+        public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

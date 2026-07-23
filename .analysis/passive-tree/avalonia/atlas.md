@@ -97,3 +97,13 @@ lists only versions with bundled Atlas data; adding 3.28 consists of adding its
 bundle and registering the version. Atlas version migration retains still-present
 connected node IDs, and `AtlasTreeDiff` compares Atlas nodes without passing
 through character-tree diff types.
+
+## Persistence
+
+Atlas allocation state participates in the PathOfAvalonia local build record.
+The record stores the Atlas tree version and allocated node ids alongside the
+character build; restoration loads the recorded Atlas version when it is still
+bundled and then passes the ids through `RestoreConnectedAllocations`. Unknown
+or disconnected ids are pruned by the domain invariant instead of being copied
+directly into mutable state. This is a PathOfAvalonia extension because upstream
+PoB has no Atlas planner or Atlas save section.

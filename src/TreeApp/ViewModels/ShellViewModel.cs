@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -19,19 +20,26 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly GameRegistry _games;
     private readonly IGameWorkspaceFactory _workspaceFactory;
     private readonly IUserSettingsService _settings;
+    private readonly IBuildLibraryService? _buildLibrary;
     private int _workspaceLoadRequest;
 
     public ShellViewModel(
         GameRegistry games,
         IGameWorkspaceFactory workspaceFactory,
-        IUserSettingsService settings)
+        IUserSettingsService settings,
+        IBuildLibraryService? buildLibrary = null)
     {
         _games = games;
         _workspaceFactory = workspaceFactory;
         _settings = settings;
+        _buildLibrary = buildLibrary;
         Games = _games.Games.Select(g => new GameChoiceViewModel(g, settings.LastGameId == g.Id)).ToArray();
 
-        if (settings.LastGameId is { } lastGame && _games.TryGet(lastGame, out var game))
+        if (settings.LastBuildId is { } lastBuildId && _buildLibrary is not null)
+        {
+            _ = OpenSavedBuildAsync(lastBuildId, fallBackToLastGame: true);
+        }
+        else if (settings.LastGameId is { } lastGame && _games.TryGet(lastGame, out var game))
         {
             _ = OpenWorkspaceAsync(game, game.DefaultTreeVersion, "Could not reopen last game.");
         }
@@ -79,7 +87,11 @@ public sealed partial class ShellViewModel : ObservableObject
         IsConfirmingGameChange = false;
     }
 
-    private async Task OpenWorkspaceAsync(GameDefinition game, string treeVersion, string errorMessage)
+    private async Task OpenWorkspaceAsync(
+        GameDefinition game,
+        string treeVersion,
+        string errorMessage,
+        SavedBuild? savedBuild = null)
     {
         var request = ++_workspaceLoadRequest;
         StatusMessage = "Loading tree data…";
@@ -91,6 +103,11 @@ public sealed partial class ShellViewModel : ObservableObject
                 treeVersion,
                 SwitchTreeVersionAsync,
                 BackToLandingCommand);
+            workspace.SetOpenSavedBuildHandler(id => OpenSavedBuildAsync(id, fallBackToLastGame: false));
+            if (savedBuild is not null)
+            {
+                await workspace.RestoreSavedBuildAsync(savedBuild);
+            }
             if (request != _workspaceLoadRequest)
             {
                 return;
@@ -99,6 +116,7 @@ public sealed partial class ShellViewModel : ObservableObject
             CurrentPage = ShellPage.Workspace;
             StatusMessage = string.Empty;
             _settings.LastGameId = game.Id;
+            _settings.LastBuildId = savedBuild?.Id;
             _settings.Save();
             foreach (var choice in Games)
             {
@@ -116,7 +134,51 @@ public sealed partial class ShellViewModel : ObservableObject
     }
 
     private Task SwitchTreeVersionAsync(GameDefinition game, string treeVersion) =>
-        OpenWorkspaceAsync(game, treeVersion, "Could not load the selected tree version.");
+        OpenWorkspaceWithClearedBuildAsync(game, treeVersion);
+
+    private async Task OpenWorkspaceWithClearedBuildAsync(GameDefinition game, string treeVersion)
+    {
+        await OpenWorkspaceAsync(game, treeVersion, "Could not load the selected tree version.");
+    }
+
+    private async Task OpenSavedBuildAsync(Guid id, bool fallBackToLastGame)
+    {
+        if (_buildLibrary is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var savedBuild = await _buildLibrary.LoadAsync(id);
+            if (savedBuild is null || !_games.TryGet(savedBuild.GameId, out var game))
+            {
+                throw new InvalidOperationException("The saved build could not be found.");
+            }
+            var treeVersion = game.TreeVersions.Contains(savedBuild.TreeVersion)
+                ? savedBuild.TreeVersion
+                : game.DefaultTreeVersion;
+            await OpenWorkspaceAsync(game, treeVersion, "Could not open the saved build.", savedBuild);
+        }
+        catch
+        {
+            _settings.LastBuildId = null;
+            _settings.Save();
+            if (fallBackToLastGame
+                && _settings.LastGameId is { } lastGame
+                && _games.TryGet(lastGame, out var fallbackGame))
+            {
+                await OpenWorkspaceAsync(
+                    fallbackGame,
+                    fallbackGame.DefaultTreeVersion,
+                    "The last saved build could not be reopened.");
+            }
+            else
+            {
+                StatusMessage = "The saved build could not be opened.";
+            }
+        }
+    }
 
     private void ReturnToLanding()
     {

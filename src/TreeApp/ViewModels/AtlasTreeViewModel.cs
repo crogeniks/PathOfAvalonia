@@ -31,6 +31,7 @@ public sealed partial class AtlasTreeViewModel : ObservableObject
     private IReadOnlyDictionary<int, string> _searchIndex;
     private int _versionLoadRequest;
     private int _diffLoadRequest;
+    private bool _suppressVersionSelectionLoad;
     private AtlasPassiveSpec _spec;
     private int? _hoverNodeId;
     private AtlasHoverPath _hoverPath = AtlasHoverPath.Empty;
@@ -159,10 +160,30 @@ public sealed partial class AtlasTreeViewModel : ObservableObject
 
     async partial void OnSelectedVersionChanged(string value)
     {
-        if (string.IsNullOrWhiteSpace(value) || value == Tree.Version)
+        if (_suppressVersionSelectionLoad || string.IsNullOrWhiteSpace(value) || value == Tree.Version)
         {
             return;
         }
+        await LoadVersionAsync(value);
+    }
+
+    public async Task RestoreStateAsync(string? version, IEnumerable<int> allocatedNodeIds)
+    {
+        if (!string.IsNullOrWhiteSpace(version)
+            && VersionOptions.Contains(version, StringComparer.Ordinal)
+            && version != Tree.Version)
+        {
+            _suppressVersionSelectionLoad = true;
+            SelectedVersion = version;
+            _suppressVersionSelectionLoad = false;
+            await LoadVersionAsync(version);
+        }
+
+        _spec.RestoreConnectedAllocations(allocatedNodeIds);
+    }
+
+    private async Task LoadVersionAsync(string value)
+    {
         var request = ++_versionLoadRequest;
         IsLoading = true;
         StatusMessage = $"Loading Atlas {value}…";

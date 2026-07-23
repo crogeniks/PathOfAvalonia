@@ -9,6 +9,7 @@ namespace PathOfAvalonia.TreeApp.Services;
 public interface IUserSettingsService
 {
     GameId? LastGameId { get; set; }
+    Guid? LastBuildId { get; set; }
     string? Poe2BuildPlannerDirectory { get; set; }
     void Save();
 }
@@ -29,6 +30,7 @@ public sealed class UserSettingsService : IUserSettingsService
     }
 
     public GameId? LastGameId { get; set; }
+    public Guid? LastBuildId { get; set; }
     public string? Poe2BuildPlannerDirectory { get; set; }
 
     public void Save()
@@ -37,6 +39,7 @@ public sealed class UserSettingsService : IUserSettingsService
         var dto = new SettingsDto
         {
             LastGameId = LastGameId?.ToString(),
+            LastBuildId = LastBuildId?.ToString("D"),
             Poe2BuildPlannerDirectory = Poe2BuildPlannerDirectory,
         };
         File.WriteAllText(_path, JsonSerializer.Serialize(dto, JsonOpts));
@@ -55,6 +58,10 @@ public sealed class UserSettingsService : IUserSettingsService
             {
                 LastGameId = gameId;
             }
+            if (Guid.TryParse(dto?.LastBuildId, out var buildId))
+            {
+                LastBuildId = buildId;
+            }
             Poe2BuildPlannerDirectory = dto?.Poe2BuildPlannerDirectory;
         }
         catch
@@ -72,6 +79,7 @@ public sealed class UserSettingsService : IUserSettingsService
     private sealed class SettingsDto
     {
         [JsonPropertyName("lastGameId")] public string? LastGameId { get; set; }
+        [JsonPropertyName("lastBuildId")] public string? LastBuildId { get; set; }
         [JsonPropertyName("poe2BuildPlannerDirectory")] public string? Poe2BuildPlannerDirectory { get; set; }
     }
 }

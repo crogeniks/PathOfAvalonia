@@ -96,6 +96,10 @@ public sealed class CoreUserJourneyHeadlessTests
         var poe1Window = Show(poe1View);
         try
         {
+            Assert.True(Required<TextBox>(poe1View, "BuildNameInput").IsVisible);
+            Assert.True(Required<Button>(poe1View, "SaveBuildButton").IsVisible);
+            Assert.True(Required<Button>(poe1View, "SaveBuildAsButton").IsVisible);
+            Assert.True(Required<ComboBox>(poe1View, "SavedBuildSelector").IsVisible);
             Assert.True(Required<ComboBox>(poe1View, "TreeVersionSelector").IsVisible);
             Assert.True(Required<ComboBox>(poe1View, "DiffTreeVersionSelector").IsVisible);
             Assert.False(Required<Button>(poe1View, "ImportBuildPlannerButton").IsVisible);
@@ -541,6 +545,7 @@ public sealed class CoreUserJourneyHeadlessTests
     private sealed class StubSettings : IUserSettingsService
     {
         public GameId? LastGameId { get; set; }
+        public Guid? LastBuildId { get; set; }
         public string? Poe2BuildPlannerDirectory { get; set; }
         public void Save() { }
     }

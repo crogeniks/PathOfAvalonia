@@ -221,6 +221,7 @@ public partial class EquipmentViewModel : ObservableObject
     public ImportedBuild ApplyToBuild(ImportedBuild build) => _workspace.ApplyTo(build) with
     {
         CharacterLevel = CharacterLevel,
+        Skills = build.Skills with { ActiveSkillSetIndex = SelectedSkillSetIndex },
     };
 
     public void SetPassivePreview(PassiveAllocationPreview preview)
