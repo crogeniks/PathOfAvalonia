@@ -69,7 +69,7 @@
             </Grid>
         </Border>
         <TabControl Name="WorkspaceTabs" Grid.Row="1" Background="#101018">
-            <TabItem Header="Passive Tree">
+            <TabItem Name="PassiveTreeTab" Header="Passive Tree">
                 <Grid Name="TreeRoot" Background="#101018" ColumnDefinitions="286,*" RowDefinitions="*,Auto">
                     <local:BasicStatsSidebarView Name="TreeStatsSidebar"
                                                  Grid.Column="0"
@@ -225,29 +225,14 @@
                     </Border>
                 </Grid>
             </TabItem>
+            <TabItem Name="SkillsTab" Header="Skills" IsEnabled="{Binding SupportsEquipment}">
+                <local:SkillsView DataContext="{Binding State.Equipment}"/>
+            </TabItem>
             <TabItem Name="EquipmentTab" Header="Equipment" IsEnabled="{Binding SupportsEquipment}">
                 <local:EquipmentView DataContext="{Binding State.Equipment}"/>
             </TabItem>
             <TabItem Name="BuildOutputTab" Header="Calculations" IsEnabled="{Binding SupportsEquipment}">
-                <Grid RowDefinitions="Auto,*" Background="#101018">
-                    <StackPanel Orientation="Horizontal"
-                                Spacing="8"
-                                Margin="14,12,14,4"
-                                HorizontalAlignment="Left"
-                                DataContext="{Binding State.Equipment}"
-                                x:DataType="vm:EquipmentViewModel"
-                                IsVisible="{Binding HasSkillSetVariants}">
-                        <TextBlock Text="Skill set"
-                                   Foreground="#EAEAEA"
-                                   FontWeight="Bold"
-                                   VerticalAlignment="Center"/>
-                        <ComboBox Width="260"
-                                  ItemsSource="{Binding SkillSetOptions}"
-                                  SelectedIndex="{Binding SelectedSkillSetIndex}"
-                                  DisplayMemberBinding="{Binding DisplayName}"/>
-                    </StackPanel>
-                    <local:BuildOutputView Grid.Row="1" DataContext="{Binding State.Equipment}"/>
-                </Grid>
+                <local:BuildOutputView DataContext="{Binding State.Equipment}"/>
             </TabItem>
             <TabItem Name="AtlasTreeTab" Header="Atlas Tree" IsVisible="{Binding HasAtlasTree}">
                 <Grid DataContext="{Binding Atlas}"

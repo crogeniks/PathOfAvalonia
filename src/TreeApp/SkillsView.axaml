@@ -1,0 +1,317 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PathOfAvalonia.TreeApp.ViewModels"
+             x:Class="PathOfAvalonia.TreeApp.SkillsView"
+             x:DataType="vm:EquipmentViewModel"
+             Background="#0C0D12">
+    <UserControl.Styles>
+        <Style Selector="TextBlock.sectionTitle">
+            <Setter Property="Foreground" Value="#F4F4F8"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="TextBlock.muted">
+            <Setter Property="Foreground" Value="#85899A"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style Selector="Border.panel">
+            <Setter Property="Background" Value="#111219"/>
+            <Setter Property="BorderBrush" Value="#252731"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="ListBox.skillGroups">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="ListBox.skillGroups ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,0,7"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="ListBox.skillGroups ListBoxItem:selected">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
+        <Style Selector="ListBox.skillGroups ListBoxItem:selected Border.skillGroupCard">
+            <Setter Property="Background" Value="#25243A"/>
+            <Setter Property="BorderBrush" Value="#7164D9"/>
+        </Style>
+        <Style Selector="Border.detailField">
+            <Setter Property="Background" Value="#171821"/>
+            <Setter Property="BorderBrush" Value="#252733"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="10,8"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="72,*">
+        <Border Background="#12131A"
+                BorderBrush="#292B35"
+                BorderThickness="0,0,0,1"
+                Padding="18,10">
+            <Grid ColumnDefinitions="Auto,36,Auto,8,260,*"
+                  VerticalAlignment="Center">
+                <StackPanel>
+                    <TextBlock Text="Skills"
+                               Foreground="#F6F6FA"
+                               FontSize="18"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Text="Imported socket groups and gems (read-only)"
+                               Classes="muted"/>
+                </StackPanel>
+                <TextBlock Grid.Column="2"
+                           Text="Skill set"
+                           Foreground="#A5A8B6"
+                           VerticalAlignment="Center"/>
+                <ComboBox Grid.Column="4"
+                          Name="SkillSetSelector"
+                          ItemsSource="{Binding SkillSetOptions}"
+                          SelectedIndex="{Binding SelectedSkillSetIndex}"
+                          DisplayMemberBinding="{Binding DisplayName}"
+                          PlaceholderText="No imported skill sets"/>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" ColumnDefinitions="360,*">
+            <Border Classes="panel" BorderThickness="0,0,1,0">
+                <Grid RowDefinitions="Auto,*">
+                    <StackPanel Margin="16,14,16,10" Spacing="3">
+                        <TextBlock Text="Socket groups" Classes="sectionTitle"/>
+                        <TextBlock Text="Select a group to inspect its linked gems"
+                                   Classes="muted"/>
+                    </StackPanel>
+                    <Grid Grid.Row="1">
+                        <ListBox Name="SkillGroupList"
+                                 Classes="skillGroups"
+                                 Margin="12,0,10,12"
+                                 ItemsSource="{Binding SkillGroups}"
+                                 SelectedItem="{Binding SelectedSkillGroup}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="vm:ImportedSkillGroupViewModel">
+                                    <Border Classes="skillGroupCard"
+                                            Padding="11,10"
+                                            Background="#16171F"
+                                            BorderBrush="#282A35"
+                                            BorderThickness="1"
+                                            CornerRadius="7"
+                                            Opacity="{Binding DisplayOpacity}">
+                                        <Grid ColumnDefinitions="4,*,Auto">
+                                            <Border Background="#7164D9"
+                                                    CornerRadius="2"
+                                                    IsVisible="{Binding IsMainSkillGroup}"/>
+                                            <StackPanel Grid.Column="1"
+                                                        Margin="10,0,8,0"
+                                                        Spacing="3">
+                                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                                    <TextBlock Text="{Binding Header}"
+                                                               Foreground="#E7E7EC"
+                                                               FontWeight="SemiBold"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <Border Background="#39335E"
+                                                            CornerRadius="8"
+                                                            Padding="6,1"
+                                                            IsVisible="{Binding IsMainSkillGroup}">
+                                                        <TextBlock Text="MAIN"
+                                                                   Foreground="#C9C2FF"
+                                                                   FontSize="9"
+                                                                   FontWeight="Bold"/>
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding SocketLocation}"
+                                                           Foreground="#8F94A8"
+                                                           FontSize="11"/>
+                                                <TextBlock Text="{Binding MainSkill, StringFormat='Main skill: {0}'}"
+                                                           Foreground="#BFC8E8"
+                                                           FontSize="11"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2"
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Center"
+                                                        Spacing="3">
+                                                <TextBlock Text="{Binding GemCount}"
+                                                           Foreground="#A8ABBA"
+                                                           FontSize="10"
+                                                           HorizontalAlignment="Right"/>
+                                                <TextBlock Text="Full DPS"
+                                                           Foreground="#D8D090"
+                                                           FontSize="9"
+                                                           IsVisible="{Binding IncludeInFullDps}"
+                                                           HorizontalAlignment="Right"/>
+                                                <TextBlock Text="Disabled"
+                                                           Foreground="#A66E6E"
+                                                           FontSize="9"
+                                                           IsVisible="{Binding IsDisabled}"
+                                                           HorizontalAlignment="Right"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <TextBlock Text="Import a build to see its skill sets and socket groups."
+                                   Margin="28"
+                                   MaxWidth="250"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   Foreground="#74788A"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   IsVisible="{Binding !HasSkillGroups}"/>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Column="1">
+                <ScrollViewer Name="SkillGroupDetail"
+                              HorizontalScrollBarVisibility="Disabled"
+                              IsVisible="{Binding HasSelectedSkillGroup}">
+                    <StackPanel Margin="24,20,28,24"
+                                MaxWidth="920"
+                                HorizontalAlignment="Stretch"
+                                DataContext="{Binding SelectedSkillGroup}"
+                                x:DataType="vm:ImportedSkillGroupViewModel"
+                                Spacing="18">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="{Binding Header}"
+                                           Foreground="#F4F4F8"
+                                           FontSize="22"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding MainSkill, StringFormat='Main active skill: {0}'}"
+                                           Foreground="#AEB8DE"
+                                           FontSize="12"/>
+                            </StackPanel>
+                            <Border Grid.Column="1"
+                                    Background="#39335E"
+                                    CornerRadius="10"
+                                    Padding="9,4"
+                                    VerticalAlignment="Top"
+                                    IsVisible="{Binding IsMainSkillGroup}">
+                                <TextBlock Text="MAIN SKILL GROUP"
+                                           Foreground="#D4CEFF"
+                                           FontSize="10"
+                                           FontWeight="Bold"/>
+                            </Border>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,12,*,12,*"
+                              RowDefinitions="Auto,10,Auto">
+                            <Border Classes="detailField">
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="Socketed in" Classes="muted"/>
+                                    <TextBlock Text="{Binding SocketLocation}" Foreground="#E0E1E7"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Classes="detailField">
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="Skill set" Classes="muted"/>
+                                    <TextBlock Text="{Binding SkillSetName}" Foreground="#E0E1E7"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="4" Classes="detailField">
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="Group count" Classes="muted"/>
+                                    <TextBlock Text="{Binding GroupCount}" Foreground="#E0E1E7"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Row="2" Classes="detailField">
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="State" Classes="muted"/>
+                                    <TextBlock Text="{Binding State}" Foreground="#E0E1E7"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Row="2" Grid.Column="2" Classes="detailField">
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="Full DPS" Classes="muted"/>
+                                    <TextBlock Text="{Binding FullDpsState}" Foreground="#E0E1E7"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Row="2"
+                                    Grid.Column="4"
+                                    Classes="detailField"
+                                    IsVisible="{Binding HasSource}">
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="Granted by" Classes="muted"/>
+                                    <TextBlock Text="{Binding Source}"
+                                               Foreground="#E0E1E7"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <StackPanel Spacing="8">
+                            <Grid ColumnDefinitions="*,72,82,64,88"
+                                  Margin="11,0">
+                                <TextBlock Text="Gem" Classes="muted"/>
+                                <TextBlock Grid.Column="1" Text="Level" Classes="muted"/>
+                                <TextBlock Grid.Column="2" Text="Quality" Classes="muted"/>
+                                <TextBlock Grid.Column="3" Text="Count" Classes="muted"/>
+                                <TextBlock Grid.Column="4" Text="State" Classes="muted"/>
+                            </Grid>
+                            <ItemsControl Name="SkillGemList"
+                                          ItemsSource="{Binding Gems}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:ImportedGemViewModel">
+                                        <Border Margin="0,0,0,6"
+                                                Padding="11,10"
+                                                Background="#15161E"
+                                                BorderBrush="#272934"
+                                                BorderThickness="1"
+                                                CornerRadius="6"
+                                                Opacity="{Binding DisplayOpacity}">
+                                            <Grid ColumnDefinitions="*,72,82,64,88">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}"
+                                                               Foreground="#D7DDF3"
+                                                               FontWeight="SemiBold"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding Metadata}"
+                                                               Foreground="#777C90"
+                                                               FontSize="10"
+                                                               IsVisible="{Binding HasMetadata}"/>
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding Level}"
+                                                           Foreground="#B6B8C4"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Grid.Column="2"
+                                                           Text="{Binding Quality}"
+                                                           Foreground="#B6B8C4"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Grid.Column="3"
+                                                           Text="{Binding Count}"
+                                                           Foreground="#B6B8C4"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Grid.Column="4"
+                                                           Text="{Binding State}"
+                                                           Foreground="#B6B8C4"
+                                                           VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <StackPanel HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="5"
+                            IsVisible="{Binding !HasSelectedSkillGroup}">
+                    <TextBlock Text="No socket group selected"
+                               Foreground="#A5A8B6"
+                               FontSize="16"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="Choose a socket group from the list to inspect its gems."
+                               Foreground="#666A7A"
+                               FontSize="11"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

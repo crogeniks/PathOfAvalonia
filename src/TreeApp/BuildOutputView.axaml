@@ -133,34 +133,6 @@
                     </ItemsControl>
                 </StackPanel>
 
-                <StackPanel IsVisible="{Binding HasSkillGroups}" Spacing="6">
-                    <TextBlock Text="Imported Skill Groups"
-                               Foreground="#DDDDEE"
-                               FontWeight="Bold"
-                               FontSize="14"/>
-                    <ItemsControl ItemsSource="{Binding SkillGroups}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="vm:ImportedSkillGroupViewModel">
-                                <Border Margin="0,2" Padding="8" Background="#141420" BorderBrush="#252536" BorderThickness="1" CornerRadius="4">
-                                    <StackPanel Spacing="3">
-                                        <TextBlock Text="{Binding Header}" Foreground="#DDDDDD" FontWeight="Bold" FontSize="12" TextWrapping="Wrap"/>
-                                        <TextBlock Text="{Binding Metadata}" IsVisible="{Binding HasMetadata}" Foreground="#8888AA" FontSize="10" TextWrapping="Wrap"/>
-                                        <ItemsControl ItemsSource="{Binding Gems}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate DataType="vm:ImportedGemViewModel">
-                                                    <Grid ColumnDefinitions="*,Auto" Margin="0,1">
-                                                        <TextBlock Grid.Column="0" Text="{Binding Name}" Foreground="#BFC8E8" FontSize="11" TextWrapping="Wrap"/>
-                                                        <TextBlock Grid.Column="1" Text="{Binding Metadata}" IsVisible="{Binding HasMetadata}" Foreground="#8888AA" FontSize="10" Margin="8,0,0,0"/>
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
             </StackPanel>
         </ScrollViewer>
     </Grid>

@@ -34,3 +34,12 @@ Name — Level — Quality — Enabled — Count. Order is preserved as displaye
 ## Skill Set Management
 
 Multiple skill sets per build (mapping / bossing / level-up). Each set owns its full socket-group list. Switching is a reference swap.
+
+## Current Avalonia presentation
+
+Skills are presented in their own workspace tab between Passive Tree and
+Equipment. The tab keeps PoB's skill-set selector and socket-group
+master/detail layout, but is intentionally read-only at the current porting
+milestone: users can switch sets and select groups, while group and gem values
+are displayed rather than edited. Calculation-only skill DPS metrics remain in
+the Calculations tab.

@@ -286,6 +286,8 @@ public sealed class MainWindowViewModelTests
         equipment.SelectedSkillSetIndex = 0;
 
         Assert.Equal("Spark", Assert.Single(equipment.SkillGroups).Header);
+        Assert.True(equipment.IsDirty);
+        Assert.Equal(0, equipment.ApplyToBuild(build).Skills.ActiveSkillSetIndex);
     }
 
     [Fact]

@@ -104,8 +104,15 @@ public sealed class CoreUserJourneyHeadlessTests
             Assert.True(Required<ComboBox>(poe1View, "DiffTreeVersionSelector").IsVisible);
             Assert.False(Required<Button>(poe1View, "ImportBuildPlannerButton").IsVisible);
             Assert.False(Required<Button>(poe1View, "ExportBuildPlannerButton").IsVisible);
+            Assert.True(Required<TabItem>(poe1View, "SkillsTab").IsEnabled);
             Assert.True(Required<TabItem>(poe1View, "EquipmentTab").IsEnabled);
             Assert.True(Required<TabItem>(poe1View, "BuildOutputTab").IsEnabled);
+            Assert.Equal(
+                ["Passive Tree", "Skills", "Equipment", "Calculations", "Atlas Tree"],
+                Required<TabControl>(poe1View, "WorkspaceTabs")
+                    .Items
+                    .OfType<TabItem>()
+                    .Select(tab => tab.Header));
         }
         finally
         {
@@ -122,6 +129,7 @@ public sealed class CoreUserJourneyHeadlessTests
             Assert.True(Required<Button>(poe2View, "ImportBuildPlannerButton").IsVisible);
             Assert.True(Required<Button>(poe2View, "ExportBuildPlannerButton").IsVisible);
             Assert.False(Required<Button>(poe2View, "ExportBuildPlannerButton").IsEnabled);
+            Assert.True(Required<TabItem>(poe2View, "SkillsTab").IsEnabled);
             Assert.True(Required<TabItem>(poe2View, "EquipmentTab").IsEnabled);
             Assert.True(Required<TabItem>(poe2View, "BuildOutputTab").IsEnabled);
         }
@@ -318,7 +326,7 @@ public sealed class CoreUserJourneyHeadlessTests
             Assert.Contains("1 nodes applied", Required<TextBlock>(view, "ImportStatusText").Text);
 
             var tabs = Required<TabControl>(view, "WorkspaceTabs");
-            tabs.SelectedIndex = 1;
+            tabs.SelectedItem = Required<TabItem>(view, "EquipmentTab");
             Dispatcher.UIThread.RunJobs();
             RequiredVisual<ListBox>(view, "SlotsList").SelectedItem =
                 Assert.Single(workspace.State.Equipment.Slots, slot => slot.Name == "Ring 1");

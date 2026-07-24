@@ -16,10 +16,12 @@ public partial class EquipmentViewModel : ObservableObject
     private readonly EquipmentWorkspace _workspace;
     private readonly PassiveSpec? _spec;
     private IReadOnlyList<ImportedSkillSet> _importedSkillSets = [];
+    private int _mainSocketGroupIndex;
     private bool _synchronizingLoadout;
     private bool _synchronizingSlots;
     private bool _synchronizingTreeJewels;
     private bool _synchronizingCharacterLevel;
+    private bool _synchronizingSkillSet;
     private int? _editorItemId;
     private PassiveAllocationPreview _passiveAllocationPreview = PassiveAllocationPreview.None;
     private HashSet<int> _visibleJewelSocketIds = [];
@@ -133,6 +135,10 @@ public partial class EquipmentViewModel : ObservableObject
     public partial ObservableCollection<ImportedSkillGroupViewModel> SkillGroups { get; set; } = new();
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedSkillGroup))]
+    public partial ImportedSkillGroupViewModel? SelectedSkillGroup { get; set; }
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSkillSetVariants))]
     public partial ObservableCollection<ImportedSkillSetOptionViewModel> SkillSetOptions { get; set; } = new();
 
@@ -148,6 +154,7 @@ public partial class EquipmentViewModel : ObservableObject
     public bool HasTreeCalculatedStats => TreeCalculatedStats is not null;
     public bool HasPassivePreview => PassivePreview is not null;
     public bool HasSkillGroups => SkillGroups.Count > 0;
+    public bool HasSelectedSkillGroup => SelectedSkillGroup is not null;
     public bool HasContent => HasItems || HasMetrics || HasCalculatedStats || HasSkillGroups;
     public bool HasSkillSetVariants => SkillSetOptions.Count > 1;
     public bool HasSelectedSlot => SelectedSlot is not null;
@@ -174,11 +181,14 @@ public partial class EquipmentViewModel : ObservableObject
             ? ImportedBuildMetricsViewModel.FromImported(build.Metrics)
             : null;
         _importedSkillSets = build.Skills.SkillSets;
+        _mainSocketGroupIndex = build.Skills.MainSocketGroupIndex;
         SkillSetOptions = new ObservableCollection<ImportedSkillSetOptionViewModel>(
             _importedSkillSets.Select(set => new ImportedSkillSetOptionViewModel(set.Index, set.DisplayName)));
+        _synchronizingSkillSet = true;
         SelectedSkillSetIndex = build.Skills.ActiveSkillSetIndex >= 0 && build.Skills.ActiveSkillSetIndex < _importedSkillSets.Count
             ? build.Skills.ActiveSkillSetIndex
             : 0;
+        _synchronizingSkillSet = false;
         RefreshSkillGroups();
         RefreshEquipment(preserveSelectedItemId: null);
         RecalculateStats();
@@ -193,9 +203,13 @@ public partial class EquipmentViewModel : ObservableObject
         _synchronizingCharacterLevel = false;
         Metrics = null;
         _importedSkillSets = [];
+        _mainSocketGroupIndex = 0;
         SkillSetOptions = new ObservableCollection<ImportedSkillSetOptionViewModel>();
+        _synchronizingSkillSet = true;
         SelectedSkillSetIndex = 0;
+        _synchronizingSkillSet = false;
         SkillGroups = new ObservableCollection<ImportedSkillGroupViewModel>();
+        SelectedSkillGroup = null;
         IsEditorOpen = false;
         IsConfirmingItemDelete = false;
         RefreshEquipment(preserveSelectedItemId: null);
@@ -209,9 +223,13 @@ public partial class EquipmentViewModel : ObservableObject
         _workspace.Reset();
         Metrics = null;
         _importedSkillSets = [];
+        _mainSocketGroupIndex = 0;
         SkillSetOptions = new ObservableCollection<ImportedSkillSetOptionViewModel>();
+        _synchronizingSkillSet = true;
         SelectedSkillSetIndex = 0;
+        _synchronizingSkillSet = false;
         SkillGroups = new ObservableCollection<ImportedSkillGroupViewModel>();
+        SelectedSkillGroup = null;
         EmptyMessage = "Equipment is not available for this game yet.";
         RefreshEquipment(preserveSelectedItemId: null);
         EmptyMessage = "Equipment is not available for this game yet.";
@@ -457,7 +475,14 @@ public partial class EquipmentViewModel : ObservableObject
         NotifyEquipmentChanged();
     }
 
-    partial void OnSelectedSkillSetIndexChanged(int value) => RefreshSkillGroups();
+    partial void OnSelectedSkillSetIndexChanged(int value)
+    {
+        RefreshSkillGroups();
+        if (!_synchronizingSkillSet)
+        {
+            NotifyEquipmentChanged();
+        }
+    }
 
     private void RefreshEquipment(int? preserveSelectedItemId)
     {
@@ -824,12 +849,18 @@ public partial class EquipmentViewModel : ObservableObject
         if (SelectedSkillSetIndex < 0 || SelectedSkillSetIndex >= _importedSkillSets.Count)
         {
             SkillGroups = new ObservableCollection<ImportedSkillGroupViewModel>();
+            SelectedSkillGroup = null;
             return;
         }
 
         var set = _importedSkillSets[SelectedSkillSetIndex];
         SkillGroups = new ObservableCollection<ImportedSkillGroupViewModel>(
-            set.Groups.Select(group => ImportedSkillGroupViewModel.FromImported(set, group)));
+            set.Groups.Select(group => ImportedSkillGroupViewModel.FromImported(
+                set,
+                group,
+                group.Index == _mainSocketGroupIndex)));
+        SelectedSkillGroup = SkillGroups.FirstOrDefault(group => group.IsMainSkillGroup)
+            ?? SkillGroups.FirstOrDefault();
     }
 
     private static string GroupName(ImportedItem item)
@@ -1330,12 +1361,39 @@ public sealed class ImportedSkillGroupViewModel
 {
     public string Header { get; }
     public string Metadata { get; }
+    public string SkillSetName { get; }
+    public string SocketLocation { get; }
+    public string Source { get; }
+    public string State { get; }
+    public string FullDpsState { get; }
+    public string GroupCount { get; }
+    public string GemCount { get; }
+    public string MainSkill { get; }
+    public bool IsEnabled { get; }
+    public bool IsDisabled => !IsEnabled;
+    public double DisplayOpacity => IsEnabled ? 1 : 0.58;
+    public bool IncludeInFullDps { get; }
+    public bool IsMainSkillGroup { get; }
+    public bool HasSource => !string.IsNullOrWhiteSpace(Source);
     public ObservableCollection<ImportedGemViewModel> Gems { get; }
     public bool HasMetadata => !string.IsNullOrWhiteSpace(Metadata);
 
-    private ImportedSkillGroupViewModel(ImportedSkillSet set, ImportedSkillGroup group)
+    private ImportedSkillGroupViewModel(ImportedSkillSet set, ImportedSkillGroup group, bool isMainSkillGroup)
     {
         Header = group.Label;
+        SkillSetName = set.DisplayName;
+        SocketLocation = string.IsNullOrWhiteSpace(group.Slot) ? "Not assigned" : group.Slot;
+        Source = group.Source ?? string.Empty;
+        IsEnabled = group.Enabled;
+        IncludeInFullDps = group.IncludeInFullDps;
+        IsMainSkillGroup = isMainSkillGroup;
+        State = group.Enabled ? "Enabled" : "Disabled";
+        FullDpsState = group.IncludeInFullDps ? "Included" : "Not included";
+        GroupCount = group.GroupCount.ToString();
+        GemCount = group.Gems.Count == 1 ? "1 gem" : $"{group.Gems.Count} gems";
+        MainSkill = group.MainActiveSkillIndex >= 0 && group.MainActiveSkillIndex < group.Gems.Count
+            ? group.Gems[group.MainActiveSkillIndex].NameSpec
+            : group.Gems.FirstOrDefault(gem => gem.Enabled)?.NameSpec ?? "None";
         var parts = new List<string> { set.DisplayName };
         if (!string.IsNullOrWhiteSpace(group.Slot))
         {
@@ -1354,20 +1412,33 @@ public sealed class ImportedSkillGroupViewModel
         Gems = new ObservableCollection<ImportedGemViewModel>(group.Gems.Select(ImportedGemViewModel.FromImported));
     }
 
-    public static ImportedSkillGroupViewModel FromImported(ImportedSkillSet set, ImportedSkillGroup group) => new(set, group);
+    public static ImportedSkillGroupViewModel FromImported(
+        ImportedSkillSet set,
+        ImportedSkillGroup group,
+        bool isMainSkillGroup = false) =>
+        new(set, group, isMainSkillGroup);
 }
 
 public sealed class ImportedGemViewModel
 {
     public string Name { get; }
     public string Metadata { get; }
+    public string Level { get; }
+    public string Quality { get; }
+    public string Count { get; }
+    public string State { get; }
     public bool IsDisabled { get; }
+    public double DisplayOpacity => IsDisabled ? 0.58 : 1;
     public bool HasMetadata => !string.IsNullOrWhiteSpace(Metadata);
 
     private ImportedGemViewModel(ImportedGem gem)
     {
         Name = gem.NameSpec;
         IsDisabled = !gem.Enabled;
+        Level = gem.Level?.ToString() ?? "—";
+        Quality = gem.Quality is { } qualityValue ? $"{qualityValue}%" : "—";
+        Count = gem.Count.ToString();
+        State = gem.Enabled ? "Enabled" : "Disabled";
         var parts = new List<string>();
         if (gem.Level is { } level)
         {
