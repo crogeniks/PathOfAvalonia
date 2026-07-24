@@ -48,9 +48,14 @@ public sealed class BuildLibraryService : IBuildLibraryService
         _directory = Path.Combine(paths.ConfigRoot, "PathOfAvalonia", "builds");
     }
 
-    public async Task<IReadOnlyList<SavedBuildSummary>> ListAsync(
+    public Task<IReadOnlyList<SavedBuildSummary>> ListAsync(
         GameId? gameId = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        Task.Run(() => ListCoreAsync(gameId, cancellationToken), cancellationToken);
+
+    private async Task<IReadOnlyList<SavedBuildSummary>> ListCoreAsync(
+        GameId? gameId,
+        CancellationToken cancellationToken)
     {
         if (!Directory.Exists(_directory))
         {
@@ -63,16 +68,11 @@ public sealed class BuildLibraryService : IBuildLibraryService
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                var envelope = await ReadEnvelopeAsync(path, cancellationToken);
+                var envelope = await ReadSummaryEnvelopeAsync(path, cancellationToken);
                 if (envelope is { FormatVersion: CurrentFormatVersion, Build: { } build }
                     && (gameId is null || build.GameId == gameId))
                 {
-                    summaries.Add(new SavedBuildSummary(
-                        build.Id,
-                        build.Name,
-                        build.GameId,
-                        build.TreeVersion,
-                        build.UpdatedAt));
+                    summaries.Add(build);
                 }
             }
             catch (IOException)
@@ -91,7 +91,10 @@ public sealed class BuildLibraryService : IBuildLibraryService
             .ToArray();
     }
 
-    public async Task<SavedBuild?> LoadAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task<SavedBuild?> LoadAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.Run(() => LoadCoreAsync(id, cancellationToken), cancellationToken);
+
+    private async Task<SavedBuild?> LoadCoreAsync(Guid id, CancellationToken cancellationToken)
     {
         var path = BuildPath(id);
         if (!File.Exists(path))
@@ -160,17 +163,43 @@ public sealed class BuildLibraryService : IBuildLibraryService
 
     private static async Task<SavedBuildEnvelope?> ReadEnvelopeAsync(string path, CancellationToken cancellationToken)
     {
-        await using var stream = new FileStream(
+        await using var stream = OpenRead(path);
+        return await JsonSerializer.DeserializeAsync<SavedBuildEnvelope>(stream, JsonOptions, cancellationToken);
+    }
+
+    private static async Task<SavedBuildSummaryEnvelope?> ReadSummaryEnvelopeAsync(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        await using var stream = OpenRead(path);
+        return await JsonSerializer.DeserializeAsync<SavedBuildSummaryEnvelope>(
+            stream,
+            SummaryJsonOptions,
+            cancellationToken);
+    }
+
+    private static FileStream OpenRead(string path) =>
+        new(
             path,
             FileMode.Open,
             FileAccess.Read,
             FileShare.Read,
             16 * 1024,
             FileOptions.Asynchronous | FileOptions.SequentialScan);
-        return await JsonSerializer.DeserializeAsync<SavedBuildEnvelope>(stream, JsonOptions, cancellationToken);
-    }
+
+    private static readonly JsonSerializerOptions SummaryJsonOptions = CreateSummaryJsonOptions();
 
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
+
+    private static JsonSerializerOptions CreateSummaryJsonOptions()
+    {
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        };
+        options.Converters.Add(new JsonStringEnumConverter());
+        return options;
+    }
 
     private static JsonSerializerOptions CreateJsonOptions()
     {
@@ -193,7 +222,6 @@ public sealed class BuildLibraryService : IBuildLibraryService
         var options = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
             TypeInfoResolver = resolver,
         };
@@ -202,4 +230,5 @@ public sealed class BuildLibraryService : IBuildLibraryService
     }
 
     private sealed record SavedBuildEnvelope(int FormatVersion, SavedBuild Build);
+    private sealed record SavedBuildSummaryEnvelope(int FormatVersion, SavedBuildSummary Build);
 }

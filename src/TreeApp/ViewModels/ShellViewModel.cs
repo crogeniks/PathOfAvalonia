@@ -22,6 +22,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly IUserSettingsService _settings;
     private readonly IBuildLibraryService? _buildLibrary;
     private int _workspaceLoadRequest;
+    private bool _isInitialized;
 
     public ShellViewModel(
         GameRegistry games,
@@ -34,18 +35,24 @@ public sealed partial class ShellViewModel : ObservableObject
         _settings = settings;
         _buildLibrary = buildLibrary;
         Games = _games.Games.Select(g => new GameChoiceViewModel(g, settings.LastGameId == g.Id)).ToArray();
+        CurrentPage = ShellPage.Landing;
+    }
 
-        if (settings.LastBuildId is { } lastBuildId && _buildLibrary is not null)
+    public async Task InitializeAsync()
+    {
+        if (_isInitialized)
         {
-            _ = OpenSavedBuildAsync(lastBuildId, fallBackToLastGame: true);
+            return;
         }
-        else if (settings.LastGameId is { } lastGame && _games.TryGet(lastGame, out var game))
+        _isInitialized = true;
+
+        if (_settings.LastBuildId is { } lastBuildId && _buildLibrary is not null)
         {
-            _ = OpenWorkspaceAsync(game, game.DefaultTreeVersion, "Could not reopen last game.");
+            await OpenSavedBuildAsync(lastBuildId, fallBackToLastGame: true);
         }
-        else
+        else if (_settings.LastGameId is { } lastGame && _games.TryGet(lastGame, out var game))
         {
-            CurrentPage = ShellPage.Landing;
+            await OpenWorkspaceAsync(game, game.DefaultTreeVersion, "Could not reopen last game.");
         }
     }
 
@@ -115,6 +122,7 @@ public sealed partial class ShellViewModel : ObservableObject
             ActiveWorkspace = workspace;
             CurrentPage = ShellPage.Workspace;
             StatusMessage = string.Empty;
+            _ = workspace.LoadSavedBuildOptionsAsync();
             _settings.LastGameId = game.Id;
             _settings.LastBuildId = savedBuild?.Id;
             _settings.Save();

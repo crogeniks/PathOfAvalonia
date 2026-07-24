@@ -52,8 +52,13 @@ The last saved build id is stored in user settings. `ShellViewModel` loads that
 record first on startup, selects its game and character-tree version, creates a
 normal workspace, and restores the snapshot through public domain/view-model
 operations. Missing saves fall back to the last game rather than preventing the
-application from opening. Opening another saved build is blocked while the
-current workspace has unsaved changes.
+application from opening. Startup initialization begins from the window-open
+lifecycle rather than the shell constructor, and persistence deserialization
+runs away from the UI thread. The saved-build selector is populated after the
+workspace is presented, and library listing reads only envelope metadata rather
+than materializing every character snapshot. Together these keep automatic
+restore from delaying the first window/workspace frame. Opening another saved
+build is blocked while the current workspace has unsaved changes.
 
 This is deliberately PathOfAvalonia-owned JSON rather than upstream PoB XML:
 PoB has no Atlas-planner section, while the import model is the canonical

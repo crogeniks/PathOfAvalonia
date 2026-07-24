@@ -59,8 +59,11 @@ versioned envelope. Each record contains its stable id, display name, game,
 character-tree version, `ImportedBuild` snapshot, optional Atlas-tree version,
 Atlas node ids, and last-updated time. Filenames use only generated ids, so user
 build names never participate in path construction. Writes use a same-directory
-temporary file followed by replacement; unreadable or corrupt entries are
-ignored when listing without being deleted.
+temporary file followed by replacement and compact JSON; unreadable or corrupt
+entries are ignored when listing without being deleted. Listing deserializes a
+summary projection of the envelope and skips the character/Atlas payload, so
+its memory and object-materialization cost does not grow with snapshot
+complexity.
 
 The parsed `ImportedItem.Text` projection is omitted from JSON and rebuilt from
 the persisted raw item text on load. This avoids duplicating derived item data.

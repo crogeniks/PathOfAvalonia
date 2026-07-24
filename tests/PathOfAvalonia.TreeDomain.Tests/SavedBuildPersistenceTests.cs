@@ -66,6 +66,38 @@ public sealed class SavedBuildPersistenceTests
     }
 
     [Fact]
+    public async Task BuildLibraryListReadsMetadataWithoutMaterializingBuildPayload()
+    {
+        using var paths = new TemporaryUserPaths();
+        var library = new BuildLibraryService(paths);
+        var id = Guid.NewGuid();
+        var buildsDirectory = Path.Combine(paths.ConfigRoot, "PathOfAvalonia", "builds");
+        Directory.CreateDirectory(buildsDirectory);
+        await File.WriteAllTextAsync(
+            Path.Combine(buildsDirectory, $"{id:N}.json"),
+            $$"""
+            {
+              "formatVersion": 1,
+              "build": {
+                "id": "{{id:D}}",
+                "name": "Metadata only",
+                "gameId": "PathOfExile1",
+                "treeVersion": "3.29.0",
+                "characterBuild": 42,
+                "atlasNodeIds": [],
+                "updatedAt": "2026-07-23T12:00:00+00:00"
+              }
+            }
+            """);
+
+        var summary = Assert.Single(await library.ListAsync(GameId.PathOfExile1));
+
+        Assert.Equal(id, summary.Id);
+        Assert.Equal("Metadata only", summary.Name);
+        await Assert.ThrowsAsync<System.Text.Json.JsonException>(() => library.LoadAsync(id));
+    }
+
+    [Fact]
     public async Task WorkspaceSaveAndRestoreIncludesAtlasAllocations()
     {
         var library = new RecordingBuildLibrary();

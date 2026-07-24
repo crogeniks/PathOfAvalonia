@@ -1,5 +1,7 @@
+using System;
 using System.ComponentModel;
 using Avalonia.Controls;
+using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using PathOfAvalonia.TreeApp.Services;
 using PathOfAvalonia.TreeApp.ViewModels;
@@ -22,6 +24,18 @@ public partial class MainWindow : Window
         DataContext = vm;
         vm.PropertyChanged += OnShellPropertyChanged;
         UpdateShellHost(vm);
+        Opened += OnOpened;
+    }
+
+    private void OnOpened(object? sender, EventArgs e)
+    {
+        Opened -= OnOpened;
+        if (DataContext is ShellViewModel vm)
+        {
+            Dispatcher.UIThread.Post(
+                () => _ = vm.InitializeAsync(),
+                DispatcherPriority.Background);
+        }
     }
 
     private void OnShellPropertyChanged(object? sender, PropertyChangedEventArgs e)

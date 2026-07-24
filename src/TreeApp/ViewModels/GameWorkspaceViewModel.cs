@@ -53,7 +53,6 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
         {
             Atlas.StateChanged += MarkDirty;
         }
-        _ = RefreshSavedBuildsAsync();
     }
 
     public BuildWorkspaceState State { get; }
@@ -125,6 +124,14 @@ public sealed partial class GameWorkspaceViewModel : ObservableObject
             _trackingChanges = true;
         }
         MarkClean();
+    }
+
+    public async Task LoadSavedBuildOptionsAsync()
+    {
+        // The shell starts this only after presenting the workspace. Yield once
+        // so a cached local file cannot make the initial selector scan delay the
+        // first rendered workspace frame.
+        await Task.Yield();
         await RefreshSavedBuildsAsync();
     }
 

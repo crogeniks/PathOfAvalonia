@@ -22,9 +22,10 @@ public sealed class ShellViewModelTests
     }
 
     [Fact]
-    public void OpensRememberedGame()
+    public async Task OpensRememberedGame()
     {
         var vm = CreateViewModel(new StubSettings { LastGameId = GameId.PathOfExile2 });
+        await vm.InitializeAsync();
 
         Assert.Equal(ShellPage.Workspace, vm.CurrentPage);
         Assert.Equal(GameId.PathOfExile2, vm.ActiveWorkspace!.Workspace.Game.Id);
@@ -32,7 +33,7 @@ public sealed class ShellViewModelTests
     }
 
     [Fact]
-    public void RestoresLastSavedBuildAtStartup()
+    public async Task RestoresLastSavedBuildAtStartup()
     {
         var id = Guid.NewGuid();
         var settings = new StubSettings
@@ -50,22 +51,30 @@ public sealed class ShellViewModelTests
             [],
             DateTimeOffset.UtcNow);
 
+        var library = new StaticBuildLibrary(savedBuild);
         var vm = new ShellViewModel(
             new GameRegistry(),
             CreateWorkspaceFactory(),
             settings,
-            new StaticBuildLibrary(savedBuild));
+            library);
+
+        Assert.Equal(0, library.LoadCount);
+
+        await vm.InitializeAsync();
+        await vm.InitializeAsync();
 
         Assert.Equal(ShellPage.Workspace, vm.CurrentPage);
         Assert.Equal("Saved Scion", vm.ActiveWorkspace!.BuildName);
         Assert.Contains(2, vm.ActiveWorkspace.State.Spec.AllocatedNodes);
         Assert.False(vm.ActiveWorkspace.IsDirty);
+        Assert.Equal(1, library.LoadCount);
     }
 
     [Fact]
-    public void Poe1ExposesItsAvailableTreeVersions()
+    public async Task Poe1ExposesItsAvailableTreeVersions()
     {
         var vm = CreateViewModel(new StubSettings { LastGameId = GameId.PathOfExile1 });
+        await vm.InitializeAsync();
         var workspace = vm.ActiveWorkspace!;
 
         Assert.True(workspace.HasTreeVersionOptions);
@@ -179,13 +188,18 @@ public sealed class ShellViewModelTests
 
     private sealed class StaticBuildLibrary(SavedBuild savedBuild) : IBuildLibraryService
     {
+        public int LoadCount { get; private set; }
+
         public Task<IReadOnlyList<SavedBuildSummary>> ListAsync(GameId? gameId = null, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SavedBuildSummary>>([
                 new(savedBuild.Id, savedBuild.Name, savedBuild.GameId, savedBuild.TreeVersion, savedBuild.UpdatedAt),
             ]);
 
-        public Task<SavedBuild?> LoadAsync(Guid id, CancellationToken cancellationToken = default) =>
-            Task.FromResult<SavedBuild?>(id == savedBuild.Id ? savedBuild : null);
+        public Task<SavedBuild?> LoadAsync(Guid id, CancellationToken cancellationToken = default)
+        {
+            LoadCount++;
+            return Task.FromResult<SavedBuild?>(id == savedBuild.Id ? savedBuild : null);
+        }
 
         public Task<SavedBuild> SaveAsync(SavedBuild build, CancellationToken cancellationToken = default) =>
             Task.FromResult(build);
